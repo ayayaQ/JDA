@@ -17,6 +17,7 @@ package net.dv8tion.jda.api;
 
 import net.dv8tion.jda.annotations.DeprecatedSince;
 import net.dv8tion.jda.annotations.ForRemoval;
+import net.dv8tion.jda.api.AccountType;
 import net.dv8tion.jda.api.entities.EmbedType;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.Role;
@@ -423,26 +424,7 @@ public class EmbedBuilder
         }
         return this; 
     }
-    
-    /**
-     * Sets the Color of the embed.
-     *
-     * <a href="https://raw.githubusercontent.com/DV8FromTheWorld/JDA/assets/assets/docs/embeds/02-setColor.png" target="_blank">Example</a>
-     *
-     * @param  color
-     *         The {@link java.awt.Color Color} of the embed
-     *         or {@code null} to use no color
-     *
-     * @return the builder after the color has been set
-     *
-     * @see    #setColor(int)
-     */
-    @Nonnull
-    public EmbedBuilder setColor(@Nullable Color color)
-    {
-        this.color = color == null ? Role.DEFAULT_COLOR_RAW : color.getRGB();
-        return this;
-    }
+
 
     /**
      * Sets the raw RGB color value for the embed.
@@ -454,7 +436,7 @@ public class EmbedBuilder
      *
      * @return the builder after the color has been set
      *
-     * @see    #setColor(java.awt.Color)
+     *
      */
     @Nonnull
     public EmbedBuilder setColor(int color)
