@@ -80,7 +80,7 @@ class SimpleLogger extends MarkerIgnoringBase {
         try {
             prop = System.getProperty(name);
         } catch (SecurityException e) {
-            ; // Ignore
+            // Ignore
         }
         return (prop == null) ? SIMPLE_LOGGER_PROPS.getProperty(name) : prop;
     }
@@ -186,7 +186,7 @@ class SimpleLogger extends MarkerIgnoringBase {
         while ((levelString == null) && (indexOfLastDot > -1)) {
             tempName = tempName.substring(0, indexOfLastDot);
             levelString = getStringProperty(LOG_KEY_PREFIX + tempName, null);
-            indexOfLastDot = String.valueOf(tempName).lastIndexOf(".");
+            indexOfLastDot = tempName.lastIndexOf(".");
         }
         return levelString;
     }
@@ -261,9 +261,9 @@ class SimpleLogger extends MarkerIgnoringBase {
         if (SHOW_SHORT_LOG_NAME) {
             if (shortLogName == null)
                 shortLogName = computeShortName();
-            buf.append(String.valueOf(shortLogName)).append(" - ");
+            buf.append(shortLogName).append(" - ");
         } else if (SHOW_LOG_NAME) {
-            buf.append(String.valueOf(name)).append(" - ");
+            buf.append(name).append(" - ");
         }
 
         // Append the message

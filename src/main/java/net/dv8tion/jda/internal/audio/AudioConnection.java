@@ -578,7 +578,7 @@ public class AudioConnection
 
             nonEncodedBuffer.put(toShort);
         }
-        ((Buffer) nonEncodedBuffer).flip();
+        nonEncodedBuffer.flip();
 
         int result = Opus.INSTANCE.opus_encode(opusEncoder, nonEncodedBuffer, OpusPacket.OPUS_FRAME_SIZE, encoded, encoded.capacity());
         if (result <= 0)
@@ -587,7 +587,7 @@ public class AudioConnection
             return null;
         }
 
-        ((Buffer) encoded).position(0).limit(result);
+        encoded.position(0).limit(result);
         return encoded;
     }
 
@@ -796,7 +796,7 @@ public class AudioConnection
 
         private void ensureEncryptionBuffer(ByteBuffer data)
         {
-            ((Buffer) encryptionBuffer).clear();
+            encryptionBuffer.clear();
             int currentCapacity = encryptionBuffer.remaining();
             int requiredCapacity = AudioPacket.RTP_HEADER_BYTE_LENGTH + data.remaining();
             if (currentCapacity < requiredCapacity)

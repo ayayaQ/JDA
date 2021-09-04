@@ -401,7 +401,7 @@ public class ChannelManagerImpl extends ManagerBase<ChannelManager> implements C
     protected long getId(IPermissionHolder holder)
     {
         if (holder instanceof Role)
-            return ((Role) holder).getIdLong();
+            return holder.getIdLong();
         else
             return ((Member) holder).getUser().getIdLong();
     }
