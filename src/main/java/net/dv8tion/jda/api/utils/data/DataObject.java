@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,21 +17,25 @@
 package net.dv8tion.jda.api.utils.data;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.MapType;
 import net.dv8tion.jda.api.exceptions.ParsingException;
+import net.dv8tion.jda.api.utils.MiscUtil;
+import net.dv8tion.jda.api.utils.data.etf.ExTermDecoder;
+import net.dv8tion.jda.api.utils.data.etf.ExTermEncoder;
+import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.Helpers;
 import org.jetbrains.annotations.Contract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.UncheckedIOException;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -177,6 +181,38 @@ public class DataObject implements SerializableData
         }
         catch (IOException ex)
         {
+            throw new ParsingException(ex);
+        }
+    }
+
+    /**
+     * Parses using {@link ExTermDecoder}.
+     * The provided data must start with the correct version header (131).
+     *
+     * @param  data
+     *         The data to decode
+     *
+     * @throws IllegalArgumentException
+     *         If the provided data is null
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the provided ETF payload is incorrectly formatted or an I/O error occurred
+     *
+     * @return A DataObject instance for the provided payload
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public static DataObject fromETF(@Nonnull byte[] data)
+    {
+        Checks.notNull(data, "Data");
+        try
+        {
+            Map<String, Object> map = ExTermDecoder.unpackMap(ByteBuffer.wrap(data));
+            return new DataObject(map);
+        }
+        catch (Exception ex)
+        {
+            log.error("Failed to parse ETF data {}", Arrays.toString(data), ex);
             throw new ParsingException(ex);
         }
     }
@@ -433,7 +469,7 @@ public class DataObject implements SerializableData
      */
     public long getLong(@Nonnull String key)
     {
-        Long value = get(Long.class, key, Long::parseLong, Number::longValue);
+        Long value = get(Long.class, key, MiscUtil::parseLong, Number::longValue);
         if (value == null)
             throw valueError(key, "long");
         return value;
@@ -573,6 +609,44 @@ public class DataObject implements SerializableData
     }
 
     /**
+     * Resolves a double to a key.
+     * 
+     * @param  key
+     *         The key to check for a value
+     *
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the value is missing, null, or of the wrong type
+     * 
+     * @return The double value for the key
+     */
+    public double getDouble(@Nonnull String key)
+    {
+        Double value = get(Double.class, key, Double::parseDouble, Number::doubleValue);
+        if(value == null)
+            throw valueError(key, "double");
+        return value;
+    }
+
+    /**
+     * Resolves a double to a key.
+     *
+     * @param  key
+     *         The key to check for a value
+     * @param  defaultValue
+     *         Alternative value to use when no value or null value is associated with the key
+     * 
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the value is of the wrong type
+     * 
+     * @return The double value for the key
+     */
+    public double getDouble(@Nonnull String key, double defaultValue)
+    {
+        Double value = get(Double.class, key, Double::parseDouble, Number::doubleValue);
+        return value == null ? defaultValue : value;
+    }
+
+    /**
      * Removes the value associated with the specified key.
      * If no value is associated with the key, this does nothing.
      *
@@ -618,8 +692,8 @@ public class DataObject implements SerializableData
     {
         if (value instanceof SerializableData)
             data.put(key, ((SerializableData) value).toData().data);
-        else if (value instanceof DataArray)
-            data.put(key, ((DataArray) value).data);
+        else if (value instanceof SerializableArray)
+            data.put(key, ((SerializableArray) value).toDataArray().data);
         else
             data.put(key, value);
         return this;
@@ -650,8 +724,9 @@ public class DataObject implements SerializableData
     /**
      * Serialize this object as JSON.
      *
-     * @return a byte array containing the JSON representation of this object.
+     * @return byte array containing the JSON representation of this object
      */
+    @Nonnull
     public byte[] toJson()
     {
         try
@@ -666,12 +741,42 @@ public class DataObject implements SerializableData
         }
     }
 
+    /**
+     * Serializes this object as ETF MAP term.
+     *
+     * @return byte array containing the encoded ETF term
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public byte[] toETF()
+    {
+        ByteBuffer buffer = ExTermEncoder.pack(data);
+        return Arrays.copyOfRange(buffer.array(), buffer.arrayOffset(), buffer.arrayOffset() + buffer.limit());
+    }
+
     @Override
     public String toString()
     {
         try
         {
             return mapper.writeValueAsString(data);
+        }
+        catch (JsonProcessingException e)
+        {
+            throw new ParsingException(e);
+        }
+    }
+
+    @Nonnull
+    public String toPrettyString()
+    {
+        DefaultPrettyPrinter.Indenter indent = new DefaultIndenter("    ", DefaultIndenter.SYS_LF);
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
+        printer.withObjectIndenter(indent).withArrayIndenter(indent);
+        try
+        {
+            return mapper.writer(printer).writeValueAsString(data);
         }
         catch (JsonProcessingException e)
         {
@@ -714,15 +819,17 @@ public class DataObject implements SerializableData
         Object value = data.get(key);
         if (value == null)
             return null;
-        if (type.isAssignableFrom(value.getClass()))
+        if (type.isInstance(value))
             return type.cast(value);
+        if (type == String.class)
+            return type.cast(value.toString());
         // attempt type coercion
         if (value instanceof Number && numberParse != null)
             return numberParse.apply((Number) value);
         else if (value instanceof String && stringParse != null)
             return stringParse.apply((String) value);
 
-        throw new ParsingException(String.format("Cannot parse value for %s into type %s: %s instance of %s",
+        throw new ParsingException(Helpers.format("Cannot parse value for %s into type %s: %s instance of %s",
                                                       key, type.getSimpleName(), value, value.getClass().getSimpleName()));
     }
 }

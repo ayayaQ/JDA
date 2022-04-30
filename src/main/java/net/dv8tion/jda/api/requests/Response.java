@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,9 +47,9 @@ public class Response implements Closeable
     private boolean attemptedParsing = false;
     private Exception exception;
 
-    public Response(@Nullable final okhttp3.Response response, @Nonnull final Exception exception, @Nonnull final Set<String> cfRays)
+    public Response(@Nonnull final Exception exception, @Nonnull final Set<String> cfRays)
     {
-        this(response, response != null ? response.code() : ERROR_CODE, ERROR_MESSAGE, -1, cfRays);
+        this(null, ERROR_CODE, ERROR_MESSAGE, -1, cfRays);
         this.exception = exception;
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,11 @@ import javax.annotation.Nonnull;
  * <br>Every GuildInviteEvent is derived from this event and can be casted.
  *
  * <p>Can be used to detect any GuildInviteEvent.
+ *
+ * <h2>Requirements</h2>
+ *
+ * <p>These events require the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_INVITES GUILD_INVITES} intent to be enabled.
+ * <br>These events will only fire for invite events that occur in channels where you can {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL MANAGE_CHANNEL}.
  */
 public class GenericGuildInviteEvent extends GenericGuildEvent
 {
@@ -109,7 +114,7 @@ public class GenericGuildInviteEvent extends GenericGuildEvent
      * The {@link VoiceChannel} this invite points to.
      *
      * @throws IllegalStateException
-     *         If this did not happen in a channel of type {@link ChannelType#VOICE ChannelType.VOICE}
+     *         If this did not happen in a voice channel or stage channel
      *
      * @return {@link VoiceChannel}
      *
@@ -119,9 +124,28 @@ public class GenericGuildInviteEvent extends GenericGuildEvent
     @Nonnull
     public VoiceChannel getVoiceChannel()
     {
-        if (getChannelType() != ChannelType.VOICE)
-            throw new IllegalStateException("The channel is not of type VOICE");
+        if (!(channel instanceof VoiceChannel))
+            throw new IllegalStateException("The channel is not of type VOICE or STAGE");
         return (VoiceChannel) getChannel();
+    }
+
+    /**
+     * The {@link StageChannel} this invite points to.
+     *
+     * @throws IllegalStateException
+     *         If this did not happen in a channel of type {@link ChannelType#STAGE ChannelType.STAGE}
+     *
+     * @return {@link StageChannel}
+     *
+     * @see    #getChannel()
+     * @see    #getChannelType()
+     */
+    @Nonnull
+    public StageChannel getStageChannel()
+    {
+        if (getChannelType() != ChannelType.STAGE)
+            throw new IllegalStateException("The channel is not of type STAGE");
+        return (StageChannel) getChannel();
     }
 
     /**

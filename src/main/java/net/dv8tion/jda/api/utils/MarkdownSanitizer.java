@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ public class MarkdownSanitizer
     private static final int ESCAPED_QUOTE_BLOCK = Integer.MIN_VALUE | QUOTE_BLOCK;
 
     private static final Pattern codeLanguage = Pattern.compile("^\\w+\n.*", Pattern.MULTILINE | Pattern.DOTALL);
-    private static final Pattern quote = Pattern.compile("> +\\S.*", Pattern.DOTALL | Pattern.MULTILINE);
+    private static final Pattern quote = Pattern.compile("> +.*", Pattern.DOTALL | Pattern.MULTILINE);
     private static final Pattern quoteBlock = Pattern.compile(">>>\\s+\\S.*", Pattern.DOTALL | Pattern.MULTILINE);
 
     private static final TIntObjectMap<String> tokens;
@@ -186,6 +186,95 @@ public class MarkdownSanitizer
                 .withIgnored(ignored)
                 .withStrategy(SanitizationStrategy.ESCAPE)
                 .compute(sequence);
+    }
+
+    /**
+     * Escapes every single markdown formatting token found in the provided string.
+     * <br>Example: {@code escape("**Hello _World_", true)}
+     *
+     * @param sequence
+     *        The string to sanitize
+     * @param single
+     *        Whether it should scape single tokens or not.
+     *
+     * @throws java.lang.IllegalArgumentException
+     *         If provided with null sequence
+     *
+     * @return The string with escaped markdown
+     */
+    @Nonnull
+    public static String escape(@Nonnull String sequence, boolean single)
+    {
+        Checks.notNull(sequence, "Input");
+        if(!single) return escape(sequence);
+
+        StringBuilder builder = new StringBuilder();
+        boolean escaped = false;
+        boolean newline = true;
+        for (int i = 0; i < sequence.length(); i++)
+        {
+            char current = sequence.charAt(i);
+            if (newline)
+            {
+                newline = Character.isWhitespace(current); // might still be a quote if prefixed by whitespace
+                if (current == '>')
+                {
+                    // Check for quote if line starts with angle bracket
+                    if (i + 1 < sequence.length() && Character.isWhitespace(sequence.charAt(i+1)))
+                    {
+                        builder.append("\\>"); // simple quote
+                    }
+                    else if (i + 3 < sequence.length() && sequence.startsWith(">>>", i) && Character.isWhitespace(sequence.charAt(i+3)))
+                    {
+                        builder.append("\\>\\>\\>").append(sequence.charAt(i+3)); // block quote
+                        i += 3; // since we include 3 angle brackets AND whitespace
+                    }
+                    else
+                    {
+                        builder.append(current); // just a normal angle bracket
+                    }
+                    continue;
+                }
+            }
+
+            if (escaped)
+            {
+                builder.append(current);
+                escaped = false;
+                continue;
+            }
+            // Handle average case
+            switch (current)
+            {
+            case '*': // simple markdown escapes for single characters
+            case '_':
+            case '`':
+                builder.append('\\').append(current);
+                break;
+            case '|': // cases that require at least 2 characters in sequence
+            case '~':
+                if (i + 1 < sequence.length() && sequence.charAt(i+1) == current)
+                {
+                    builder.append('\\').append(current)
+                            .append('\\').append(current);
+                    i++;
+                }
+                else
+                    builder.append(current);
+                break;
+            case '\\': // escape character
+                builder.append(current);
+                escaped = true;
+                break;
+            case '\n': // linefeed is a special case for quotes
+                builder.append(current);
+                newline = true;
+                break;
+            default:
+                builder.append(current);
+            }
+        }
+        return builder.toString();
     }
 
     /**
@@ -504,16 +593,14 @@ public class MarkdownSanitizer
         // Special handling for quote
         if (!isIgnored(QUOTE) && quote.matcher(sequence).matches())
         {
-            int end = sequence.indexOf('\n');
-            if (end < 0)
-                end = sequence.length();
-            StringBuilder builder = new StringBuilder(compute(sequence.substring(2, end)));
+            int start = sequence.indexOf('>');
+            if (start < 0)
+                start = 0;
+            StringBuilder builder = new StringBuilder(compute(sequence.substring(start + 2)));
             if (strategy == SanitizationStrategy.ESCAPE)
                 builder.insert(0, "\\> ");
             if (newline)
                 builder.insert(0, '\n');
-            if (end < sequence.length())
-                builder.append(compute(sequence.substring(end)));
             return builder.toString();
 
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,10 @@ public enum ChannelType
      * A {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel}, Guild-Only.
      */
     STORE(6, 0, true),
+    /**
+     * A {@link StageChannel StageChannel}, Guild-Only.
+     */
+    STAGE(13, 1, true),
     /**
      * Unknown Discord channel type. Should never happen and would only possibly happen if Discord implemented a new
      * channel type and JDA had yet to implement support for it.
@@ -97,6 +101,42 @@ public enum ChannelType
     public boolean isGuild()
     {
         return isGuild;
+    }
+
+    /**
+     * Whether channels of this type support audio connections.
+     *
+     * @return True, if channels of this type support audio
+     */
+    public boolean isAudio()
+    {
+        switch (this)
+        {
+            case VOICE:
+            case STAGE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Whether channels of this type support message sending.
+     *
+     * @return True, if channels of this type support messages
+     */
+    public boolean isMessage()
+    {
+        switch (this)
+        {
+            //case NEWS: TODO
+            case TEXT:
+            case PRIVATE:
+            case GROUP:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**

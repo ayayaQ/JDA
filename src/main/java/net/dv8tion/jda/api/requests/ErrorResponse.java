@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,11 @@ public enum ErrorResponse
     UNKNOWN_LOBBY(                  10031, "Unknown Lobby"),
     UNKNOWN_BRANCH(                 10032, "Unknown Branch"),
     UNKNOWN_REDISTRIBUTABLE(        10036, "Unknown Redistributable"),
+    UNKNOWN_GUILD_TEMPLATE(         10057, "Unknown Guild Template"),
+    UNKNOWN_INTERACTION(            10062, "Unknown Interaction"),
+    UNKNOWN_COMMAND(                10063, "Unknown application command"),
+    UNKNOWN_COMMAND_PERMISSIONS(    10066, "Unknown application command permissions"),
+    UNKNOWN_STAGE_INSTANCE(         10067, "Unknown Stage Instance"),
     BOTS_NOT_ALLOWED(               20001, "Bots cannot use this endpoint"),
     ONLY_BOTS_ALLOWED(              20002, "Only bots can use this endpoint"),
     MAX_GUILDS(                     30001, "Maximum number of Guilds reached (100)"),
@@ -67,12 +72,15 @@ public enum ErrorResponse
     MAX_MESSAGE_PINS(               30003, "Maximum number of pinned messages reached (50)"),
     MAX_USERS_PER_DM(               30004, "Maximum number of recipients reached. (10)"),
     MAX_ROLES_PER_GUILD(            30005, "Maximum number of guild roles reached (250)"),
+    MAX_WEBHOOKS(                   30007, "Maximum number of webhooks reached (10)"),
     TOO_MANY_REACTIONS(             30010, "Maximum number of reactions reached (20)"),
     MAX_CHANNELS(                   30013, "Maximum number of guild channels reached (500)"),
     MAX_INVITES(                    30016, "Maximum number of invites reached (1000)"),
+    ALREADY_HAS_TEMPLATE(           30031, "Guild already has a template"),
     UNAUTHORIZED(                   40001, "Unauthorized"),
     REQUEST_ENTITY_TOO_LARGE(       40005, "Request entity too large"),
     USER_NOT_CONNECTED(             40032, "Target user is not connected to voice."),
+    ALREADY_CROSSPOSTED(            40033, "This message has already been crossposted."),
     MISSING_ACCESS(                 50001, "Missing Access"),
     INVALID_ACCOUNT_TYPE(           50002, "Invalid Account Type"),
     INVALID_DM_ACTION(              50003, "Cannot execute action on a DM channel"),
@@ -103,6 +111,7 @@ public enum ErrorResponse
     MFA_NOT_ENABLED(                60003, "MFA auth required but not enabled"),
     REACTION_BLOCKED(               90001, "Reaction Blocked"),
     RESOURCES_OVERLOADED(          130000, "Resource overloaded"),
+    STAGE_ALREADY_OPEN(            150006, "The Stage is already open"),
 
     SERVER_ERROR(                       0, "Discord encountered an internal server error! Not good!");
 

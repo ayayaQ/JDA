@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
     private String topic;
     private long lastMessageId;
     private boolean nsfw;
+    private boolean news;
     private int slowmode;
 
     public TextChannelImpl(long id, GuildImpl guild)
@@ -65,13 +66,6 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
     {
         getGuild().getTextChannelsView().clearCachedLists();
         return super.setPosition(rawPosition);
-    }
-
-    @Nonnull
-    @Override
-    public String getAsMention()
-    {
-        return "<#" + id + '>';
     }
 
     @Nonnull
@@ -110,10 +104,26 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
     {
         Checks.notBlank(name, "Webhook name");
         name = name.trim();
+        Checks.notEmpty(name, "Name");
+        Checks.notLonger(name, 100, "Name");
         checkPermission(Permission.MANAGE_WEBHOOKS);
-        Checks.check(name.length() >= 2 && name.length() <= 100, "Name must be 2-100 characters in length!");
 
         return new WebhookActionImpl(getJDA(), this, name);
+    }
+
+    @Nonnull
+    @Override
+    public RestAction<Webhook.WebhookReference> follow(@Nonnull String targetChannelId)
+    {
+        Checks.notNull(targetChannelId, "Target Channel ID");
+        if (!isNews())
+            throw new IllegalStateException("Can only follow news channels!");
+        Route.CompiledRoute route = Route.Channels.FOLLOW_CHANNEL.compile(getId());
+        DataObject body = DataObject.empty().put("webhook_channel_id", targetChannelId);
+        return new RestActionImpl<>(getJDA(), route, body, (response, request) -> {
+            DataObject json = response.getObject();
+            return new Webhook.WebhookReference(request.getJDA(), json.getUnsignedLong("webhook_id") , json.getUnsignedLong("channel_id"));
+        });
     }
 
     @Nonnull
@@ -148,8 +158,7 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
     {
         Checks.isSnowflake(id, "Webhook ID");
 
-        if (!getGuild().getSelfMember().hasPermission(this, Permission.MANAGE_WEBHOOKS))
-            throw new InsufficientPermissionException(this, Permission.MANAGE_WEBHOOKS);
+        checkPermission(Permission.MANAGE_WEBHOOKS);
 
         Route.CompiledRoute route = Route.Webhooks.DELETE_WEBHOOK.compile(id);
         return new AuditableRestActionImpl<>(getJDA(), route);
@@ -270,6 +279,12 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
     public boolean isNSFW()
     {
         return nsfw;
+    }
+
+    @Override
+    public boolean isNews()
+    {
+        return news && getGuild().getFeatures().contains("NEWS");
     }
 
     @Override
@@ -570,12 +585,23 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
 
     @Nonnull
     @Override
+    @Deprecated
     public MessageAction editMessageById(@Nonnull String messageId, @Nonnull MessageEmbed newEmbed)
     {
         checkPermission(Permission.MESSAGE_READ);
         checkPermission(Permission.MESSAGE_WRITE);
         checkPermission(Permission.MESSAGE_EMBED_LINKS);
         return TextChannel.super.editMessageById(messageId, newEmbed);
+    }
+
+    @Nonnull
+    @Override
+    public MessageAction editMessageEmbedsById(@Nonnull String messageId, @Nonnull Collection<? extends MessageEmbed> newEmbeds)
+    {
+        checkPermission(Permission.MESSAGE_READ);
+        checkPermission(Permission.MESSAGE_WRITE);
+        checkPermission(Permission.MESSAGE_EMBED_LINKS);
+        return TextChannel.super.editMessageEmbedsById(messageId, newEmbeds);
     }
 
     @Nonnull
@@ -623,6 +649,12 @@ public class TextChannelImpl extends AbstractChannelImpl<TextChannel, TextChanne
     public TextChannelImpl setSlowmode(int slowmode)
     {
         this.slowmode = slowmode;
+        return this;
+    }
+
+    public TextChannelImpl setNews(boolean news)
+    {
+        this.news = news;
         return this;
     }
 

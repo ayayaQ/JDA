@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.ApplicationInfo;
 import net.dv8tion.jda.api.entities.ApplicationTeam;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.internal.utils.Checks;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -29,18 +30,20 @@ public class ApplicationInfoImpl implements ApplicationInfo
 {
     private final JDA api;
 
-
     private final boolean doesBotRequireCodeGrant;
     private final boolean isBotPublic;
     private final long id;
     private final String iconId;
     private final String description;
+    private final String termsOfServiceUrl;
+    private final String privacyPolicyUrl;
     private final String name;
     private final User owner;
     private final ApplicationTeam team;
+    private String scopes = "bot";
 
     public ApplicationInfoImpl(JDA api, String description, boolean doesBotRequireCodeGrant, String iconId, long id,
-            boolean isBotPublic, String name, User owner, ApplicationTeam team)
+            boolean isBotPublic, String name, String termsOfServiceUrl, String privacyPolicyUrl, User owner, ApplicationTeam team)
     {
         this.api = api;
         this.description = description;
@@ -49,6 +52,8 @@ public class ApplicationInfoImpl implements ApplicationInfo
         this.id = id;
         this.isBotPublic = isBotPublic;
         this.name = name;
+        this.termsOfServiceUrl = termsOfServiceUrl;
+        this.privacyPolicyUrl = privacyPolicyUrl;
         this.owner = owner;
         this.team = team;
     }
@@ -73,6 +78,18 @@ public class ApplicationInfoImpl implements ApplicationInfo
     }
 
     @Override
+    public String getTermsOfServiceUrl()
+    {
+        return this.termsOfServiceUrl;
+    }
+
+    @Override
+    public String getPrivacyPolicyUrl()
+    {
+        return this.privacyPolicyUrl;
+    }
+
+    @Override
     public String getIconId()
     {
         return this.iconId;
@@ -92,6 +109,22 @@ public class ApplicationInfoImpl implements ApplicationInfo
         return team;
     }
 
+    @Nonnull
+    @Override
+    public ApplicationInfo setRequiredScopes(@Nonnull Collection<String> scopes)
+    {
+        Checks.noneNull(scopes, "Scopes");
+        this.scopes = String.join("+", scopes);
+        if (!this.scopes.contains("bot"))
+        {
+            if (this.scopes.isEmpty())
+                this.scopes = "bot";
+            else
+                this.scopes += "+bot";
+        }
+        return this;
+    }
+
     @Override
     public long getIdLong()
     {
@@ -104,7 +137,7 @@ public class ApplicationInfoImpl implements ApplicationInfo
     {
         StringBuilder builder = new StringBuilder("https://discord.com/oauth2/authorize?client_id=");
         builder.append(this.getId());
-        builder.append("&scope=bot");
+        builder.append("&scope=").append(scopes);
         if (permissions != null && !permissions.isEmpty())
         {
             builder.append("&permissions=");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberLeaveEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceLeaveEvent;
+import net.dv8tion.jda.api.utils.cache.CacheView;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.entities.*;
-import net.dv8tion.jda.internal.requests.WebSocketClient;
 import net.dv8tion.jda.internal.utils.UnlockHook;
 import net.dv8tion.jda.internal.utils.cache.SnowflakeCacheViewImpl;
 
@@ -61,13 +61,16 @@ public class GuildMemberRemoveHandler extends SocketHandler
 
         // Update the memberCount
         guild.onMemberRemove();
+        CacheView.SimpleCacheView<MemberPresenceImpl> presences = guild.getPresenceView();
+        if (presences != null)
+            presences.remove(userId);
 
-        User user = api.getEntityBuilder().createFakeUser(content.getObject("user"));
+        User user = api.getEntityBuilder().createUser(content.getObject("user"));
         MemberImpl member = (MemberImpl) guild.getMembersView().remove(userId);
 
         if (member == null)
         {
-            WebSocketClient.LOG.debug("Received GUILD_MEMBER_REMOVE for a Member that does not exist in the specified Guild. UserId: {} GuildId: {}", userId, id);
+//            WebSocketClient.LOG.debug("Received GUILD_MEMBER_REMOVE for a Member that does not exist in the specified Guild. UserId: {} GuildId: {}", userId, id);
             // Remove user from voice channel if applicable
             guild.getVoiceChannelsView().forEachUnordered((channel) -> {
                 VoiceChannelImpl impl = (VoiceChannelImpl) channel;
@@ -107,17 +110,9 @@ public class GuildMemberRemoveHandler extends SocketHandler
         {
             if (userId != getJDA().getSelfUser().getIdLong() // don't remove selfUser from cache
                     && getJDA().getGuildsView().stream()
-                               .map(GuildImpl.class::cast)
-                               .noneMatch(g -> g.getMembersView().get(userId) != null))
+                               .noneMatch(g -> g.getMemberById(userId) != null))
             {
-                UserImpl removedUser = (UserImpl) userView.getMap().remove(userId);
-                if (removedUser.hasPrivateChannel())
-                {
-                    PrivateChannelImpl priv = (PrivateChannelImpl) removedUser.getPrivateChannel();
-                    removedUser.setFake(true);
-                    getJDA().getFakeUserMap().put(removedUser.getIdLong(), removedUser);
-                    getJDA().getFakePrivateChannelMap().put(priv.getIdLong(), priv);
-                }
+                userView.remove(userId);
                 getJDA().getEventCache().clear(EventCache.Type.USER, userId);
             }
         }

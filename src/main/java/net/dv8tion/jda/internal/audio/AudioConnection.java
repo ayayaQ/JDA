@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -578,7 +578,7 @@ public class AudioConnection
 
             nonEncodedBuffer.put(toShort);
         }
-        nonEncodedBuffer.flip();
+        ((Buffer) nonEncodedBuffer).flip();
 
         int result = Opus.INSTANCE.opus_encode(opusEncoder, nonEncodedBuffer, OpusPacket.OPUS_FRAME_SIZE, encoded, encoded.capacity());
         if (result <= 0)
@@ -587,7 +587,7 @@ public class AudioConnection
             return null;
         }
 
-        encoded.position(0).limit(result);
+        ((Buffer) encoded).position(0).limit(result);
         return encoded;
     }
 
@@ -796,7 +796,7 @@ public class AudioConnection
 
         private void ensureEncryptionBuffer(ByteBuffer data)
         {
-            encryptionBuffer.clear();
+            ((Buffer) encryptionBuffer).clear();
             int currentCapacity = encryptionBuffer.remaining();
             int requiredCapacity = AudioPacket.RTP_HEADER_BYTE_LENGTH + data.remaining();
             if (currentCapacity < requiredCapacity)

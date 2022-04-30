@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,15 @@ package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.managers.WebhookManager;
+import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
+import net.dv8tion.jda.internal.requests.RestActionImpl;
+import net.dv8tion.jda.internal.requests.Route;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.regex.Pattern;
 
 /**
  * An object representing Webhooks in Discord
@@ -33,8 +37,41 @@ import javax.annotation.Nullable;
  * @see    Guild#retrieveWebhooks()
  * @see    JDA#retrieveWebhookById(String)
  */
-public interface Webhook extends ISnowflake, IFakeable
+public interface Webhook extends ISnowflake
 {
+    /**
+     * Pattern for a Webhook URL.
+     *
+     * <h2>Groups</h2>
+     * <table>
+     *   <caption style="display: none">Javadoc is stupid, this is not a required tag</caption>
+     *   <tr>
+     *     <th>Index</th>
+     *     <th>Name</th>
+     *     <th>Description</th>
+     *   </tr>
+     *   <tr>
+     *     <td>0</td>
+     *     <td>N/A</td>
+     *     <td>The entire link</td>
+     *   </tr>
+     *   <tr>
+     *     <td>1</td>
+     *     <td>id</td>
+     *     <td>The ID of the webhook</td>
+     *   </tr>
+     *   <tr>
+     *     <td>2</td>
+     *     <td>token</td>
+     *     <td>The token of the webhook</td>
+     *   </tr>
+     * </table>
+     *
+     * You can use the names with {@link java.util.regex.Matcher#group(String) Matcher.group(String)}
+     * and the index with {@link java.util.regex.Matcher#group(int) Matcher.group(int)}.
+     */
+    Pattern WEBHOOK_URL = Pattern.compile("https?://(?:[^\\s.]+\\.)?discord(?:app)?\\.com/api(?:/v\\d+)?/webhooks/(?<id>\\d+)/(?<token>[^\\s/]+)", Pattern.CASE_INSENSITIVE);
+
     /**
      * The JDA instance of this Webhook.
      *
@@ -53,9 +90,20 @@ public interface Webhook extends ISnowflake, IFakeable
     WebhookType getType();
 
     /**
+     * Whether this webhook cannot provide {@link #getChannel()} and {@link #getGuild()}.
+     * <br>This means that the webhook is not local to this shard's cache and cannot provide full channel/guild references.
+     *
+     * @return True, if {@link #getChannel()} and {@link #getGuild()} would throw
+     */
+    boolean isPartial();
+
+    /**
      * The {@link net.dv8tion.jda.api.entities.Guild Guild} instance
      * for this Webhook.
      * <br>This is a shortcut for <code>{@link #getChannel()}.getGuild()</code>.
+     *
+     * @throws IllegalStateException
+     *         If this webhooks {@link #isPartial() is partial}
      *
      * @return The current Guild of this Webhook
      */
@@ -66,13 +114,17 @@ public interface Webhook extends ISnowflake, IFakeable
      * The {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} instance
      * this Webhook is attached to.
      *
+     * @throws IllegalStateException
+     *         If this webhooks {@link #isPartial() is partial}
+     *
      * @return The current TextChannel of this Webhook
      */
     @Nonnull
     TextChannel getChannel();
 
     /**
-     * The owner of this Webhook. This will be null for fake Webhooks, such as those retrieved from Audit Logs.
+     * The owner of this Webhook. This will be null for some Webhooks, such as those retrieved from Audit Logs.
+     * <br>This requires the member to be cached. You can use {@link #getOwnerAsUser()} to get a reference to the user instead.
      *
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.Member Member} instance
      *         representing the owner of this Webhook.
@@ -81,9 +133,19 @@ public interface Webhook extends ISnowflake, IFakeable
     Member getOwner();
 
     /**
+     * The owner of this Webhook. This will be null for some Webhooks, such as those retrieved from Audit Logs.
+     * <br>This can be non-null even when {@link #getOwner()} is null. {@link #getOwner()} requires the webhook to be local to this shard and in cache.
+     *
+     * @return Possibly-null {@link net.dv8tion.jda.api.entities.User User} instance
+     *         representing the owner of this Webhook.
+     */
+    @Nullable
+    User getOwnerAsUser();
+
+    /**
      * The default User for this Webhook.
      *
-     * <p>The {@link net.dv8tion.jda.api.entities.User User} returned is always {@code fake}.
+     * <p>The {@link net.dv8tion.jda.api.entities.User User} returned is always fake and cannot be interacted with.
      * <br>This User is used for all messages posted to the Webhook route (found in {@link #getUrl()}),
      * it holds the default references for the message authors of messages by this Webhook.
      *
@@ -115,7 +177,7 @@ public interface Webhook extends ISnowflake, IFakeable
      * <br>This can be used to modify/delete/execute
      * this Webhook.
      * 
-     * <p><b>Note: Fake Webhooks, such as those retrieved from Audit Logs, do not contain a token</b>
+     * <p><b>Note: Some Webhooks, such as those retrieved from Audit Logs, do not contain a token</b>
      *
      * @return The execute token for this Webhook
      */
@@ -125,7 +187,7 @@ public interface Webhook extends ISnowflake, IFakeable
     /**
      * The {@code POST} route for this Webhook.
      * <br>This contains the {@link #getToken() token} and {@link #getId() id}
-     * of this Webhook. Fake Webhooks without tokens (such as those retrieved from Audit Logs)
+     * of this Webhook. Some Webhooks without tokens (such as those retrieved from Audit Logs)
      * will return a URL without a token.
      *
      * <p>The route returned by this method does not need permission checks
@@ -141,6 +203,22 @@ public interface Webhook extends ISnowflake, IFakeable
      */
     @Nonnull
     String getUrl();
+
+    /**
+     * The source channel for a Webhook of type {@link WebhookType#FOLLOWER FOLLOWER}.
+     *
+     * @return {@link ChannelReference}
+     */
+    @Nullable
+    ChannelReference getSourceChannel();
+
+    /**
+     * The source guild for a Webhook of type {@link WebhookType#FOLLOWER FOLLOWER}.
+     *
+     * @return {@link GuildReference}
+     */
+    @Nullable
+    GuildReference getSourceGuild();
 
     /**
      * Deletes this Webhook.
@@ -159,7 +237,7 @@ public interface Webhook extends ISnowflake, IFakeable
      * </ul>
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
-     *         If the Webhook is fake, such as the Webhooks retrieved from Audit Logs and the currently
+     *         If the Webhook does not have a token, such as the Webhooks retrieved from Audit Logs and the currently
      *         logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_WEBHOOKS} in this channel.
      * 
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
@@ -207,6 +285,9 @@ public interface Webhook extends ISnowflake, IFakeable
      * The {@link WebhookManager WebhookManager} for this Webhook.
      * <br>You can modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
      *
+     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
+     * This getter is not thread-safe and would require guards by the user.
+     *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_WEBHOOKS Permission.MANAGE_WEBHOOKS}
      *
@@ -214,4 +295,130 @@ public interface Webhook extends ISnowflake, IFakeable
      */
     @Nonnull
     WebhookManager getManager();
+
+    /**
+     * Partial Webhook which can be {@link #resolve() resolved} to a {@link Webhook}.
+     *
+     * @see #resolve()
+     */
+    class WebhookReference implements ISnowflake
+    {
+        private final JDA api;
+        private final long webhookId, channelId;
+
+        public WebhookReference(JDA api, long webhookId, long channelId)
+        {
+            this.api = api;
+            this.webhookId = webhookId;
+            this.channelId = channelId;
+        }
+
+        @Override
+        public long getIdLong()
+        {
+            return webhookId;
+        }
+
+        /**
+         * The ID for the channel this webhook belongs to
+         *
+         * @return The ID for the channel this webhook belongs to
+         */
+        @Nonnull
+        public String getChannelId()
+        {
+            return Long.toUnsignedString(channelId);
+        }
+
+        /**
+         * The ID for the channel this webhook belongs to
+         *
+         * @return The ID for the channel this webhook belongs to
+         */
+        public long getChannelIdLong()
+        {
+            return channelId;
+        }
+
+        /**
+         * Resolves this reference to a {@link Webhook} instance.
+         * <br>The resulting instance may not provide a {@link #getChannel()} and {@link #getGuild()} due to API limitation.
+         *
+         * <p>The resulting webhook can also not be executed because the API does not provide a token.
+         *
+         * @return {@link RestAction} - Type: {@link Webhook}
+         */
+        @Nonnull
+        @CheckReturnValue
+        public RestAction<Webhook> resolve()
+        {
+            Route.CompiledRoute route = Route.Webhooks.GET_WEBHOOK.compile(getId());
+            return new RestActionImpl<>(api, route,
+                (response, request) -> request.getJDA().getEntityBuilder().createWebhook(response.getObject(), true));
+        }
+    }
+
+    /**
+     * Partial Channel which references the source channel for a follower webhook.
+     */
+    class ChannelReference implements ISnowflake
+    {
+        private final long id;
+        private final String name;
+
+        public ChannelReference(long id, String name)
+        {
+            this.id = id;
+            this.name = name;
+        }
+
+        @Override
+        public long getIdLong()
+        {
+            return id;
+        }
+
+        /**
+         * The source channel's name
+         *
+         * @return The channel name
+         */
+        @Nonnull
+        public String getName()
+        {
+            return name;
+        }
+    }
+
+    /**
+     * Partial Guild which references the source guild for a follower webhook.
+     */
+    class GuildReference implements ISnowflake
+    {
+        private final long id;
+        private final String name;
+
+        public GuildReference(long id, String name)
+        {
+            this.id = id;
+            this.name = name;
+        }
+
+        @Override
+        public long getIdLong()
+        {
+            return id;
+        }
+
+        /**
+         * The source guild's name
+         *
+         * @return The guild name
+         */
+        @Nonnull
+        public String getName()
+        {
+            return name;
+        }
+    }
 }

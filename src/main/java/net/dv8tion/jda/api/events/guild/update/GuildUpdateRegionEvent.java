@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 
 package net.dv8tion.jda.api.events.guild.update;
 
+import net.dv8tion.jda.annotations.DeprecatedSince;
+import net.dv8tion.jda.annotations.ForRemoval;
+import net.dv8tion.jda.annotations.ReplaceWith;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Region;
 import net.dv8tion.jda.api.entities.Guild;
@@ -28,7 +31,13 @@ import javax.annotation.Nonnull;
  * <p>Can be used to detect when a Region changes and retrieve the old one
  *
  * <p>Identifier: {@code region}
+ *
+ * @deprecated This event is no longer supported by discord
  */
+@Deprecated
+@ForRemoval(deadline = "5.0.0")
+@ReplaceWith("VoiceChannelUpdateRegionEvent")
+@DeprecatedSince("4.3.0")
 public class GuildUpdateRegionEvent extends GenericGuildUpdateEvent<Region>
 {
     public static final String IDENTIFIER = "region";

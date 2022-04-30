@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,66 +16,63 @@
 
 package net.dv8tion.jda.internal.entities;
 
+import gnu.trove.map.TLongObjectMap;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
+import net.dv8tion.jda.api.utils.cache.CacheView;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.Helpers;
 import net.dv8tion.jda.internal.utils.PermissionUtil;
-import net.dv8tion.jda.internal.utils.cache.SnowflakeReference;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.awt.*;
-import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MemberImpl implements Member
 {
-    private static final ZoneOffset OFFSET = ZoneOffset.of("+00:00");
-    private final SnowflakeReference<Guild> guild;
     private final JDAImpl api;
     private final Set<Role> roles = ConcurrentHashMap.newKeySet();
     private final GuildVoiceState voiceState;
-    private final Map<ClientType, OnlineStatus> clientStatus;
 
+    private GuildImpl guild;
     private User user;
     private String nickname;
+    private String avatarId;
     private long joinDate, boostDate;
-    private List<Activity> activities = null;
-    private OnlineStatus onlineStatus = OnlineStatus.OFFLINE;
+    private boolean pending = false;
 
     public MemberImpl(GuildImpl guild, User user)
     {
         this.api = (JDAImpl) user.getJDA();
-        this.guild = new SnowflakeReference<>(guild, api::getGuildById);
+        this.guild = guild;
         this.user = user;
         this.joinDate = 0;
         boolean cacheState = api.isCacheFlagSet(CacheFlag.VOICE_STATE) || user.equals(api.getSelfUser());
-        boolean cacheOnline = api.isCacheFlagSet(CacheFlag.CLIENT_STATUS);
         this.voiceState = cacheState ? new GuildVoiceStateImpl(this) : null;
-        this.clientStatus = cacheOnline ? Collections.synchronizedMap(new EnumMap<>(ClientType.class)) : null;
     }
 
-    private void updateUser()
+    public MemberPresenceImpl getPresence()
     {
-        // Load user from cache if one exists, ideally two members with the same id should wrap the same user object
-        User realUser = getJDA().getUserById(user.getIdLong());
-        if (realUser != null)
-            this.user = realUser;
+        CacheView.SimpleCacheView<MemberPresenceImpl> presences = guild.getPresenceView();
+        return presences == null ? null : presences.get(getIdLong());
     }
 
     @Nonnull
     @Override
     public User getUser()
     {
-        updateUser();
+        // Load user from cache if one exists, ideally two members with the same id should wrap the same user object
+        User realUser = getJDA().getUserById(user.getIdLong());
+        if (realUser != null)
+            this.user = realUser;
         return user;
     }
 
@@ -83,7 +80,10 @@ public class MemberImpl implements Member
     @Override
     public GuildImpl getGuild()
     {
-        return (GuildImpl) guild.resolve();
+        GuildImpl realGuild = (GuildImpl) api.getGuildById(guild.getIdLong());
+        if (realGuild != null)
+            guild = realGuild;
+        return guild;
     }
 
     @Nonnull
@@ -98,7 +98,7 @@ public class MemberImpl implements Member
     public OffsetDateTime getTimeJoined()
     {
         if (hasTimeJoined())
-            return OffsetDateTime.ofInstant(Instant.ofEpochMilli(joinDate), OFFSET);
+            return Helpers.toOffset(joinDate);
         return getGuild().getTimeCreated();
     }
 
@@ -112,7 +112,7 @@ public class MemberImpl implements Member
     @Override
     public OffsetDateTime getTimeBoosted()
     {
-        return boostDate != 0 ? OffsetDateTime.ofInstant(Instant.ofEpochMilli(boostDate), OFFSET) : null;
+        return boostDate != 0 ? Helpers.toOffset(boostDate) : null;
     }
 
     @Override
@@ -125,14 +125,16 @@ public class MemberImpl implements Member
     @Override
     public List<Activity> getActivities()
     {
-        return activities == null || activities.isEmpty() ? Collections.emptyList() : activities;
+        MemberPresenceImpl presence = getPresence();
+        return presence == null ? Collections.emptyList() : presence.getActivities();
     }
 
     @Nonnull
     @Override
     public OnlineStatus getOnlineStatus()
     {
-        return onlineStatus;
+        MemberPresenceImpl presence = getPresence();
+        return presence == null ? OnlineStatus.OFFLINE : presence.getOnlineStatus();
     }
 
     @Nonnull
@@ -140,9 +142,10 @@ public class MemberImpl implements Member
     public OnlineStatus getOnlineStatus(@Nonnull ClientType type)
     {
         Checks.notNull(type, "Type");
-        if (this.clientStatus == null || this.clientStatus.isEmpty())
+        MemberPresenceImpl presence = getPresence();
+        if (presence == null)
             return OnlineStatus.OFFLINE;
-        OnlineStatus status = this.clientStatus.get(type);
+        OnlineStatus status = presence.getClientStatus().get(type);
         return status == null ? OnlineStatus.OFFLINE : status;
     }
 
@@ -150,15 +153,20 @@ public class MemberImpl implements Member
     @Override
     public EnumSet<ClientType> getActiveClients()
     {
-        if (clientStatus == null || clientStatus.isEmpty())
-            return EnumSet.noneOf(ClientType.class);
-        return EnumSet.copyOf(clientStatus.keySet());
+        MemberPresenceImpl presence = getPresence();
+        return presence == null ? EnumSet.noneOf(ClientType.class) : Helpers.copyEnumSet(ClientType.class, presence.getClientStatus().keySet());
     }
 
     @Override
     public String getNickname()
     {
         return nickname;
+    }
+
+    @Override
+    public String getAvatarId()
+    {
+        return avatarId;
     }
 
     @Nonnull
@@ -258,6 +266,55 @@ public class MemberImpl implements Member
     }
 
     @Override
+    public boolean canSync(@Nonnull GuildChannel targetChannel, @Nonnull GuildChannel syncSource)
+    {
+        Checks.notNull(targetChannel, "Channel");
+        Checks.notNull(syncSource, "Channel");
+        Checks.check(targetChannel.getGuild().equals(getGuild()), "Channels must be from the same guild!");
+        Checks.check(syncSource.getGuild().equals(getGuild()), "Channels must be from the same guild!");
+        long userPerms = PermissionUtil.getEffectivePermission(targetChannel, this);
+        if ((userPerms & Permission.MANAGE_PERMISSIONS.getRawValue()) == 0)
+            return false; // We can't manage permissions at all!
+
+        long channelPermissions = PermissionUtil.getExplicitPermission(targetChannel, this, false);
+        // If the user has ADMINISTRATOR or MANAGE_PERMISSIONS then it can also set any other permission on the channel
+        boolean hasLocalAdmin = ((userPerms & Permission.ADMINISTRATOR.getRawValue()) | (channelPermissions & Permission.MANAGE_PERMISSIONS.getRawValue())) != 0;
+        if (hasLocalAdmin)
+            return true;
+
+        TLongObjectMap<PermissionOverride> existingOverrides = ((AbstractChannelImpl<?, ?>) targetChannel).getOverrideMap();
+        for (PermissionOverride override : syncSource.getPermissionOverrides())
+        {
+            PermissionOverride existing = existingOverrides.get(override.getIdLong());
+            long allow = override.getAllowedRaw();
+            long deny = override.getDeniedRaw();
+            if (existing != null)
+            {
+                allow ^= existing.getAllowedRaw();
+                deny ^= existing.getDeniedRaw();
+            }
+            // If any permissions changed that the user doesn't have in the channel, they can't sync it :(
+            if (((allow | deny) & ~userPerms) != 0)
+                return false;
+        }
+        return true;
+    }
+
+    @Override
+    public boolean canSync(@Nonnull GuildChannel channel)
+    {
+        Checks.notNull(channel, "Channel");
+        Checks.check(channel.getGuild().equals(getGuild()), "Channels must be from the same guild!");
+        long userPerms = PermissionUtil.getEffectivePermission(channel, this);
+        if ((userPerms & Permission.MANAGE_PERMISSIONS.getRawValue()) == 0)
+            return false; // We can't manage permissions at all!
+
+        long channelPermissions = PermissionUtil.getExplicitPermission(channel, this, false);
+        // If the user has ADMINISTRATOR or MANAGE_PERMISSIONS then it can also set any other permission on the channel
+        return ((userPerms & Permission.ADMINISTRATOR.getRawValue()) | (channelPermissions & Permission.MANAGE_PERMISSIONS.getRawValue())) != 0;
+    }
+
+    @Override
     public boolean canInteract(@Nonnull Member member)
     {
         return PermissionUtil.canInteract(this, member);
@@ -282,9 +339,9 @@ public class MemberImpl implements Member
     }
 
     @Override
-    public boolean isFake()
+    public boolean isPending()
     {
-        return getGuild().getMemberById(getIdLong()) == null;
+        return this.pending;
     }
 
     @Override
@@ -296,6 +353,12 @@ public class MemberImpl implements Member
     public MemberImpl setNickname(String nickname)
     {
         this.nickname = nickname;
+        return this;
+    }
+
+    public MemberImpl setAvatarId(String avatarId)
+    {
+        this.avatarId = avatarId;
         return this;
     }
 
@@ -311,26 +374,9 @@ public class MemberImpl implements Member
         return this;
     }
 
-    public MemberImpl setActivities(List<Activity> activities)
+    public MemberImpl setPending(boolean pending)
     {
-        this.activities = Collections.unmodifiableList(activities);
-        return this;
-    }
-
-    public MemberImpl setOnlineStatus(ClientType type, OnlineStatus status)
-    {
-        if (this.clientStatus == null || type == ClientType.UNKNOWN || type == null)
-            return this;
-        if (status == null || status == OnlineStatus.UNKNOWN || status == OnlineStatus.OFFLINE)
-            this.clientStatus.remove(type);
-        else
-            this.clientStatus.put(type, status);
-        return this;
-    }
-
-    public MemberImpl setOnlineStatus(OnlineStatus onlineStatus)
-    {
-        this.onlineStatus = onlineStatus;
+        this.pending = pending;
         return this;
     }
 

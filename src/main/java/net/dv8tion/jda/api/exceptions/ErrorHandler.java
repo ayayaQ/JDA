@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -215,7 +215,7 @@ public class ErrorHandler implements Consumer<Throwable>
      * <pre>{@code
      * public static void sendMessage(TextChannel context, User user, String content) {
      *     user.openPrivateChannel()
-     *         .flapMap(channel -> channel.sendMessage(content))
+     *         .flatMap(channel -> channel.sendMessage(content))
      *         .queue(null, new ErrorHandler()
      *             .handle(ErrorResponse.CANNOT_SEND_TO_USER,
      *                 (ex) -> context.sendMessage("Cannot send direct message, please enable direct messages from server members!").queue()));
@@ -247,7 +247,7 @@ public class ErrorHandler implements Consumer<Throwable>
      * <pre>{@code
      * public static void sendMessage(TextChannel context, User user, String content) {
      *     user.openPrivateChannel()
-     *         .flapMap(channel -> channel.sendMessage(content))
+     *         .flatMap(channel -> channel.sendMessage(content))
      *         .queue(null, new ErrorHandler()
      *             .handle(EnumSet.of(ErrorResponse.CANNOT_SEND_TO_USER),
      *                 (ex) -> context.sendMessage("Cannot send direct message, please enable direct messages from server members!").queue()));

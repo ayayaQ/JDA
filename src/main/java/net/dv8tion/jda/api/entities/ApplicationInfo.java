@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.internal.utils.Checks;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -54,6 +55,22 @@ public interface ApplicationInfo extends ISnowflake
     String getDescription();
 
     /**
+     * The URL for the application's terms of service.
+     *
+     * @return The URL for the application's terms of service or {@code null} if none is set
+     */
+    @Nullable
+    String getTermsOfServiceUrl();
+
+    /**
+     * The URL for the application's privacy policy.
+     *
+     * @return The URL for the application's privacy policy or {@code null} if none is set
+     */
+    @Nullable
+    String getPrivacyPolicyUrl();
+
+    /**
      * The icon id of the bot's application.
      * <br>The application icon is <b>not</b> necessarily the same as the bot's avatar!
      * 
@@ -78,6 +95,40 @@ public interface ApplicationInfo extends ISnowflake
      */
     @Nullable
     ApplicationTeam getTeam();
+
+    /**
+     * Configures the required scopes applied to the {@link #getInviteUrl(Permission...)} and similar methods.
+     * <br>To use slash commands you must add {@code "applications.commands"} to these scopes. The scope {@code "bot"} is always applied.
+     *
+     * @param  scopes
+     *         The scopes to use with {@link #getInviteUrl(Permission...)} and the likes
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided
+     *
+     * @return The current ApplicationInfo instance
+     */
+    @Nonnull
+    default ApplicationInfo setRequiredScopes(@Nonnull String... scopes)
+    {
+        Checks.noneNull(scopes, "Scopes");
+        return setRequiredScopes(Arrays.asList(scopes));
+    }
+
+    /**
+     * Configures the required scopes applied to the {@link #getInviteUrl(Permission...)} and similar methods.
+     * <br>To use slash commands you must add {@code "applications.commands"} to these scopes. The scope {@code "bot"} is always applied.
+     *
+     * @param  scopes
+     *         The scopes to use with {@link #getInviteUrl(Permission...)} and the likes
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided
+     *
+     * @return The current ApplicationInfo instance
+     */
+    @Nonnull
+    ApplicationInfo setRequiredScopes(@Nonnull Collection<String> scopes);
 
     /**
      * Creates a OAuth invite-link used to invite the bot.
@@ -222,7 +273,7 @@ public interface ApplicationInfo extends ISnowflake
     String getName();
 
     /**
-     * The owner of the bot's application. This may be a fake user.
+     * The owner of the bot's application.
      * 
      * @return The owner of the bot's application
      */

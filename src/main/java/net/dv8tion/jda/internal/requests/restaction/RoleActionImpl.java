@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package net.dv8tion.jda.internal.requests.restaction;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Icon;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.requests.Request;
@@ -25,6 +26,7 @@ import net.dv8tion.jda.api.requests.Response;
 import net.dv8tion.jda.api.requests.restaction.RoleAction;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.entities.GuildImpl;
+import net.dv8tion.jda.internal.managers.RoleManagerImpl;
 import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.utils.Checks;
 import okhttp3.RequestBody;
@@ -42,6 +44,8 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     protected Integer color = null;
     protected Boolean hoisted = null;
     protected Boolean mentionable = null;
+    protected Icon icon = null;
+    protected String emoji = null;
 
     /**
      * Creates a new RoleAction instance
@@ -88,7 +92,11 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     @CheckReturnValue
     public RoleActionImpl setName(String name)
     {
-        Checks.check(name == null || name.length() > 0 && name.length() <= 100, "Name must be between 1-100 characters long");
+        if (name != null)
+        {
+            Checks.notEmpty(name, "Name");
+            Checks.notLonger(name, 100, "Name");
+        }
         this.name = name;
         return this;
     }
@@ -127,12 +135,30 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     {
         if (permissions != null)
         {
-            Checks.notNegative(permissions, "Raw Permissions");
-            Checks.check(permissions <= Permission.ALL_PERMISSIONS, "Provided permissions may not be greater than a full permission set!");
             for (Permission p : Permission.getPermissions(permissions))
                 checkPermission(p);
         }
         this.permissions = permissions;
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    @CheckReturnValue
+    public RoleActionImpl setIcon(Icon icon)
+    {
+        this.icon = icon;
+        this.emoji = null;
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    @CheckReturnValue
+    public RoleActionImpl setIcon(String emoji)
+    {
+        this.emoji = emoji;
+        this.icon = null;
         return this;
     }
 
@@ -150,6 +176,10 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
             object.put("hoist", hoisted);
         if (mentionable != null)
             object.put("mentionable", mentionable);
+        if (icon != null)
+            object.put("icon", icon.getEncoding());
+        if (emoji != null)
+            object.put("unicode_emoji", emoji);
 
         return getRequestBody(object);
     }

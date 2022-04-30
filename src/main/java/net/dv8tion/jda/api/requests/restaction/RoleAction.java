@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.requests.restaction;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Icon;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.internal.utils.Checks;
 
@@ -196,8 +197,6 @@ public interface RoleAction extends AuditableRestAction<Role>
      *         The raw {@link net.dv8tion.jda.api.Permission Permissions} value for the new role.
      *         To retrieve this use {@link net.dv8tion.jda.api.Permission#getRawValue()}
      *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided permission value is invalid
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not hold one of the specified permissions
      *
@@ -210,4 +209,32 @@ public interface RoleAction extends AuditableRestAction<Role>
     @Nonnull
     @CheckReturnValue
     RoleAction setPermissions(@Nullable Long permissions);
+
+    /**
+     * Sets the {@link net.dv8tion.jda.api.entities.Icon Icon} of this {@link net.dv8tion.jda.api.entities.Role Role}.
+     * This icon will be displayed next to the role's name in the members tab and in chat.
+     *
+     * @param  icon
+     *         The new icon for this {@link net.dv8tion.jda.api.entities.Role Role}
+     *         or {@code null} to reset
+     *
+     * @return RoleManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    RoleAction setIcon(@Nullable Icon icon);
+
+    /**
+     * Sets the Unicode Emoji of this {@link net.dv8tion.jda.api.entities.Role Role} instead of a custom image.
+     * This emoji will be displayed next to the role's name in the members tab and in chat.
+     *
+     * @param  emoji
+     *         The new Unicode emoji for this {@link net.dv8tion.jda.api.entities.Role Role}
+     *         or {@code null} to reset
+     *
+     * @return RoleManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    RoleAction setIcon(@Nullable String emoji);
 }

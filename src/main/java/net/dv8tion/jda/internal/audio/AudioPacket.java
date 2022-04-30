@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ public class AudioPacket
 
         this.encodedAudio = ByteBuffer.allocate(data.length - offset);
         this.encodedAudio.put(data, offset, encodedAudio.capacity());
-        this.encodedAudio.flip();
+        ((Buffer) this.encodedAudio).flip();
     }
 
     public AudioPacket(ByteBuffer buffer, char seq, int timestamp, int ssrc, ByteBuffer encodedAudio)
@@ -177,7 +177,7 @@ public class AudioPacket
         int length = encodedAudio.remaining();
         byte[] encryptedAudio = boxer.box(array, offset, length, extendedNonce);
 
-        buffer.clear();
+        ((Buffer) buffer).clear();
         int capacity = RTP_HEADER_BYTE_LENGTH + encryptedAudio.length + nlen;
         if (capacity > buffer.remaining())
             buffer = ByteBuffer.allocate(capacity);
@@ -185,7 +185,7 @@ public class AudioPacket
         if (nlen > 0) // this means we append the nonce to the payload
             buffer.put(nonce, 0, nlen);
 
-        buffer.flip();
+        ((Buffer) buffer).flip();
         return buffer;
     }
 
@@ -267,6 +267,6 @@ public class AudioPacket
         buffer.putInt(timestamp);
         buffer.putInt(ssrc);
         buffer.put(data);
-        data.flip();
+        ((Buffer) data).flip();
     }
 }

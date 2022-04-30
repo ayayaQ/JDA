@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
 
 package net.dv8tion.jda.internal.utils;
 
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.Objects;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * This class has major inspiration from <a href="https://commons.apache.org/proper/commons-lang/" target="_blank">Lang 3</a>
@@ -28,6 +29,27 @@ import java.util.Objects;
  */
 public final class Helpers
 {
+    private static final ZoneOffset OFFSET = ZoneOffset.of("+00:00");
+    @SuppressWarnings("rawtypes")
+    private static final Consumer EMPTY_CONSUMER = (v) -> {};
+
+    @SuppressWarnings("unchecked")
+    public static <T> Consumer<T> emptyConsumer()
+    {
+        return (Consumer<T>) EMPTY_CONSUMER;
+    }
+
+    public static OffsetDateTime toOffset(long instant)
+    {
+        return OffsetDateTime.ofInstant(Instant.ofEpochMilli(instant), OFFSET);
+    }
+
+    // locale-safe String#format
+
+    public static String format(String format, Object... args)
+    {
+        return String.format(Locale.ROOT, format, args);
+    }
 
     // ## StringUtils ##
 
@@ -119,6 +141,11 @@ public final class Helpers
         return true;
     }
 
+    public static int codePointLength(final String string)
+    {
+        return string.codePointCount(0, string.length());
+    }
+
     // ## CollectionUtils ##
 
     public static boolean deepEquals(Collection<?> first, Collection<?> second)
@@ -146,7 +173,7 @@ public final class Helpers
 
     public static <E extends Enum<E>> EnumSet<E> copyEnumSet(Class<E> clazz, Collection<E> col)
     {
-        return col.isEmpty() ? EnumSet.noneOf(clazz) : EnumSet.copyOf(col);
+        return col == null || col.isEmpty() ? EnumSet.noneOf(clazz) : EnumSet.copyOf(col);
     }
 
     // ## ExceptionUtils ##
@@ -158,5 +185,17 @@ public final class Helpers
             t = t.getCause();
         t.initCause(cause);
         return throwable;
+    }
+
+    public static boolean hasCause(Throwable throwable, Class<? extends Throwable> cause)
+    {
+        Throwable cursor = throwable;
+        while (cursor != null)
+        {
+            if (cause.isInstance(cursor))
+                return true;
+            cursor = cursor.getCause();
+        }
+        return false;
     }
 }

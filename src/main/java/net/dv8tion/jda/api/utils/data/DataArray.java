@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,24 +17,30 @@
 package net.dv8tion.jda.api.utils.data;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import net.dv8tion.jda.api.exceptions.ParsingException;
+import net.dv8tion.jda.api.utils.data.etf.ExTermDecoder;
+import net.dv8tion.jda.api.utils.data.etf.ExTermEncoder;
+import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.Helpers;
 import org.jetbrains.annotations.Contract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.UncheckedIOException;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Represents a list of values used in communication with the Discord API.
@@ -44,7 +50,7 @@ import java.util.function.UnaryOperator;
  *
  * <p>This class is not Thread-Safe
  */
-public class DataArray implements Iterable<Object>
+public class DataArray implements Iterable<Object>, SerializableArray
 {
     private static final Logger log = LoggerFactory.getLogger(DataObject.class);
     private static final ObjectMapper mapper;
@@ -165,6 +171,38 @@ public class DataArray implements Iterable<Object>
         catch (IOException e)
         {
             throw new ParsingException(e);
+        }
+    }
+
+    /**
+     * Parses using {@link ExTermDecoder}.
+     * The provided data must start with the correct version header (131).
+     *
+     * @param  data
+     *         The data to decode
+     *
+     * @throws IllegalArgumentException
+     *         If the provided data is null
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the provided ETF payload is incorrectly formatted or an I/O error occurred
+     *
+     * @return A DataArray instance for the provided payload
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public static DataArray fromETF(@Nonnull byte[] data)
+    {
+        Checks.notNull(data, "Data");
+        try
+        {
+            List<Object> list = ExTermDecoder.unpackList(ByteBuffer.wrap(data));
+            return new DataArray(list);
+        }
+        catch (Exception ex)
+        {
+            log.error("Failed to parse ETF data {}", Arrays.toString(data), ex);
+            throw new ParsingException(ex);
         }
     }
 
@@ -516,8 +554,8 @@ public class DataArray implements Iterable<Object>
     {
         if (value instanceof SerializableData)
             data.add(((SerializableData) value).toData().data);
-        else if (value instanceof DataArray)
-            data.add(((DataArray) value).data);
+        else if (value instanceof SerializableArray)
+            data.add(((SerializableArray) value).toDataArray().data);
         else
             data.add(value);
         return this;
@@ -567,8 +605,8 @@ public class DataArray implements Iterable<Object>
     {
         if (value instanceof SerializableData)
             data.add(index, ((SerializableData) value).toData().data);
-        else if (value instanceof DataArray)
-            data.add(index, ((DataArray) value).data);
+        else if (value instanceof SerializableArray)
+            data.add(index, ((SerializableArray) value).toDataArray().data);
         else
             data.add(index, value);
         return this;
@@ -605,10 +643,11 @@ public class DataArray implements Iterable<Object>
     }
 
     /**
-     * Serialize this object as JSON.
+     * Serializes this object as JSON.
      *
-     * @return a byte array containing the JSON representation of this object.
+     * @return byte array containing the JSON representation of this object
      */
+    @Nonnull
     public byte[] toJson()
     {
         try
@@ -623,12 +662,42 @@ public class DataArray implements Iterable<Object>
         }
     }
 
+    /**
+     * Serializes this object as ETF LIST term.
+     *
+     * @return byte array containing the encoded ETF term
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public byte[] toETF()
+    {
+        ByteBuffer buffer = ExTermEncoder.pack(data);
+        return Arrays.copyOfRange(buffer.array(), buffer.arrayOffset(), buffer.arrayOffset() + buffer.limit());
+    }
+
     @Override
     public String toString()
     {
         try
         {
             return mapper.writeValueAsString(data);
+        }
+        catch (JsonProcessingException e)
+        {
+            throw new ParsingException(e);
+        }
+    }
+
+    @Nonnull
+    public String toPrettyString()
+    {
+        DefaultPrettyPrinter.Indenter indent = new DefaultIndenter("    ", DefaultIndenter.SYS_LF);
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
+        printer.withObjectIndenter(indent).withArrayIndenter(indent);
+        try
+        {
+            return mapper.writer(printer).writeValueAsString(data);
         }
         catch (JsonProcessingException e)
         {
@@ -664,15 +733,17 @@ public class DataArray implements Iterable<Object>
         Object value = data.get(index);
         if (value == null)
             return null;
-        if (type.isAssignableFrom(value.getClass()))
+        if (type.isInstance(value))
             return type.cast(value);
+        if (type == String.class)
+            return type.cast(value.toString());
         // attempt type coercion
         if (stringMapper != null && value instanceof String)
             return stringMapper.apply((String) value);
         else if (numberMapper != null && value instanceof Number)
             return numberMapper.apply((Number) value);
 
-        throw new ParsingException(String.format("Cannot parse value for index %d into type %s: %s instance of %s",
+        throw new ParsingException(Helpers.format("Cannot parse value for index %d into type %s: %s instance of %s",
                                                       index, type.getSimpleName(), value, value.getClass().getSimpleName()));
     }
 
@@ -681,5 +752,19 @@ public class DataArray implements Iterable<Object>
     public Iterator<Object> iterator()
     {
         return data.iterator();
+    }
+
+    @Nonnull
+    public <T> Stream<T> stream(BiFunction<? super DataArray, Integer, ? extends T> mapper)
+    {
+        return IntStream.range(0, length())
+                .mapToObj(index -> mapper.apply(this, index));
+    }
+
+    @Nonnull
+    @Override
+    public DataArray toDataArray()
+    {
+        return this;
     }
 }

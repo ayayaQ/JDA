@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -270,6 +270,21 @@ public class MessageListenerExample extends ListenerAdapter
             {
                 System.out.println("Unfortunately something went wrong when we tried to send the Message and .complete() threw an Exception.");
                 e.printStackTrace();
+            }
+        }
+        else if (msg.equals("!whoami"))
+        {
+            // This example sends a message wich contains id, display name, nickname and user mention to the text channel
+
+            Member member = event.getMember(); //This Member that sent the message. Contains Guild specific information about the User!
+            if (member != null) // This member might be null if the message came from a webhook or a DM
+            {
+                channel.sendMessage(
+                    "Your ID: " + member.getId() +                          // Get ID from User
+                    "\n Your EffectiveName: " + member.getEffectiveName() + // Get Display Name from User
+                    "\n Your Nickname: " + member.getNickname() +           // Get Nickname from User
+                    "\n As Mention" + member.getAsMention()                 // Get User Mention
+                ).queue();
             }
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package net.dv8tion.jda.api.entities;
 
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.requests.RestAction;
 
 import javax.annotation.CheckReturnValue;
@@ -26,7 +25,7 @@ import javax.annotation.Nonnull;
  *
  * @see User#openPrivateChannel()
  */
-public interface PrivateChannel extends MessageChannel, IFakeable
+public interface PrivateChannel extends MessageChannel
 {
     /**
      * The {@link net.dv8tion.jda.api.entities.User User} that this {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} communicates with.
@@ -35,14 +34,6 @@ public interface PrivateChannel extends MessageChannel, IFakeable
      */
     @Nonnull
     User getUser();
-
-    /**
-     * Returns the {@link net.dv8tion.jda.api.JDA JDA} instance of this PrivateChannel
-     *
-     * @return the corresponding JDA instance
-     */
-    @Nonnull
-    JDA getJDA();
 
     /**
      * Closes a PrivateChannel. After being closed successfully the PrivateChannel is removed from the JDA mapping.

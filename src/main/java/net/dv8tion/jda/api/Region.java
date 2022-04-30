@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@ package net.dv8tion.jda.api;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * Represents the Regions used for Audio connections.
@@ -61,7 +64,15 @@ public enum Region
     VIP_US_SOUTH("vip-us-south", "US South (VIP)", "\uD83C\uDDFA\uD83C\uDDF8", true),
     VIP_US_WEST("vip-us-west", "US West (VIP)", "\uD83C\uDDFA\uD83C\uDDF8", true),
 
-    UNKNOWN("", "Unknown Region", null, false);
+    UNKNOWN("", "Unknown Region", null, false),
+
+    AUTOMATIC("automatic", "Automatic", null, false);
+
+    /**
+     * This {@link java.util.Set Set} represents all regions that can be used for VoiceChannel region overrides.
+     */
+    public static final Set<Region> VOICE_CHANNEL_REGIONS =
+            Collections.unmodifiableSet(EnumSet.of(AUTOMATIC, US_WEST, US_EAST, US_CENTRAL, US_SOUTH, SINGAPORE, SOUTH_AFRICA, SYDNEY, EUROPE, INDIA, SOUTH_KOREA, BRAZIL, JAPAN, RUSSIA));
 
     private final String key;
     private final String name;
@@ -103,7 +114,7 @@ public enum Region
      * 
      * @return Possibly-null unicode for the region's flag
      */
-    @Nonnull
+    @Nullable
     public String getEmoji()
     {
         return emoji;

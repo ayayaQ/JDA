@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package net.dv8tion.jda.internal.managers;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Icon;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.exceptions.HierarchyException;
@@ -27,7 +28,6 @@ import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.utils.Checks;
 import net.dv8tion.jda.internal.utils.PermissionUtil;
-import net.dv8tion.jda.internal.utils.cache.SnowflakeReference;
 import okhttp3.RequestBody;
 
 import javax.annotation.CheckReturnValue;
@@ -37,13 +37,15 @@ import java.util.EnumSet;
 
 public class RoleManagerImpl extends ManagerBase<RoleManager> implements RoleManager
 {
-    protected final SnowflakeReference<Role> role;
+    protected Role role;
 
     protected String name;
     protected int color;
     protected long permissions;
     protected boolean hoist;
     protected boolean mentionable;
+    protected Icon icon;
+    protected String emoji;
 
     /**
      * Creates a new RoleManager instance
@@ -55,7 +57,7 @@ public class RoleManagerImpl extends ManagerBase<RoleManager> implements RoleMan
     {
         super(role.getJDA(), Route.Roles.MODIFY_ROLE.compile(role.getGuild().getId(), role.getId()));
         JDA api = role.getJDA();
-        this.role = new SnowflakeReference<>(role, api::getRoleById);
+        this.role = role;
         if (isPermissionChecksEnabled())
             checkPermissions();
     }
@@ -64,7 +66,10 @@ public class RoleManagerImpl extends ManagerBase<RoleManager> implements RoleMan
     @Override
     public Role getRole()
     {
-        return role.resolve();
+        Role realRole = role.getGuild().getRoleById(role.getIdLong());
+        if (realRole != null)
+            role = realRole;
+        return role;
     }
 
     @Nonnull
@@ -106,7 +111,9 @@ public class RoleManagerImpl extends ManagerBase<RoleManager> implements RoleMan
     public RoleManagerImpl setName(@Nonnull String name)
     {
         Checks.notBlank(name, "Name");
-        Checks.check(name.length() <= 100, "Name must be less or equal to 100 characters in length");
+        name = name.trim();
+        Checks.notEmpty(name, "Name");
+        Checks.notLonger(name, 100, "Name");
         this.name = name;
         set |= NAME;
         return this;
@@ -167,6 +174,28 @@ public class RoleManagerImpl extends ManagerBase<RoleManager> implements RoleMan
     @Nonnull
     @Override
     @CheckReturnValue
+    public RoleManagerImpl setIcon(Icon icon)
+    {
+        this.icon = icon;
+        this.emoji = null;
+        set |= ICON;
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    @CheckReturnValue
+    public RoleManagerImpl setIcon(String emoji)
+    {
+        this.emoji = emoji;
+        this.icon = null;
+        set |= ICON;
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    @CheckReturnValue
     public RoleManagerImpl givePermissions(@Nonnull Collection<Permission> perms)
     {
         Checks.noneNull(perms, "Permissions");
@@ -198,6 +227,11 @@ public class RoleManagerImpl extends ManagerBase<RoleManager> implements RoleMan
             object.put("mentionable", mentionable);
         if (shouldUpdate(COLOR))
             object.put("color", color == Role.DEFAULT_COLOR_RAW ? 0 : color & 0xFFFFFF);
+        if (shouldUpdate(ICON))
+        {
+            object.put("icon", icon == null ? null : icon.getEncoding());
+            object.put("unicode_emoji", emoji);
+        }
         reset();
         return getRequestBody(object);
     }

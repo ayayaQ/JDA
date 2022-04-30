@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 package net.dv8tion.jda.api.audit;
+
+import net.dv8tion.jda.api.entities.Member;
 
 /**
  * ActionTypes for {@link net.dv8tion.jda.api.audit.AuditLogEntry AuditLogEntry} instances
@@ -38,6 +40,8 @@ public enum ActionType
      *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#GUILD_REGION GUILD_REGION}</li>
      *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#GUILD_SPLASH GUILD_SPLASH}</li>
      *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#GUILD_SYSTEM_CHANNEL GUILD_SYSTEM_CHANNEL}</li>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#GUILD_RULES_CHANNEL GUILD_RULES_CHANNEL}</li>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#GUILD_COMMUNITY_UPDATES_CHANNEL GUILD_COMMUNITY_UPDATES_CHANNEL}</li>
      * </ul>
      */
     GUILD_UPDATE(1, TargetType.GUILD),
@@ -441,6 +445,54 @@ public enum ActionType
      * An Administrator has removed an integration from the guild
      */
     INTEGRATION_DELETE(82, TargetType.INTEGRATION),
+
+    /**
+     * A {@link net.dv8tion.jda.api.entities.StageInstance StageInstance} was started by a {@link net.dv8tion.jda.api.entities.StageChannel#isModerator(Member) Stage Moderator}.
+     *
+     * <h2>Possible Options</h2>
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogOption#CHANNEL CHANNEL}</li>
+     * </ul>
+     *
+     * <h2>Possible Keys</h2>
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#CHANNEL_TOPIC CHANNEL_TOPIC}</li>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#PRIVACY_LEVEL STAGE_INSTANCE_PRIVACY_LEVEL}</li>
+     * </ul>
+     */
+    STAGE_INSTANCE_CREATE(83, TargetType.STAGE_INSTANCE),
+
+    /**
+     * A {@link net.dv8tion.jda.api.entities.StageInstance StageInstance} was updated by a {@link net.dv8tion.jda.api.entities.StageChannel#isModerator(Member) Stage Moderator}.
+     *
+     * <h2>Possible Options</h2>
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogOption#CHANNEL CHANNEL}</li>
+     * </ul>
+     *
+     * <h2>Possible Keys</h2>
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#CHANNEL_TOPIC CHANNEL_TOPIC}</li>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#PRIVACY_LEVEL STAGE_INSTANCE_PRIVACY_LEVEL}</li>
+     * </ul>
+     */
+    STAGE_INSTANCE_UPDATE(84, TargetType.STAGE_INSTANCE),
+
+    /**
+     * A {@link net.dv8tion.jda.api.entities.StageInstance StageInstance} was deleted by a {@link net.dv8tion.jda.api.entities.StageChannel#isModerator(Member) Stage Moderator}.
+     *
+     * <h2>Possible Options</h2>
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogOption#CHANNEL CHANNEL}</li>
+     * </ul>
+     *
+     * <h2>Possible Keys</h2>
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#CHANNEL_TOPIC CHANNEL_TOPIC}</li>
+     *     <li>{@link net.dv8tion.jda.api.audit.AuditLogKey#PRIVACY_LEVEL STAGE_INSTANCE_PRIVACY_LEVEL}</li>
+     * </ul>
+     */
+    STAGE_INSTANCE_DELETE(85, TargetType.STAGE_INSTANCE),
 
     UNKNOWN(-1, TargetType.UNKNOWN);
 

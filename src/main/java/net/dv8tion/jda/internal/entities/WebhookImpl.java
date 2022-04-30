@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,39 +21,43 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.managers.WebhookManager;
+import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
-import net.dv8tion.jda.api.utils.MiscUtil;
 import net.dv8tion.jda.internal.managers.WebhookManagerImpl;
 import net.dv8tion.jda.internal.requests.Requester;
 import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.requests.restaction.AuditableRestActionImpl;
+import net.dv8tion.jda.internal.requests.restaction.WebhookMessageActionImpl;
+import net.dv8tion.jda.internal.requests.restaction.WebhookMessageUpdateActionImpl;
 import net.dv8tion.jda.internal.utils.Checks;
 
 import javax.annotation.Nonnull;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * The implementation for {@link net.dv8tion.jda.api.entities.Webhook Webhook}
  *
  * @since  3.0
  */
-public class WebhookImpl implements Webhook
+public class WebhookImpl extends AbstractWebhookClient<Void> implements Webhook
 {
-    protected volatile WebhookManager manager = null;
-
-    private final ReentrantLock mngLock = new ReentrantLock();
     private final TextChannel channel;
-    private final long id;
     private final WebhookType type;
+    private WebhookManager manager;
 
     private Member owner;
-    private User user;
-    private String token;
+    private User user, ownerUser;
+    private ChannelReference sourceChannel;
+    private GuildReference sourceGuild;
 
     public WebhookImpl(TextChannel channel, long id, WebhookType type)
     {
+        this(channel, channel.getJDA(), id, type);
+    }
+
+    public WebhookImpl(TextChannel channel, JDA api, long id, WebhookType type)
+    {
+        super(id, null, api);
         this.channel = channel;
-        this.id = id;
         this.type = type;
     }
 
@@ -64,31 +68,49 @@ public class WebhookImpl implements Webhook
         return type;
     }
 
+    @Override
+    public boolean isPartial()
+    {
+        return channel == null;
+    }
+
     @Nonnull
     @Override
     public JDA getJDA()
     {
-        return channel.getJDA();
+        return api;
     }
 
     @Nonnull
     @Override
     public Guild getGuild()
     {
-        return channel.getGuild();
+        if (channel == null)
+            throw new IllegalStateException("Cannot provide guild for this Webhook instance because it does not belong to this shard");
+        return getChannel().getGuild();
     }
 
     @Nonnull
     @Override
     public TextChannel getChannel()
     {
+        if (channel == null)
+            throw new IllegalStateException("Cannot provide channel for this Webhook instance because it does not belong to this shard");
         return channel;
     }
 
     @Override
     public Member getOwner()
     {
+        if (owner == null && channel != null && ownerUser != null)
+            return getGuild().getMember(ownerUser); // maybe it exists later?
         return owner;
+    }
+
+    @Override
+    public User getOwnerAsUser()
+    {
+        return ownerUser;
     }
 
     @Nonnull
@@ -118,6 +140,18 @@ public class WebhookImpl implements Webhook
         return Requester.DISCORD_API_PREFIX + "webhooks/" + getId() + (getToken() == null ? "" : "/" + getToken());
     }
 
+    @Override
+    public ChannelReference getSourceChannel()
+    {
+        return sourceChannel;
+    }
+
+    @Override
+    public GuildReference getSourceGuild()
+    {
+        return sourceGuild;
+    }
+
     @Nonnull
     @Override
     public AuditableRestAction<Void> delete()
@@ -145,17 +179,9 @@ public class WebhookImpl implements Webhook
     @Override
     public WebhookManager getManager()
     {
-        WebhookManager mng = manager;
-        if (mng == null)
-        {
-            mng = MiscUtil.locked(mngLock, () ->
-            {
-                if (manager == null)
-                    manager = new WebhookManagerImpl(this);
-                return manager;
-            });
-        }
-        return mng;
+        if (manager == null)
+            return manager = new WebhookManagerImpl(this);
+        return manager;
     }
 
     @Override
@@ -164,17 +190,12 @@ public class WebhookImpl implements Webhook
         return id;
     }
 
-    @Override
-    public boolean isFake()
-    {
-        return token == null;
-    }
-
     /* -- Impl Setters -- */
 
-    public WebhookImpl setOwner(Member member)
+    public WebhookImpl setOwner(Member member, User user)
     {
         this.owner = member;
+        this.ownerUser = user;
         return this;
     }
 
@@ -187,6 +208,18 @@ public class WebhookImpl implements Webhook
     public WebhookImpl setUser(User user)
     {
         this.user = user;
+        return this;
+    }
+
+    public WebhookImpl setSourceGuild(GuildReference reference)
+    {
+        this.sourceGuild = reference;
+        return this;
+    }
+
+    public WebhookImpl setSourceChannel(ChannelReference reference)
+    {
+        this.sourceChannel = reference;
         return this;
     }
 
@@ -213,5 +246,42 @@ public class WebhookImpl implements Webhook
     public String toString()
     {
         return "WH:" + getName() + "(" + id + ")";
+    }
+
+    // TODO: Implement WebhookMessage
+
+    @Override
+    public WebhookMessageActionImpl<Void> sendRequest()
+    {
+        checkToken();
+        Route.CompiledRoute route = Route.Webhooks.EXECUTE_WEBHOOK.compile(getId(), token);
+        WebhookMessageActionImpl<Void> action = new WebhookMessageActionImpl<>(api, channel, route, (json) -> null);
+        action.run();
+        return action;
+    }
+
+    @Override
+    public WebhookMessageUpdateActionImpl<Void> editRequest(String messageId)
+    {
+        checkToken();
+        Checks.isSnowflake(messageId);
+        Route.CompiledRoute route = Route.Webhooks.EXECUTE_WEBHOOK_EDIT.compile(getId(), token, messageId);
+        WebhookMessageUpdateActionImpl<Void> action = new WebhookMessageUpdateActionImpl<>(api, route, (json) -> null);
+        action.run();
+        return action;
+    }
+
+    @Nonnull
+    @Override
+    public RestAction<Void> deleteMessageById(@Nonnull String messageId)
+    {
+        checkToken();
+        return super.deleteMessageById(messageId);
+    }
+
+    private void checkToken()
+    {
+        if (token == null)
+            throw new UnsupportedOperationException("Cannot execute webhook without a token!");
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -388,5 +388,76 @@ class EscapeMarkdownTest
         Assertions.assertEquals("\\>>> Hello\nWorld", markdown.compute(">>> Hello\nWorld"));
         Assertions.assertEquals("\\>>>\nHello\nWorld", markdown.compute(">>>\nHello\nWorld"));
         Assertions.assertEquals("\\>>>\nHello > World", markdown.compute(">>>\nHello > World"));
+        Assertions.assertEquals("\\> \\_Hello \n\\> World\\_", markdown.compute("> _Hello \n> World_"));
+    }
+}
+
+class EscapeMarkdownAllTest
+{
+    @Test
+    public void testAsterisk()
+    {
+        Assertions.assertEquals("Hello\\*World", MarkdownSanitizer.escape("Hello*World", true));
+        Assertions.assertEquals("Hello\\*\\*World", MarkdownSanitizer.escape("Hello**World", true));
+        Assertions.assertEquals("Hello\\*\\*\\*World", MarkdownSanitizer.escape("Hello***World", true));
+
+        Assertions.assertEquals("Hello\\*World", MarkdownSanitizer.escape("Hello\\*World", true));
+        Assertions.assertEquals("Hello\\*\\*World", MarkdownSanitizer.escape("Hello\\*\\*World", true));
+        Assertions.assertEquals("Hello\\*\\*\\*World", MarkdownSanitizer.escape("Hello\\*\\*\\*World", true));
+    }
+
+    @Test
+    public void testUnderscore()
+    {
+        Assertions.assertEquals("Hello\\_World", MarkdownSanitizer.escape("Hello_World", true));
+        Assertions.assertEquals("Hello\\_\\_World", MarkdownSanitizer.escape("Hello__World", true));
+        Assertions.assertEquals("Hello\\_\\_\\_World", MarkdownSanitizer.escape("Hello___World", true));
+
+        Assertions.assertEquals("Hello\\_World", MarkdownSanitizer.escape("Hello\\_World", true));
+        Assertions.assertEquals("Hello\\_\\_World", MarkdownSanitizer.escape("Hello\\_\\_World", true));
+        Assertions.assertEquals("Hello\\_\\_\\_World", MarkdownSanitizer.escape("Hello\\_\\_\\_World", true));
+    }
+
+    @Test
+    public void testCodeBlock()
+    {
+        Assertions.assertEquals("Hello\\`World", MarkdownSanitizer.escape("Hello`World", true));
+        Assertions.assertEquals("Hello\\`\\`World", MarkdownSanitizer.escape("Hello``World", true));
+        Assertions.assertEquals("Hello\\`\\`\\`World", MarkdownSanitizer.escape("Hello```World", true));
+
+        Assertions.assertEquals("Hello\\`World", MarkdownSanitizer.escape("Hello\\`World", true));
+        Assertions.assertEquals("Hello\\`\\`World", MarkdownSanitizer.escape("Hello\\`\\`World", true));
+        Assertions.assertEquals("Hello\\`\\`\\`World", MarkdownSanitizer.escape("Hello\\`\\`\\`World", true));
+    }
+
+    @Test
+    public void testSpoiler()
+    {
+        Assertions.assertEquals("Hello\\|\\|World", MarkdownSanitizer.escape("Hello||World", true));
+        Assertions.assertEquals("Hello|World", MarkdownSanitizer.escape("Hello|World", true));
+
+        Assertions.assertEquals("Hello\\|\\|World", MarkdownSanitizer.escape("Hello\\|\\|World", true));
+        Assertions.assertEquals("Hello\\|World", MarkdownSanitizer.escape("Hello\\|World", true));
+    }
+
+    @Test
+    public void testStrike()
+    {
+        Assertions.assertEquals("Hello\\~\\~World", MarkdownSanitizer.escape("Hello~~World", true));
+        Assertions.assertEquals("Hello\\~\\~World", MarkdownSanitizer.escape("Hello\\~\\~World", true));
+    }
+
+    @Test
+    public void testQuote()
+    {
+        Assertions.assertEquals("\\> Hello World", MarkdownSanitizer.escape("> Hello World", true));
+        Assertions.assertEquals(">Hello World", MarkdownSanitizer.escape(">Hello World", true));
+        Assertions.assertEquals("\\>\\>\\> Hello World", MarkdownSanitizer.escape(">>> Hello World", true));
+        Assertions.assertEquals(">>>Hello World", MarkdownSanitizer.escape(">>>Hello World", true));
+        Assertions.assertEquals("\\>\\>\\> Hello > World\n\\> Hello >>> World\n<@12345> > Hello\n \\> Hello world", MarkdownSanitizer.escape(">>> Hello > World\n> Hello >>> World\n<@12345> > Hello\n > Hello world", true));
+
+        Assertions.assertEquals("\\> Hello World", MarkdownSanitizer.escape("\\> Hello World", true));
+        Assertions.assertEquals("\\>\\>\\> Hello World", MarkdownSanitizer.escape("\\>\\>\\> Hello World", true));
+        Assertions.assertEquals("Hello > World", MarkdownSanitizer.escape("Hello > World"));
     }
 }

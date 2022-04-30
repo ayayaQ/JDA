@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.managers.RoleManager;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.api.requests.restaction.RoleAction;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
@@ -46,7 +47,7 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
     /**
      * The hierarchical position of this {@link net.dv8tion.jda.api.entities.Role Role}
      * in the {@link net.dv8tion.jda.api.entities.Guild Guild} hierarchy. (higher value means higher role).
-     * <br>The {@link net.dv8tion.jda.api.entities.Guild#getPublicRole()}'s getPosition() always return -1.
+     * <br>The {@link net.dv8tion.jda.api.entities.Guild#getPublicRole()}'s getPosition() always returns -1.
      *
      * @throws IllegalStateException
      *         If this role is not in the guild cache
@@ -160,6 +161,7 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      * Creates a new {@link net.dv8tion.jda.api.entities.Role Role} in the specified {@link net.dv8tion.jda.api.entities.Guild Guild}
      * with the same settings as the given {@link net.dv8tion.jda.api.entities.Role Role}.
      * <br>The position of the specified Role does not matter in this case!
+     * <br><b>If this {@link Role} has an {@link RoleIcon Icon} set, only its emoji can be copied over.</b>
      *
      * <p>It will be placed at the bottom (just over the Public Role) to avoid permission hierarchy conflicts.
      * <br>For this to be successful, the logged in account has to have the {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES MANAGE_ROLES} Permission
@@ -194,6 +196,7 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      * Creates a new {@link net.dv8tion.jda.api.entities.Role Role} in this {@link net.dv8tion.jda.api.entities.Guild Guild}
      * with the same settings as the given {@link net.dv8tion.jda.api.entities.Role Role}.
      * <br>The position of the specified Role does not matter in this case!
+     * <br><b>If this {@link Role} has an {@link RoleIcon Icon} set, only its emoji can be copied over.</b>
      *
      * <p>It will be placed at the bottom (just over the Public Role) to avoid permission hierarchy conflicts.
      * <br>For this to be successful, the logged in account has to have the {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES MANAGE_ROLES} Permission
@@ -226,6 +229,9 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      * The {@link RoleManager RoleManager} for this Role.
      * In the RoleManager, you can modify all its values.
      * <br>You modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
+     *
+     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
+     * This getter is not thread-safe and would require guards by the user.
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES Permission.MANAGE_ROLES}
@@ -271,4 +277,104 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      */
     @Nonnull
     JDA getJDA();
+
+    /**
+     * The tags of this role.
+     * <br>This is useful to determine the purpose of a managed role.
+     *
+     * <p>This requires {@link net.dv8tion.jda.api.utils.cache.CacheFlag#ROLE_TAGS CacheFlag.ROLE_TAGS}
+     * to be enabled.
+     * See {@link net.dv8tion.jda.api.JDABuilder#enableCache(CacheFlag, CacheFlag...) JDABuilder.enableCache(...)}.
+     *
+     * @return {@link RoleTags}
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    RoleTags getTags();
+
+    /**
+     * The {@link RoleIcon Icon} of this role or {@code null} if no custom image or emoji is set.
+     * This icon will be displayed next to the role's name in the members tab and in chat.
+     *
+     * @return Possibly-null {@link RoleIcon Icon} of this role
+     *
+     * @since  4.3.1
+     */
+    @Nullable
+    RoleIcon getIcon();
+
+    /**
+     * Tags associated with this role.
+     *
+     * @since  4.2.1
+     */
+    interface RoleTags
+    {
+        /**
+         * Whether this role is associated with a bot.
+         *
+         * @return True, if this role is for a bot
+         */
+        boolean isBot();
+
+        /**
+         * The id for the bot associated with this role.
+         *
+         * @return The bot id, or 0 if this role is not for a bot
+         *
+         * @see    #isBot()
+         */
+        long getBotIdLong();
+
+        /**
+         * The id for the bot associated with this role.
+         *
+         * @return The bot id, or null if this role is not for a bot
+         *
+         * @see    #isBot()
+         */
+        @Nullable
+        default String getBotId()
+        {
+            return isBot() ? Long.toUnsignedString(getBotIdLong()) : null;
+        }
+
+        /**
+         * Whether this role is the boost role of this guild.
+         *
+         * @return True, if this role is the boost role
+         */
+        boolean isBoost();
+
+        /**
+         * Whether this role is managed by an integration.
+         * <br>This is usually true for roles such as those created for twitch subscribers.
+         *
+         * @return True, if this role is managed by an integration
+         */
+        boolean isIntegration();
+
+        /**
+         * The id for the integration associated with this role.
+         *
+         * @return The integration id, or 0 if this role is not for an integration
+         *
+         * @see    #isIntegration()
+         */
+        long getIntegrationIdLong();
+
+        /**
+         * The id for the integration associated with this role.
+         *
+         * @return The integration id, or null if this role is not for an integration
+         *
+         * @see    #isIntegration()
+         */
+        @Nullable
+        default String getIntegrationId()
+        {
+            return isIntegration() ? Long.toUnsignedString(getIntegrationIdLong()) : null;
+        }
+    }
 }

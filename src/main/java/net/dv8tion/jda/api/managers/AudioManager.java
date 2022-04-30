@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -189,7 +189,7 @@ public interface AudioManager
      * @deprecated The internals have changed and this is no longer used
      */
     @Deprecated
-    @ForRemoval
+    @ForRemoval(deadline = "5.0.0")
     @DeprecatedSince("4.2.0")
     boolean isAttemptingToConnect();
 
@@ -207,7 +207,7 @@ public interface AudioManager
      */
     @Nullable
     @Deprecated
-    @ForRemoval
+    @ForRemoval(deadline = "5.0.0")
     @DeprecatedSince("4.2.0")
     VoiceChannel getQueuedAudioConnection();
 

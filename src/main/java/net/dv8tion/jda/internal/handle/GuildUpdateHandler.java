@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import net.dv8tion.jda.internal.entities.GuildImpl;
 import net.dv8tion.jda.internal.requests.WebSocketClient;
 
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -78,12 +79,18 @@ public class GuildUpdateHandler extends SocketHandler
         Guild.VerificationLevel verificationLevel = Guild.VerificationLevel.fromKey(content.getInt("verification_level"));
         Guild.NotificationLevel notificationLevel = Guild.NotificationLevel.fromKey(content.getInt("default_message_notifications"));
         Guild.MFALevel mfaLevel = Guild.MFALevel.fromKey(content.getInt("mfa_level"));
+        Guild.NSFWLevel nsfwLevel = Guild.NSFWLevel.fromKey(content.getInt("nsfw_level", -1));
         Guild.ExplicitContentLevel explicitContentLevel = Guild.ExplicitContentLevel.fromKey(content.getInt("explicit_content_filter"));
         Guild.Timeout afkTimeout = Guild.Timeout.fromKey(content.getInt("afk_timeout"));
+        Locale locale = Locale.forLanguageTag(content.getString("preferred_locale"));
         VoiceChannel afkChannel = content.isNull("afk_channel_id")
                 ? null : guild.getVoiceChannelsView().get(content.getLong("afk_channel_id"));
         TextChannel systemChannel = content.isNull("system_channel_id")
                 ? null : guild.getTextChannelsView().get(content.getLong("system_channel_id"));
+        TextChannel rulesChannel = content.isNull("rules_channel_id")
+                ? null : guild.getTextChannelsView().get(content.getLong("rules_channel_id"));
+        TextChannel communityUpdatesChannel = content.isNull("public_updates_channel_id")
+                ? null : guild.getTextChannelsView().get(content.getLong("public_updates_channel_id"));
         Set<String> features;
         if (!content.isNull("features"))
         {
@@ -263,6 +270,15 @@ public class GuildUpdateHandler extends SocketHandler
                             getJDA(), responseNumber,
                             guild, oldAfkTimeout));
         }
+        if (!Objects.equals(locale, guild.getLocale()))
+        {
+            Locale oldLocale = guild.getLocale();
+            guild.setLocale(locale.toLanguageTag());
+            getJDA().handleEvent(
+                new GuildUpdateLocaleEvent(
+                    getJDA(), responseNumber,
+                    guild, oldLocale));
+        }
         if (!Objects.equals(afkChannel, guild.getAfkChannel()))
         {
             VoiceChannel oldAfkChannel = guild.getAfkChannel();
@@ -280,6 +296,33 @@ public class GuildUpdateHandler extends SocketHandler
                     new GuildUpdateSystemChannelEvent(
                             getJDA(), responseNumber,
                             guild, oldSystemChannel));
+        }
+        if (!Objects.equals(rulesChannel, guild.getRulesChannel()))
+        {
+            TextChannel oldRulesChannel = guild.getRulesChannel();
+            guild.setRulesChannel(rulesChannel);
+            getJDA().handleEvent(
+                    new GuildUpdateRulesChannelEvent(
+                            getJDA(), responseNumber,
+                            guild, oldRulesChannel));
+        }
+        if (!Objects.equals(communityUpdatesChannel, guild.getCommunityUpdatesChannel()))
+        {
+            TextChannel oldCommunityUpdatesChannel = guild.getCommunityUpdatesChannel();
+            guild.setCommunityUpdatesChannel(communityUpdatesChannel);
+            getJDA().handleEvent(
+                    new GuildUpdateCommunityUpdatesChannelEvent(
+                            getJDA(), responseNumber,
+                            guild, oldCommunityUpdatesChannel));
+        }
+        if (content.hasKey("nsfw_level") && nsfwLevel != guild.getNSFWLevel())
+        {
+            Guild.NSFWLevel oldNSFWLevel = guild.getNSFWLevel();
+            guild.setNSFWLevel(nsfwLevel);
+            getJDA().handleEvent(
+                    new GuildUpdateNSFWLevelEvent(
+                            getJDA(), responseNumber,
+                            guild, oldNSFWLevel));
         }
         return null;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,31 +16,36 @@
 
 package net.dv8tion.jda.api.events.message.priv.react;
 
+import javax.annotation.CheckReturnValue;
+
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.MessageReaction;
-import net.dv8tion.jda.api.entities.PrivateChannel;
-import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.message.priv.GenericPrivateMessageEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.internal.requests.CompletedRestAction;
+
 /**
  * Indicates that a {@link net.dv8tion.jda.api.entities.MessageReaction MessageReaction} was added or removed.
  *
  * <p>Can be used to detect when a message reaction is added or removed from a message.
+ *
+ * <h2>Requirements</h2>
+ *
+ * <p>These events require the {@link net.dv8tion.jda.api.requests.GatewayIntent#DIRECT_MESSAGE_REACTIONS DIRECT_MESSAGE_REACTIONS} intent to be enabled.
  */
 public class GenericPrivateMessageReactionEvent extends GenericPrivateMessageEvent
 {
     protected final long userId;
-    protected final User issuer;
     protected final MessageReaction reaction;
 
-    public GenericPrivateMessageReactionEvent(@Nonnull JDA api, long responseNumber, @Nullable User user, @Nonnull MessageReaction reaction, long userId)
+    public GenericPrivateMessageReactionEvent(@Nonnull JDA api, long responseNumber, @Nonnull MessageReaction reaction, long userId)
     {
         super(api, responseNumber, reaction.getMessageIdLong(), (PrivateChannel) reaction.getChannel());
         this.userId = userId;
-        this.issuer = user;
         this.reaction = reaction;
     }
 
@@ -70,11 +75,15 @@ public class GenericPrivateMessageReactionEvent extends GenericPrivateMessageEve
      * <br>This might be missing if the user was not cached.
      *
      * @return The reacting user
+     *
+     * @see #retrieveUser()
      */
     @Nullable
     public User getUser()
     {
-        return issuer;
+        return userId == getJDA().getSelfUser().getIdLong()
+                ? getJDA().getSelfUser()
+                : getChannel().getUser();
     }
 
     /**
@@ -98,5 +107,40 @@ public class GenericPrivateMessageReactionEvent extends GenericPrivateMessageEve
     public MessageReaction.ReactionEmote getReactionEmote()
     {
         return reaction.getReactionEmote();
+    }
+
+    /**
+     * Retrieves the {@link User} who owns the reaction.
+     * <br>If a user is known, this will return {@link #getUser()}.
+     *
+     * @return {@link RestAction} - Type: {@link User}
+     *
+     * @since  4.3.1
+     */
+    @Nonnull
+    @CheckReturnValue
+    public RestAction<User> retrieveUser()
+    {
+        User user = getUser();
+        if (user != null)
+            return new CompletedRestAction<>(getJDA(), user);
+        return getJDA().retrieveUserById(getUserIdLong());
+    }
+
+    /**
+     * Retrieves the message for this reaction event.
+     * <br>Simple shortcut for {@code getChannel().retrieveMessageById(getMessageId())}.
+     *
+     * <p>The {@link Message#getMember() Message.getMember()} method will always return null for the resulting message.
+     *
+     * @return {@link RestAction} - Type: {@link Message}
+     *
+     * @since  4.3.1
+     */
+    @Nonnull
+    @CheckReturnValue
+    public RestAction<Message> retrieveMessage()
+    {
+        return getChannel().retrieveMessageById(getMessageId());
     }
 }

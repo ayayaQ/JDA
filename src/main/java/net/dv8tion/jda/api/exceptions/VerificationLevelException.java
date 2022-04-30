@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import net.dv8tion.jda.annotations.ForRemoval;
 import net.dv8tion.jda.api.entities.Guild;
 
 @Deprecated
-@ForRemoval
+@ForRemoval(deadline = "4.4.0")
 @DeprecatedSince("4.2.0")
 public class VerificationLevelException extends IllegalStateException
 {

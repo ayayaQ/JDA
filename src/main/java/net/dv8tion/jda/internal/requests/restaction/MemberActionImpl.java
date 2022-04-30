@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ public class MemberActionImpl extends RestActionImpl<Void> implements MemberActi
                 this.nick = null;
                 return this;
             }
-            Checks.check(nick.length() <= 32, "Nickname must not be greater than 32 characters in length");
+            Checks.notLonger(nick, 32, "Nickname");
         }
         this.nick = nick;
         return this;

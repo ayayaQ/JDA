@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@ package net.dv8tion.jda.api.sharding;
 
 import com.neovisionaries.ws.client.WebSocketFactory;
 import net.dv8tion.jda.annotations.DeprecatedSince;
+import net.dv8tion.jda.annotations.ForRemoval;
 import net.dv8tion.jda.annotations.ReplaceWith;
+import net.dv8tion.jda.api.GatewayEncoding;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.audio.factory.IAudioSendFactory;
@@ -68,6 +70,7 @@ public class  DefaultShardManagerBuilder
     protected EnumSet<ConfigFlag> flags = ConfigFlag.getDefault();
     protected EnumSet<ShardingConfigFlag> shardingFlags = ShardingConfigFlag.getDefault();
     protected Compression compression = Compression.ZLIB;
+    protected GatewayEncoding encoding = GatewayEncoding.JSON;
     protected int shardsTotal = -1;
     protected int maxReconnectDelay = 900;
     protected int largeThreshold = 250;
@@ -83,6 +86,7 @@ public class  DefaultShardManagerBuilder
     protected ThreadPoolProvider<? extends ScheduledExecutorService> gatewayPoolProvider = null;
     protected ThreadPoolProvider<? extends ExecutorService> callbackPoolProvider = null;
     protected ThreadPoolProvider<? extends ExecutorService> eventPoolProvider = null;
+    protected ThreadPoolProvider<? extends ScheduledExecutorService> audioPoolProvider = null;
     protected Collection<Integer> shards = null;
     protected OkHttpClient.Builder httpClientBuilder = null;
     protected OkHttpClient httpClient = null;
@@ -91,44 +95,6 @@ public class  DefaultShardManagerBuilder
     protected ThreadFactory threadFactory = null;
     protected ChunkingFilter chunkingFilter;
     protected MemberCachePolicy memberCachePolicy = MemberCachePolicy.ALL;
-
-    /**
-     * Creates a completely empty DefaultShardManagerBuilder.
-     * <br>You need to set the token using
-     * {@link #setToken(String) setToken(String)}
-     * before calling {@link #build() build()}.
-     *
-     * @deprecated Due to breaking changes to the discord api gateway you are now required to explicitly
-     * state which events your bot needs. For this reason we have changed to new factory methods that require setting
-     * the gateway intents. Use {@link #create(Collection)} instead.
-     */
-    @Deprecated
-    @DeprecatedSince("4.2.0")
-    @ReplaceWith("DefaultShardManager.create(String, EnumSet)")
-    public DefaultShardManagerBuilder() {}
-
-    /**
-     * Creates a DefaultShardManagerBuilder with the given token.
-     * <br>This is equivalent to using the constructor
-     * {@link #DefaultShardManagerBuilder() DefaultShardManagerBuilder()}
-     * and calling {@link #setToken(String) setToken(String)}
-     * directly afterward. You can always change the token later with
-     * {@link #setToken(String) setToken(String)}.
-     *
-     * @param token
-     *        The login token
-     *
-     * @deprecated Due to breaking changes to the discord api gateway you are now required to explicitly
-     * state which events your bot needs. For this reason we have changed to new factory methods that require setting
-     * the gateway intents. Use {@link #create(String, Collection)} instead.
-     */
-    @Deprecated
-    @DeprecatedSince("4.2.0")
-    @ReplaceWith("DefaultShardManager.create(String, EnumSet)")
-    public DefaultShardManagerBuilder(@Nonnull String token)
-    {
-        this.setToken(token);
-    }
 
     private DefaultShardManagerBuilder(@Nullable String token, int intents)
     {
@@ -172,6 +138,9 @@ public class  DefaultShardManagerBuilder
      *     <li>This disables {@link CacheFlag#ACTIVITY} and {@link CacheFlag#CLIENT_STATUS}</li>
      * </ul>
      *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
+     *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
      * be cached when a voice state is available.
@@ -212,6 +181,9 @@ public class  DefaultShardManagerBuilder
      *     <li>This disables {@link CacheFlag#ACTIVITY} and {@link CacheFlag#CLIENT_STATUS}</li>
      * </ul>
      *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
+     *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
      * be cached when a voice state is available.
@@ -242,7 +214,7 @@ public class  DefaultShardManagerBuilder
     {
         return this.setMemberCachePolicy(MemberCachePolicy.DEFAULT)
                    .setChunkingFilter(ChunkingFilter.NONE)
-                   .disableCache(CacheFlag.CLIENT_STATUS, CacheFlag.ACTIVITY)
+                   .disableCache(CacheFlag.getPrivileged())
                    .setLargeThreshold(250);
     }
 
@@ -282,6 +254,9 @@ public class  DefaultShardManagerBuilder
      *     <li>This disables all existing {@link CacheFlag CacheFlags}</li>
      * </ul>
      *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
+     *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
      * be cached when a voice state is available.
@@ -318,6 +293,9 @@ public class  DefaultShardManagerBuilder
      *     <li>{@link #setChunkingFilter(ChunkingFilter)} is set to {@link ChunkingFilter#NONE}</li>
      *     <li>This disables all existing {@link CacheFlag CacheFlags}</li>
      * </ul>
+     *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
      *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
@@ -507,6 +485,27 @@ public class  DefaultShardManagerBuilder
     }
 
     /**
+     * Choose which {@link GatewayEncoding} JDA should use.
+     *
+     * @param  encoding
+     *         The {@link GatewayEncoding} (default: JSON)
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided
+     *
+     * @return The DefaultShardManagerBuilder instance. Useful for chaining.
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public DefaultShardManagerBuilder setGatewayEncoding(@Nonnull GatewayEncoding encoding)
+    {
+        Checks.notNull(encoding, "GatewayEncoding");
+        this.encoding = encoding;
+        return this;
+    }
+
+    /**
      * Whether JDA should fire {@link net.dv8tion.jda.api.events.RawGatewayEvent} for every discord event.
      * <br>Default: {@code false}
      *
@@ -566,6 +565,7 @@ public class  DefaultShardManagerBuilder
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @ReplaceWith("enableCache(flags) and disableCache(flags)")
     @DeprecatedSince("4.2.0")
     public DefaultShardManagerBuilder setEnabledCacheFlags(@Nullable EnumSet<CacheFlag> flags)
@@ -639,6 +639,7 @@ public class  DefaultShardManagerBuilder
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @ReplaceWith("enableCache(flags) and disableCache(flags)")
     @DeprecatedSince("4.2.0")
     public DefaultShardManagerBuilder setDisabledCacheFlags(@Nullable EnumSet<CacheFlag> flags)
@@ -1107,6 +1108,7 @@ public class  DefaultShardManagerBuilder
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @DeprecatedSince("3.8.1")
     @ReplaceWith("setEventManagerProvider((id) -> manager)")
     public DefaultShardManagerBuilder setEventManager(@Nonnull final IEventManager manager)
@@ -1146,7 +1148,7 @@ public class  DefaultShardManagerBuilder
      * Sets the {@link net.dv8tion.jda.api.entities.Activity Activity} for our session.
      * <br>This value can be changed at any time in the {@link net.dv8tion.jda.api.managers.Presence Presence} from a JDA instance.
      *
-     * <p><b>Hint:</b> You can create a {@link net.dv8tion.jda.api.entities.Activity Activity} object using
+     * <p><b>Hint:</b> You can create an {@link net.dv8tion.jda.api.entities.Activity Activity} object using
      * {@link net.dv8tion.jda.api.entities.Activity#playing(String) Activity.playing(String)} or
      * {@link net.dv8tion.jda.api.entities.Activity#streaming(String, String)} Activity.streaming(String, String)}.
      *
@@ -1167,7 +1169,7 @@ public class  DefaultShardManagerBuilder
      * Sets the {@link net.dv8tion.jda.api.entities.Activity Activity} for our session.
      * <br>This value can be changed at any time in the {@link net.dv8tion.jda.api.managers.Presence Presence} from a JDA instance.
      *
-     * <p><b>Hint:</b> You can create a {@link net.dv8tion.jda.api.entities.Activity Activity} object using
+     * <p><b>Hint:</b> You can create an {@link net.dv8tion.jda.api.entities.Activity Activity} object using
      * {@link net.dv8tion.jda.api.entities.Activity#playing(String) Activity.playing(String)} or
      * {@link net.dv8tion.jda.api.entities.Activity#streaming(String, String) Activity.streaming(String, String)}.
      *
@@ -1618,8 +1620,73 @@ public class  DefaultShardManagerBuilder
     }
 
     /**
+     * Sets the {@link ScheduledExecutorService ScheduledExecutorService} used by
+     * the audio WebSocket connection. Used for sending keepalives and closing the connection.
+     * <br><b>Only change this pool if you know what you're doing.</b>
+     *
+     * <p>Default: {@link ScheduledThreadPoolExecutor} with 1 thread
+     *
+     * @param  pool
+     *         The thread-pool to use for the audio WebSocket
+     *
+     * @return The DefaultShardManagerBuilder instance. Useful for chaining.
+     *
+     * @since 4.2.1
+     */
+    @Nonnull
+    public DefaultShardManagerBuilder setAudioPool(@Nullable ScheduledExecutorService pool)
+    {
+        return setAudioPool(pool, pool == null);
+    }
+
+    /**
+     * Sets the {@link ScheduledExecutorService ScheduledExecutorService} used by
+     * the audio WebSocket connection. Used for sending keepalives and closing the connection.
+     * <br><b>Only change this pool if you know what you're doing.</b>
+     *
+     * <p>Default: {@link ScheduledThreadPoolExecutor} with 1 thread
+     *
+     * @param  pool
+     *         The thread-pool to use for the audio WebSocket
+     * @param  automaticShutdown
+     *         True, if the executor should be shutdown when JDA shuts down
+     *
+     * @return The DefaultShardManagerBuilder instance. Useful for chaining.
+     *
+     * @since 4.2.1
+     */
+    @Nonnull
+    public DefaultShardManagerBuilder setAudioPool(@Nullable ScheduledExecutorService pool, boolean automaticShutdown)
+    {
+        return setAudioPoolProvider(pool == null ? null : new ThreadPoolProviderImpl<>(pool, automaticShutdown));
+    }
+
+    /**
+     * Sets the {@link ScheduledExecutorService ScheduledExecutorService} used by
+     * the audio WebSocket connection. Used for sending keepalives and closing the connection.
+     * <br><b>Only change this pool if you know what you're doing.</b>
+     *
+     * <p>Default: {@link ScheduledThreadPoolExecutor} with 1 thread
+     *
+     * @param  provider
+     *         The thread-pool provider to use for the audio WebSocket
+     *
+     * @return The DefaultShardManagerBuilder instance. Useful for chaining.
+     *
+     * @since 4.2.1
+     */
+    @Nonnull
+    public DefaultShardManagerBuilder setAudioPoolProvider(@Nullable ThreadPoolProvider<? extends ScheduledExecutorService> provider)
+    {
+        this.audioPoolProvider = provider;
+        return this;
+    }
+
+    /**
      * Sets the maximum amount of time that JDA will back off to wait when attempting to reconnect the MainWebsocket.
      * <br>Provided value must be 32 or greater.
+     *
+     * <p>Default: {@code 900}
      *
      * @param  maxReconnectDelay
      *         The maximum amount of time that JDA will wait between reconnect attempts in seconds.
@@ -1877,6 +1944,7 @@ public class  DefaultShardManagerBuilder
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @ReplaceWith("setDisabledIntents(...).setMemberCachePolicy(...)")
     @DeprecatedSince("4.2.0")
     public DefaultShardManagerBuilder setGuildSubscriptionsEnabled(boolean enabled)
@@ -2181,12 +2249,42 @@ public class  DefaultShardManagerBuilder
      *          If the provided token is invalid.
      * @throws  IllegalArgumentException
      *          If the provided token is empty or null. Or the provided intents/cache configuration is not possible.
+     * @throws  net.dv8tion.jda.api.exceptions.ErrorResponseException
+     *          If some other HTTP error occurred.
      *
      * @return A {@link net.dv8tion.jda.api.sharding.ShardManager ShardManager} instance that has started the login process. It is unknown as
      *         to whether or not loading has finished when this returns.
      */
     @Nonnull
     public ShardManager build() throws LoginException, IllegalArgumentException
+    {
+        return build(true);
+    }
+
+    /**
+     * Builds a new {@link net.dv8tion.jda.api.sharding.ShardManager ShardManager} instance. If the login parameter is true, then it will start the login process.
+     * <br>The login process runs in a different thread, so while this will return immediately, {@link net.dv8tion.jda.api.sharding.ShardManager ShardManager} has not
+     * finished loading, thus many {@link net.dv8tion.jda.api.sharding.ShardManager ShardManager} methods have the chance to return incorrect information.
+     * <br>The main use of this method is to start the JDA connect process and do other things in parallel while startup is
+     * being performed like database connection or local resource loading.
+     *
+     * <p>Note that this method is async and as such will <b>not</b> block until all shards are started.
+     *
+     * @param  login
+     *         Whether the login process will be started. If this is false, then you will need to manually call
+     *         {@link net.dv8tion.jda.api.sharding.ShardManager#login()} to start it.
+     *
+     * @throws  LoginException
+     *          If the provided token is invalid and {@code login} is true
+     * @throws  IllegalArgumentException
+     *          If the provided token is empty or null. Or the provided intents/cache configuration is not possible.
+     *
+     * @return A {@link net.dv8tion.jda.api.sharding.ShardManager ShardManager} instance. If {@code login} is set to
+     * true, then the instance will have started the login process. It is unknown as to whether or not loading has
+     * finished when this returns.
+     */
+    @Nonnull
+    public ShardManager build(boolean login) throws LoginException, IllegalArgumentException
     {
         checkIntents();
         boolean useShutdownNow = shardingFlags.contains(ShardingConfigFlag.SHUTDOWN_NOW);
@@ -2198,12 +2296,13 @@ public class  DefaultShardManagerBuilder
         presenceConfig.setActivityProvider(activityProvider);
         presenceConfig.setStatusProvider(statusProvider);
         presenceConfig.setIdleProvider(idleProvider);
-        final ThreadingProviderConfig threadingConfig = new ThreadingProviderConfig(rateLimitPoolProvider, gatewayPoolProvider, callbackPoolProvider, eventPoolProvider, threadFactory);
+        final ThreadingProviderConfig threadingConfig = new ThreadingProviderConfig(rateLimitPoolProvider, gatewayPoolProvider, callbackPoolProvider, eventPoolProvider, audioPoolProvider, threadFactory);
         final ShardingSessionConfig sessionConfig = new ShardingSessionConfig(sessionController, voiceDispatchInterceptor, httpClient, httpClientBuilder, wsFactory, audioSendFactory, flags, shardingFlags, maxReconnectDelay, largeThreshold);
-        final ShardingMetaConfig metaConfig = new ShardingMetaConfig(maxBufferSize, contextProvider, cacheFlags, flags, compression);
+        final ShardingMetaConfig metaConfig = new ShardingMetaConfig(maxBufferSize, contextProvider, cacheFlags, flags, compression, encoding);
         final DefaultShardManager manager = new DefaultShardManager(this.token, this.shards, shardingConfig, eventConfig, presenceConfig, threadingConfig, sessionConfig, metaConfig, chunkingFilter);
 
-        manager.login();
+        if (login)
+             manager.login();
 
         return manager;
     }

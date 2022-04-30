@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package net.dv8tion.jda.api.entities;
 
+import net.dv8tion.jda.annotations.Incubating;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
@@ -47,8 +48,11 @@ import java.util.List;
  * @see   Guild#getMembersWithRoles(Role...)
  * @see   Guild#getMembers()
  */
-public interface Member extends IMentionable, IPermissionHolder, IFakeable
+public interface Member extends IMentionable, IPermissionHolder
 {
+    /** Template for {@link #getAvatarUrl()}. */
+    String AVATAR_URL = "https://cdn.discordapp.com/guilds/%s/users/%s/avatars/%s.%s";
+
     /**
      * The user wrapped by this Entity.
      *
@@ -138,6 +142,8 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      * Returns the {@link net.dv8tion.jda.api.OnlineStatus OnlineStatus} of the User.
      * <br>If the {@link net.dv8tion.jda.api.OnlineStatus OnlineStatus} is unrecognized, will return {@link net.dv8tion.jda.api.OnlineStatus#UNKNOWN UNKNOWN}.
      *
+     * <p>This will always return {@link OnlineStatus#OFFLINE} if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#ONLINE_STATUS CacheFlag.ONLINE_STATUS} is disabled.
+     *
      * @return The current {@link net.dv8tion.jda.api.OnlineStatus OnlineStatus} of the {@link net.dv8tion.jda.api.entities.User User}.
      */
     @Nonnull
@@ -203,6 +209,42 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      */
     @Nonnull
     String getEffectiveName();
+
+    /**
+     * The Discord Id for this member's per guild avatar image.
+     * If the member has not set a per guild avatar, this will return null.
+     *
+     * @return Possibly-null String containing the {@link net.dv8tion.jda.api.entities.Member} per guild avatar id.
+     */
+    @Nullable
+    String getAvatarId();
+
+    /**
+     * The URL for the member's per guild avatar image.
+     * If the member has not set a per guild avatar, this will return null.
+     *
+     * @return Possibly-null String containing the {@link net.dv8tion.jda.api.entities.Member} per guild avatar url.
+     */
+    @Nullable
+    default String getAvatarUrl()
+    {
+        String avatarId = getAvatarId();
+        return avatarId == null ? null : String.format(AVATAR_URL, getGuild().getId(), getId(), avatarId, avatarId.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * The URL for the member's effective avatar image.
+     * If they do not have a per guild avatar set, this will return the URL of
+     * their effective {@link User} avatar.
+     *
+     * @return Never-null String containing the {@link net.dv8tion.jda.api.entities.Member} avatar url.
+     */
+    @Nonnull
+    default String getEffectiveAvatarUrl()
+    {
+        String avatarUrl = getAvatarUrl();
+        return avatarUrl == null ? getUser().getEffectiveAvatarUrl() : avatarUrl;
+    }
 
     /**
      * The roles applied to this Member.
@@ -304,6 +346,19 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
     boolean isOwner();
 
     /**
+     * Checks whether this member has passed the {@link net.dv8tion.jda.api.entities.Guild Guild's}
+     * Membership Screening requirements.
+     *
+     * @incubating Discord is still trying to figure this out
+     *
+     * @return True, if this member hasn't passed the guild's Membership Screening requirements
+     *
+     * @since  4.2.1
+     */
+    @Incubating
+    boolean isPending();
+
+    /**
      * The default {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} for a {@link net.dv8tion.jda.api.entities.Member Member}.
      * <br>This is the channel that the Discord client will default to opening when a Guild is opened for the first time
      * after joining the guild.
@@ -349,7 +404,6 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      *         <ul>
      *             <li>If the provided amount of days (delDays) is less than 0.</li>
      *             <li>If the provided amount of days (delDays) is bigger than 7.</li>
-     *             <li>If the provided member is {@code null}</li>
      *         </ul>
      *
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
@@ -397,7 +451,7 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      *         <ul>
      *             <li>If the provided amount of days (delDays) is less than 0.</li>
      *             <li>If the provided amount of days (delDays) is bigger than 7.</li>
-     *             <li>If the provided member is {@code null}</li>
+     *             <li>If the provided reason is longer than 512 characters.</li>
      *         </ul>
      *
      *
@@ -428,8 +482,6 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      *     <br>The specified Member was removed from the Guild before finishing the task</li>
      * </ul>
      *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided member is not a Member of this Guild or is {@code null}
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the logged in account does not have the {@link net.dv8tion.jda.api.Permission#KICK_MEMBERS} permission.
      * @throws net.dv8tion.jda.api.exceptions.HierarchyException
@@ -449,9 +501,9 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
     }
 
     /**
-     * Kicks this from the {@link net.dv8tion.jda.api.entities.Guild Guild}.
+     * Kicks this Member from the {@link net.dv8tion.jda.api.entities.Guild Guild}.
      *
-     * <p><b>Note:</b> {@link net.dv8tion.jda.api.entities.Guild#getMembers()} will still contain the {@link net.dv8tion.jda.api.entities.User User}
+     * <p><b>Note:</b> {@link net.dv8tion.jda.api.entities.Guild#getMembers()} will still contain the {@link net.dv8tion.jda.api.entities.Member Member}
      * until Discord sends the {@link net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent GuildMemberRemoveEvent}.
      *
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} caused by
@@ -467,13 +519,13 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      * @param  reason
      *         The reason for this action or {@code null} if there is no specified reason
      *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided member is not a Member of this Guild or is {@code null}
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the logged in account does not have the {@link net.dv8tion.jda.api.Permission#KICK_MEMBERS} permission.
      * @throws net.dv8tion.jda.api.exceptions.HierarchyException
      *         If the logged in account cannot kick the other member due to permission hierarchy position.
      *         <br>See {@link Member#canInteract(Member)}
+     * @throws java.lang.IllegalArgumentException
+     *         If the provided reason is longer than 512 characters
      *
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
      *         Kicks the provided Member from the current Guild
@@ -512,10 +564,8 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the logged in account does not have the {@link net.dv8tion.jda.api.Permission#VOICE_DEAF_OTHERS} permission.
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided member is not from this Guild or null.
      * @throws java.lang.IllegalStateException
-     *         If the provided member is not currently connected to a voice channel.
+     *         If the member is not currently connected to a voice channel.
      *
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
      *
@@ -552,10 +602,8 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the logged in account does not have the {@link net.dv8tion.jda.api.Permission#VOICE_DEAF_OTHERS} permission.
-     * @throws IllegalArgumentException
-     *         If the provided member is not from this Guild or null.
      * @throws java.lang.IllegalStateException
-     *         If the provided member is not currently connected to a voice channel.
+     *         If the member is not currently connected to a voice channel.
      *
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
      *
@@ -591,10 +639,6 @@ public interface Member extends IMentionable, IPermissionHolder, IFakeable
      *         The new nickname of the {@link net.dv8tion.jda.api.entities.Member Member}, provide {@code null} or an
      *         empty String to reset the nickname
      *
-     * @throws IllegalArgumentException
-     *         If the specified {@link net.dv8tion.jda.api.entities.Member Member}
-     *         is not from the same {@link net.dv8tion.jda.api.entities.Guild Guild}.
-     *         Or if the provided member is {@code null}
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         <ul>
      *             <li>If attempting to set nickname for self and the logged in account has neither {@link net.dv8tion.jda.api.Permission#NICKNAME_CHANGE}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 
 package net.dv8tion.jda.api.managers;
 
+import net.dv8tion.jda.annotations.DeprecatedSince;
+import net.dv8tion.jda.annotations.ForRemoval;
+import net.dv8tion.jda.annotations.ReplaceWith;
 import net.dv8tion.jda.api.Region;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Icon;
@@ -69,9 +72,13 @@ public interface GuildManager extends Manager<GuildManager>
     /** Used to reset the banner field */
     long BANNER                 = 0x800;
     /** Used to reset the vanity code field */
-    long VANITY_URL   = 0x1000;
+    long VANITY_URL                 = 0x1000;
     /** Used to reset the description field */
-    long DESCRIPTION  = 0x2000;
+    long DESCRIPTION                = 0x2000;
+    /** Used to reset the rules channel field */
+    long RULES_CHANNEL              = 0x4000;
+    /** Used to reset the community updates channel field */
+    long COMMUNITY_UPDATES_CHANNEL  = 0x8000;
 
     /**
      * Resets the fields specified by the provided bit-flag pattern.
@@ -87,6 +94,8 @@ public interface GuildManager extends Manager<GuildManager>
      *     <li>{@link #AFK_CHANNEL}</li>
      *     <li>{@link #AFK_TIMEOUT}</li>
      *     <li>{@link #SYSTEM_CHANNEL}</li>
+     *     <li>{@link #RULES_CHANNEL}</li>
+     *     <li>{@link #COMMUNITY_UPDATES_CHANNEL}</li>
      *     <li>{@link #MFA_LEVEL}</li>
      *     <li>{@link #NOTIFICATION_LEVEL}</li>
      *     <li>{@link #EXPLICIT_CONTENT_LEVEL}</li>
@@ -116,6 +125,8 @@ public interface GuildManager extends Manager<GuildManager>
      *     <li>{@link #AFK_CHANNEL}</li>
      *     <li>{@link #AFK_TIMEOUT}</li>
      *     <li>{@link #SYSTEM_CHANNEL}</li>
+     *     <li>{@link #RULES_CHANNEL}</li>
+     *     <li>{@link #COMMUNITY_UPDATES_CHANNEL}</li>
      *     <li>{@link #MFA_LEVEL}</li>
      *     <li>{@link #NOTIFICATION_LEVEL}</li>
      *     <li>{@link #EXPLICIT_CONTENT_LEVEL}</li>
@@ -169,9 +180,15 @@ public interface GuildManager extends Manager<GuildManager>
      *
      * @see    net.dv8tion.jda.api.Region#isVip()
      * @see    net.dv8tion.jda.api.entities.Guild#getFeatures()
+     * 
+     * @deprecated Guilds no longer have the {@link net.dv8tion.jda.api.Region Region} option. Use {@link ChannelManager#setRegion(Region)} instead.
      */
     @Nonnull
     @CheckReturnValue
+    @Deprecated
+    @ForRemoval(deadline = "5.0.0")
+    @ReplaceWith("ChannelManager.setRegion()")
+    @DeprecatedSince("4.3.0")
     GuildManager setRegion(@Nonnull Region region);
 
     /**
@@ -195,7 +212,7 @@ public interface GuildManager extends Manager<GuildManager>
      *         or {@code null} to reset
      *
      * @throws java.lang.IllegalStateException
-     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} does not include {@code INVITE_SPLASH}
+     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} do not include {@code INVITE_SPLASH}
      *
      * @return GuildManager for chaining convenience
      */
@@ -234,6 +251,38 @@ public interface GuildManager extends Manager<GuildManager>
     @Nonnull
     @CheckReturnValue
     GuildManager setSystemChannel(@Nullable TextChannel systemChannel);
+
+    /**
+     * Sets the rules {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} of this {@link net.dv8tion.jda.api.entities.Guild Guild}.
+     *
+     * @param  rulesChannel
+     *         The new rules channel for this {@link net.dv8tion.jda.api.entities.Guild Guild}
+     *         or {@code null} to reset
+     *
+     * @throws IllegalArgumentException
+     *         If the provided channel is not from this guild
+     *
+     * @return GuildManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    GuildManager setRulesChannel(@Nullable TextChannel rulesChannel);
+
+    /**
+     * Sets the community updates {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} of this {@link net.dv8tion.jda.api.entities.Guild Guild}.
+     *
+     * @param  communityUpdatesChannel
+     *         The new community updates channel for this {@link net.dv8tion.jda.api.entities.Guild Guild}
+     *         or {@code null} to reset
+     *
+     * @throws IllegalArgumentException
+     *         If the provided channel is not from this guild
+     *
+     * @return GuildManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    GuildManager setCommunityUpdatesChannel(@Nullable TextChannel communityUpdatesChannel);
 
     /**
      * Sets the afk {@link net.dv8tion.jda.api.entities.Guild.Timeout Timeout} of this {@link net.dv8tion.jda.api.entities.Guild Guild}.
@@ -318,7 +367,7 @@ public interface GuildManager extends Manager<GuildManager>
      *         or {@code null} to reset
      *
      * @throws java.lang.IllegalStateException
-     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} does not include {@code BANNER}
+     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} do not include {@code BANNER}
      *
      * @return GuildManager for chaining convenience
      */
@@ -334,7 +383,7 @@ public interface GuildManager extends Manager<GuildManager>
      *         or {@code null} to reset
      *
      * @throws java.lang.IllegalStateException
-     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} does not include {@code VANITY_URL}
+     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} do not include {@code VANITY_URL}
      *
      * @return GuildManager for chaining convenience
      */
@@ -350,7 +399,7 @@ public interface GuildManager extends Manager<GuildManager>
      *         or {@code null} to reset
      *
      * @throws java.lang.IllegalStateException
-     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} does not include {@code VERIFIED}
+     *         If the guild's {@link net.dv8tion.jda.api.entities.Guild#getFeatures() features} do not include {@code VERIFIED}
      *
      * @return GuildManager for chaining convenience
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package net.dv8tion.jda.api;
 
 import com.neovisionaries.ws.client.WebSocketFactory;
 import net.dv8tion.jda.annotations.DeprecatedSince;
+import net.dv8tion.jda.annotations.ForRemoval;
 import net.dv8tion.jda.annotations.ReplaceWith;
 import net.dv8tion.jda.api.audio.factory.IAudioSendFactory;
 import net.dv8tion.jda.api.entities.Activity;
@@ -69,6 +70,8 @@ public class JDABuilder
     protected boolean shutdownCallbackPool = true;
     protected ExecutorService eventPool = null;
     protected boolean shutdownEventPool = true;
+    protected ScheduledExecutorService audioPool = null;
+    protected boolean shutdownAudioPool = true;
     protected EnumSet<CacheFlag> cacheFlags = EnumSet.allOf(CacheFlag.class);
     protected ConcurrentMap<String, String> contextMap = null;
     protected SessionController controller = null;
@@ -91,67 +94,7 @@ public class JDABuilder
     protected EnumSet<ConfigFlag> flags = ConfigFlag.getDefault();
     protected ChunkingFilter chunkingFilter = ChunkingFilter.ALL;
     protected MemberCachePolicy memberCachePolicy = MemberCachePolicy.ALL;
-
-    /**
-     * Creates a completely empty JDABuilder.
-     *
-     * <br>If you use this, you need to set the token using
-     * {@link net.dv8tion.jda.api.JDABuilder#setToken(String) setToken(String)}
-     * before calling {@link net.dv8tion.jda.api.JDABuilder#build() build()}
-     *
-     * @deprecated Due to breaking changes to the discord api gateway you are now required to explicitly
-     * state which events your bot needs. For this reason we have changed to new factory methods that require setting
-     * the gateway intents. Refer to {@link #create(String, Collection)}, {@link #createDefault(String, Collection)}, and {@link #createLight(String, Collection)} instead.
-     *
-     * @see #JDABuilder(String)
-     */
-    @Deprecated
-    @DeprecatedSince("4.2.0")
-    @ReplaceWith("JDABuilder.create(GatewayIntent...)")
-    public JDABuilder() {}
-
-    /**
-     * Creates a JDABuilder with the predefined token.
-     *
-     * @param token
-     *        The bot token to use
-     *
-     * @deprecated Due to breaking changes to the discord api gateway you are now required to explicitly
-     * state which events your bot needs. For this reason we have changed to new factory methods that require setting
-     * the gateway intents. Refer to {@link #create(String, Collection)}, {@link #createDefault(String, Collection)}, and {@link #createLight(String, Collection)} instead.
-     *
-     * @see   #setToken(String)
-     */
-    @Deprecated
-    @DeprecatedSince("4.2.0")
-    @ReplaceWith("JDABuilder.create(String, GatewayIntent...)")
-    public JDABuilder(@Nullable String token)
-    {
-        this.token = token;
-    }
-
-    /**
-     * Creates a completely empty JDABuilder.
-     * <br>If you use this, you need to set the token using
-     * {@link net.dv8tion.jda.api.JDABuilder#setToken(String) setToken(String)}
-     * before calling {@link net.dv8tion.jda.api.JDABuilder#build() build()}
-     *
-     * @param  accountType
-     *         The {@link net.dv8tion.jda.api.AccountType AccountType}.
-     *
-     * @throws IllegalArgumentException
-     *         If the given AccountType is {@code null}
-     *
-     * @deprecated This will be removed in a future version, replace with {@link #create(String, Collection)}.
-     *             We no longer support login with {@link AccountType#CLIENT}.
-     */
-    @Deprecated
-    @ReplaceWith("JDABuilder.create(String)")
-    @DeprecatedSince("4.2.0")
-    public JDABuilder(@Nonnull AccountType accountType)
-    {
-        Checks.check(accountType == AccountType.BOT, "Client accounts are no longer supported!");
-    }
+    protected GatewayEncoding encoding = GatewayEncoding.JSON;
 
     private JDABuilder(@Nullable String token, int intents)
     {
@@ -195,6 +138,9 @@ public class JDABuilder
      *     <li>This disables {@link CacheFlag#ACTIVITY} and {@link CacheFlag#CLIENT_STATUS}</li>
      * </ul>
      *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
+     * 
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
      * be cached when a voice state is available.
@@ -235,6 +181,9 @@ public class JDABuilder
      *     <li>This disables {@link CacheFlag#ACTIVITY} and {@link CacheFlag#CLIENT_STATUS}</li>
      * </ul>
      *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
+     *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
      * be cached when a voice state is available.
@@ -265,7 +214,7 @@ public class JDABuilder
     {
         return this.setMemberCachePolicy(MemberCachePolicy.DEFAULT)
                    .setChunkingFilter(ChunkingFilter.NONE)
-                   .disableCache(CacheFlag.CLIENT_STATUS, CacheFlag.ACTIVITY)
+                   .disableCache(CacheFlag.getPrivileged())
                    .setLargeThreshold(250);
     }
 
@@ -305,6 +254,9 @@ public class JDABuilder
      *     <li>This disables all existing {@link CacheFlag CacheFlags}</li>
      * </ul>
      *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
+     *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
      * be cached when a voice state is available.
@@ -341,6 +293,9 @@ public class JDABuilder
      *     <li>{@link #setChunkingFilter(ChunkingFilter)} is set to {@link ChunkingFilter#NONE}</li>
      *     <li>This disables all existing {@link CacheFlag CacheFlags}</li>
      * </ul>
+     *
+     * <p>You can omit intents in this method to use {@link GatewayIntent#DEFAULT} and enable additional intents with
+     * {@link #enableIntents(Collection)}.
      *
      * <p>If you don't enable certain intents, the cache will be disabled.
      * For instance, if the {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent is disabled, then members will only
@@ -531,6 +486,27 @@ public class JDABuilder
     }
 
     /**
+     * Choose which {@link GatewayEncoding} JDA should use.
+     *
+     * @param  encoding
+     *         The {@link GatewayEncoding} (default: JSON)
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided
+     *
+     * @return The JDABuilder instance. Useful for chaining.
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public JDABuilder setGatewayEncoding(@Nonnull GatewayEncoding encoding)
+    {
+        Checks.notNull(encoding, "GatewayEncoding");
+        this.encoding = encoding;
+        return this;
+    }
+
+    /**
      * Whether JDA should fire {@link net.dv8tion.jda.api.events.RawGatewayEvent} for every discord event.
      * <br>Default: {@code false}
      *
@@ -592,6 +568,7 @@ public class JDABuilder
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @ReplaceWith("enableCache(flags) and disableCache(flags)")
     @DeprecatedSince("4.2.0")
     public JDABuilder setEnabledCacheFlags(@Nullable EnumSet<CacheFlag> flags)
@@ -665,6 +642,7 @@ public class JDABuilder
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @ReplaceWith("enableCache(flags) and disableCache(flags)")
     @DeprecatedSince("4.2.0")
     public JDABuilder setDisabledCacheFlags(@Nullable EnumSet<CacheFlag> flags)
@@ -1136,6 +1114,50 @@ public class JDABuilder
     }
 
     /**
+     * Sets the {@link ScheduledExecutorService ScheduledExecutorService} used by
+     * the audio WebSocket connection. Used for sending keepalives and closing the connection.
+     * <br><b>Only change this pool if you know what you're doing.</b>
+     *
+     * <p>Default: {@link ScheduledThreadPoolExecutor} with 1 thread
+     *
+     * @param  pool
+     *         The thread-pool to use for the audio WebSocket
+     *
+     * @return The JDABuilder instance. Useful for chaining.
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public JDABuilder setAudioPool(@Nullable ScheduledExecutorService pool)
+    {
+        return setAudioPool(pool, pool == null);
+    }
+
+    /**
+     * Sets the {@link ScheduledExecutorService ScheduledExecutorService} used by
+     * the audio WebSocket connection. Used for sending keepalives and closing the connection.
+     * <br><b>Only change this pool if you know what you're doing.</b>
+     *
+     * <p>Default: {@link ScheduledThreadPoolExecutor} with 1 thread
+     *
+     * @param  pool
+     *         The thread-pool to use for the audio WebSocket
+     * @param  automaticShutdown
+     *         Whether {@link JDA#shutdown()} should shutdown this pool
+     *
+     * @return The JDABuilder instance. Useful for chaining.
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    public JDABuilder setAudioPool(@Nullable ScheduledExecutorService pool, boolean automaticShutdown)
+    {
+        this.audioPool = pool;
+        this.shutdownAudioPool = automaticShutdown;
+        return this;
+    }
+
+    /**
      * If enabled, JDA will separate the bulk delete event into individual delete events, but this isn't as efficient as
      * handling a single event would be. It is recommended that BulkDelete Splitting be disabled and that the developer
      * should instead handle the {@link net.dv8tion.jda.api.events.message.MessageBulkDeleteEvent MessageBulkDeleteEvent}
@@ -1253,7 +1275,7 @@ public class JDABuilder
      * Sets the {@link net.dv8tion.jda.api.entities.Activity Activity} for our session.
      * <br>This value can be changed at any time in the {@link net.dv8tion.jda.api.managers.Presence Presence} from a JDA instance.
      *
-     * <p><b>Hint:</b> You can create a {@link net.dv8tion.jda.api.entities.Activity Activity} object using
+     * <p><b>Hint:</b> You can create an {@link net.dv8tion.jda.api.entities.Activity Activity} object using
      * {@link net.dv8tion.jda.api.entities.Activity#playing(String)} or {@link net.dv8tion.jda.api.entities.Activity#streaming(String, String)}.
      *
      * @param  activity
@@ -1348,6 +1370,8 @@ public class JDABuilder
      * Sets the maximum amount of time that JDA will back off to wait when attempting to reconnect the MainWebsocket.
      * <br>Provided value must be 32 or greater.
      *
+     * <p>Default: {@code 900}
+     *
      * @param  maxReconnectDelay
      *         The maximum amount of time that JDA will wait between reconnect attempts in seconds.
      *
@@ -1441,7 +1465,6 @@ public class JDABuilder
 
     /**
      * The {@link ChunkingFilter} to filter which guilds should use member chunking.
-     * <br>By default this uses {@link ChunkingFilter#ALL}.
      *
      * <p>If a guild is configured for chunking the {@link #setMemberCachePolicy(MemberCachePolicy)} will be ignored.
      *
@@ -1481,11 +1504,12 @@ public class JDABuilder
      *
      * @since  4.1.0
      *
-     * @deprecated This is now superceded by {@link #setDisabledIntents(Collection)} and {@link #setMemberCachePolicy(MemberCachePolicy)}.
+     * @deprecated This is now superseded by {@link #setDisabledIntents(Collection)} and {@link #setMemberCachePolicy(MemberCachePolicy)}.
      *             To get identical behavior you can do {@code setMemberCachePolicy(VOICE).setDisabledIntents(GatewayIntent.GUILD_PRESENCES, GatewayIntent.GUILD_MESSAGE_TYPING, GatewayIntent.GUILD_MEMBERS)}
      */
     @Nonnull
     @Deprecated
+    @ForRemoval(deadline = "5.0.0")
     @ReplaceWith("setDisabledIntents(...).setMemberCachePolicy(...)")
     @DeprecatedSince("4.2.0")
     public JDABuilder setGuildSubscriptionsEnabled(boolean enabled)
@@ -1821,6 +1845,7 @@ public class JDABuilder
         threadingConfig.setGatewayPool(mainWsPool, shutdownMainWsPool);
         threadingConfig.setRateLimitPool(rateLimitPool, shutdownRateLimitPool);
         threadingConfig.setEventPool(eventPool, shutdownEventPool);
+        threadingConfig.setAudioPool(audioPool, shutdownAudioPool);
         SessionConfig sessionConfig = new SessionConfig(controller, httpClient, wsFactory, voiceDispatchInterceptor, flags, maxReconnectDelay, largeThreshold);
         MetaConfig metaConfig = new MetaConfig(maxBufferSize, contextMap, cacheFlags, flags);
 
@@ -1846,7 +1871,7 @@ public class JDABuilder
                 .setCacheActivity(activity)
                 .setCacheIdle(idle)
                 .setCacheStatus(status);
-        jda.login(shardInfo, compression, true, intents);
+        jda.login(shardInfo, compression, true, intents, encoding);
         return jda;
     }
 

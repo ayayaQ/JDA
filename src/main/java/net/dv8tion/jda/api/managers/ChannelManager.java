@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package net.dv8tion.jda.api.managers;
 
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.Region;
 import net.dv8tion.jda.api.entities.*;
 
 import javax.annotation.CheckReturnValue;
@@ -62,6 +63,10 @@ public interface ChannelManager extends Manager<ChannelManager>
     long PERMISSION = 0x80;
     /** Used to reset the rate-limit per user field */
     long SLOWMODE   = 0x100;
+    /** Used to reset the channel type field */
+    long NEWS       = 0x200;
+    /** Used to reset the region field */
+    long REGION     = 0x400;
 
     /**
      * Resets the fields specified by the provided bit-flag pattern.
@@ -79,6 +84,8 @@ public interface ChannelManager extends Manager<ChannelManager>
      *     <li>{@link #USERLIMIT}</li>
      *     <li>{@link #BITRATE}</li>
      *     <li>{@link #PERMISSION}</li>
+     *     <li>{@link #NEWS}</li>
+     *     <li>{@link #REGION}</li>
      * </ul>
      *
      * @param  fields
@@ -104,6 +111,8 @@ public interface ChannelManager extends Manager<ChannelManager>
      *     <li>{@link #USERLIMIT}</li>
      *     <li>{@link #BITRATE}</li>
      *     <li>{@link #PERMISSION}</li>
+     *     <li>{@link #NEWS}</li>
+     *     <li>{@link #REGION}</li>
      * </ul>
      *
      * @param  fields
@@ -182,7 +191,7 @@ public interface ChannelManager extends Manager<ChannelManager>
      *         If the provided permission holder is {@code null}
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
-     *         in this channel
+     *         in this channel, or tries to set permissions it does not have without having {@link Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS} explicitly for this channel through an override.
      *
      * @return ChannelManager for chaining convenience
      *
@@ -210,7 +219,7 @@ public interface ChannelManager extends Manager<ChannelManager>
      *         If the provided permission holder is {@code null}
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
-     *         in this channel
+     *         in this channel, or tries to set permissions it does not have without having {@link Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS} explicitly for this channel through an override.
      *
      * @return ChannelManager for chaining convenience
      *
@@ -227,9 +236,115 @@ public interface ChannelManager extends Manager<ChannelManager>
     }
 
     /**
+     * Adds an override for the specified role with the provided raw bitmasks as allowed and denied permissions.
+     * If the role already had an override on this channel it will be replaced instead.
+     *
+     * @param  roleId
+     *         The ID of the role to set permissions for
+     * @param  allow
+     *         The bitmask to grant
+     * @param  deny
+     *         The bitmask to deny
+     *
+     * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
+     *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
+     *         in this channel, or tries to set permissions it does not have without having {@link Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS} explicitly for this channel through an override.
+     *
+     * @return ChannelManager for chaining convenience
+     *
+     * @see    #putRolePermissionOverride(long, Collection, Collection)
+     * @see    net.dv8tion.jda.api.Permission#getRaw(Permission...) Permission.getRaw(Permission...)
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelManager putRolePermissionOverride(long roleId, long allow, long deny);
+
+    /**
+     * Adds an override for the specified role with the provided permission sets as allowed and denied permissions.
+     * If the role already had an override on this channel it will be replaced instead.
+     *
+     * @param  roleId
+     *         The ID of the role to set permissions for
+     * @param  allow
+     *         The permissions to grant, or null
+     * @param  deny
+     *         The permissions to deny, or null
+     *
+     * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
+     *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
+     *         in this channel, or tries to set permissions it does not have without having {@link Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS} explicitly for this channel through an override.
+     *
+     * @return ChannelManager for chaining convenience
+     *
+     * @see    #putRolePermissionOverride(long, long, long)
+     * @see    java.util.EnumSet EnumSet
+     */
+    @Nonnull
+    @CheckReturnValue
+    default ChannelManager putRolePermissionOverride(long roleId, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny)
+    {
+        long allowRaw = allow == null ? 0 : Permission.getRaw(allow);
+        long denyRaw  = deny  == null ? 0 : Permission.getRaw(deny);
+        return putRolePermissionOverride(roleId, allowRaw, denyRaw);
+    }
+
+    /**
+     * Adds an override for the specified member with the provided raw bitmasks as allowed and denied permissions.
+     * If the member already had an override on this channel it will be replaced instead.
+     *
+     * @param  memberId
+     *         The ID of the member to set permissions for
+     * @param  allow
+     *         The bitmask to grant
+     * @param  deny
+     *         The bitmask to deny
+     *
+     * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
+     *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
+     *         in this channel, or tries to set permissions it does not have without having {@link Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS} explicitly for this channel through an override.
+     *
+     * @return ChannelManager for chaining convenience
+     *
+     * @see    #putMemberPermissionOverride(long, Collection, Collection)
+     * @see    net.dv8tion.jda.api.Permission#getRaw(Permission...) Permission.getRaw(Permission...)
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelManager putMemberPermissionOverride(long memberId, long allow, long deny);
+
+    /**
+     * Adds an override for the specified member with the provided permission sets as allowed and denied permissions.
+     * If the member already had an override on this channel it will be replaced instead.
+     *
+     * @param  memberId
+     *         The ID of the member to set permissions for
+     * @param  allow
+     *         The permissions to grant, or null
+     * @param  deny
+     *         The permissions to deny, or null
+     *
+     * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
+     *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
+     *         in this channel, or tries to set permissions it does not have without having {@link Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS} explicitly for this channel through an override.
+     *
+     * @return ChannelManager for chaining convenience
+     *
+     * @see    #putMemberPermissionOverride(long, long, long)
+     * @see    java.util.EnumSet EnumSet
+     */
+    @Nonnull
+    @CheckReturnValue
+    default ChannelManager putMemberPermissionOverride(long memberId, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny)
+    {
+        long allowRaw = allow == null ? 0 : Permission.getRaw(allow);
+        long denyRaw  = deny  == null ? 0 : Permission.getRaw(deny);
+        return putMemberPermissionOverride(memberId, allowRaw, denyRaw);
+    }
+
+    /**
      * Removes the {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverride} for the specified
      * {@link net.dv8tion.jda.api.entities.IPermissionHolder IPermissionHolder}. If no override existed for this member
-     * this does nothing.
+     * or role, this does nothing.
      *
      * @param  permHolder
      *         The permission holder
@@ -247,6 +362,23 @@ public interface ChannelManager extends Manager<ChannelManager>
     ChannelManager removePermissionOverride(@Nonnull IPermissionHolder permHolder);
 
     /**
+     * Removes the {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverride} for the specified
+     * member or role ID. If no override existed for this member or role, this does nothing.
+     *
+     * @param  id
+     *         The ID of the permission holder
+     *
+     * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
+     *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
+     *         in this channel
+     *
+     * @return ChannelManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelManager removePermissionOverride(long id);
+
+    /**
      * Syncs all {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverrides} of this GuildChannel with
      * its parent ({@link net.dv8tion.jda.api.entities.Category Category}).
      *
@@ -260,7 +392,7 @@ public interface ChannelManager extends Manager<ChannelManager>
      *          If this GuildChannel has no parent
      * @throws  net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *          If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
-     *          in this channel
+     *          in this channel or {@link IPermissionHolder#canSync(GuildChannel, GuildChannel)} is false for the self member.
      *
      * @return  ChannelManager for chaining convenience
      *
@@ -292,7 +424,7 @@ public interface ChannelManager extends Manager<ChannelManager>
      *          If the given snySource is {@code null}, this GuildChannel or from a different Guild.
      * @throws  net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *          If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
-     *          in this channel
+     *          in this channel or {@link IPermissionHolder#canSync(GuildChannel, GuildChannel)} is false for the self member.
      *
      * @return  ChannelManager for chaining convenience
      *
@@ -361,13 +493,14 @@ public interface ChannelManager extends Manager<ChannelManager>
     ChannelManager setPosition(int position);
 
     /**
-     * Sets the <b><u>topic</u></b> of the selected {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}.
+     * Sets the <b><u>topic</u></b> of the selected
+     * {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} or {@link StageChannel StageChannel}.
      *
      * <p>A channel topic <b>must not</b> be more than {@code 1024} characters long!
      * <br><b>This is only available to {@link net.dv8tion.jda.api.entities.TextChannel TextChannels}</b>
      *
      * @param  topic
-     *         The new topic for the selected {@link net.dv8tion.jda.api.entities.TextChannel TextChannel},
+     *         The new topic for the selected channel,
      *         {@code null} or empty String to reset
      *
      * @throws UnsupportedOperationException
@@ -387,8 +520,6 @@ public interface ChannelManager extends Manager<ChannelManager>
      * @param  nsfw
      *         The new nsfw flag for the selected {@link net.dv8tion.jda.api.entities.TextChannel TextChannel},
      *
-     * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
-     *         If the currently logged in account does not have the Permission {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL MANAGE_CHANNEL}
      * @throws IllegalStateException
      *         If the selected {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}'s type is not {@link net.dv8tion.jda.api.entities.ChannelType#TEXT TEXT}
      *
@@ -467,4 +598,63 @@ public interface ChannelManager extends Manager<ChannelManager>
     @Nonnull
     @CheckReturnValue
     ChannelManager setBitrate(int bitrate);
+
+    /**
+     * Sets the {@link net.dv8tion.jda.api.Region Region} of the selected {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}.
+     * <br>The default value is {@link Region#AUTOMATIC}
+     *
+     * Possible values are:
+     * <ul>
+     *     <li>{@link Region#AUTOMATIC}</li>
+     *     <li>{@link Region#US_WEST}</li>
+     *     <li>{@link Region#US_EAST}</li>
+     *     <li>{@link Region#US_CENTRAL}</li>
+     *     <li>{@link Region#US_SOUTH}</li>
+     *     <li>{@link Region#SINGAPORE}</li>
+     *     <li>{@link Region#SOUTH_AFRICA}</li>
+     *     <li>{@link Region#SYDNEY}</li>
+     *     <li>{@link Region#EUROPE}</li>
+     *     <li>{@link Region#INDIA}</li>
+     *     <li>{@link Region#SOUTH_KOREA}</li>
+     *     <li>{@link Region#BRAZIL}</li>
+     *     <li>{@link Region#JAPAN}</li>
+     *     <li>{@link Region#RUSSIA}</li>
+     * </ul>
+     *
+     * <br><b>This is only available to {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels}!</b>
+     *
+     * @param region
+     *        The new {@link net.dv8tion.jda.api.Region Region}
+     * @throws IllegalStateException
+     *         If the selected {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}'s type is not {@link net.dv8tion.jda.api.entities.ChannelType#VOICE VOICE}
+     * @throws IllegalArgumentException
+     *         If the provided Region is not in the list of usable values
+     * @return ChannelManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelManager setRegion(Region region);
+
+    /**
+     * Sets the <b><u>news flag</u></b> of the selected {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}.
+     * Announcement-/News-Channels can be used to crosspost messages to other guilds.
+     *
+     * @param  news
+     *         The new news flag for the selected {@link net.dv8tion.jda.api.entities.TextChannel TextChannel},
+     *
+     * @throws IllegalStateException
+     *         If the selected {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}'s type is not {@link net.dv8tion.jda.api.entities.ChannelType#TEXT TEXT}
+     * @throws IllegalStateException
+     *         If {@code news} is {@code true} and the guild doesn't have the NEWS feature
+     *
+     * @return ChannelManager for chaining convenience
+     *
+     * @see    net.dv8tion.jda.api.entities.Guild#getFeatures()
+     * @see    net.dv8tion.jda.api.entities.TextChannel#isNews()
+     *
+     * @since  4.2.1
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelManager setNews(boolean news);
 }

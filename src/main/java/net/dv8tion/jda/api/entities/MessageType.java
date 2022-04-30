@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,15 +26,17 @@ public enum MessageType
     /**
      * The normal text messages received when a user or bot sends a Message.
      */
-    DEFAULT(0),
+    DEFAULT(0, false),
 
     /**
      * Specialized messages used for Groups as a System-Message showing that a new User has been added to the Group.
+     * Also used in message threads to indicate a member has joined that thread.
      */
     RECIPIENT_ADD(1),
 
     /**
      * Specialized messages used for Groups as a System-Message showing that a new User has been removed from the Group.
+     * Also used in message threads to indicate a member has left that thread.
      */
     RECIPIENT_REMOVE(2),
 
@@ -45,6 +47,7 @@ public enum MessageType
 
     /**
      * Specialized message used for Groups as a System-Message showing that the name of the Group was changed.
+     * Also used in message threads to indicate the name of that thread has changed.
      */
     CHANNEL_NAME_CHANGE(4),
 
@@ -89,15 +92,70 @@ public enum MessageType
     CHANNEL_FOLLOW_ADD(12),
 
     /**
+     * System message related to discovery qualifications.
+     */
+    GUILD_DISCOVERY_DISQUALIFIED(14),
+
+    /**
+     * System message related to discovery qualifications.
+     */
+    GUILD_DISCOVERY_REQUALIFIED(15),
+
+    /**
+     * System message related to discovery qualifications.
+     */
+    GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING(16),
+
+    /**
+     * System message related to discovery qualifications.
+     */
+    GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING(17),
+
+    /**
+     * This is sent to a TextChannel when a message thread is created if the message from which the thread was started is "old".
+     * The definition of "old" is loose, but is currently a very liberal definition.
+     */
+    THREAD_CREATED(18),
+
+    /**
+     * Reply to another message. This usually comes with a {@link Message#getReferencedMessage() referenced message}.
+     */
+    INLINE_REPLY(19, false),
+
+    /**
+     * This message was created by an interaction. Usually in combination with Slash Commands.
+     * <br>Most commonly this type will appear as a {@link Message#getReferencedMessage() referenced message}.
+     */
+    APPLICATION_COMMAND(20, false),
+
+    /**
+     * A new message sent as the first message in threads that are started from an existing message in the parent channel.
+     * It only contains a message reference field that points to the message from which the thread was started.
+     */
+    THREAD_STARTER_MESSAGE(21),
+
+    /**
+     * The "Invite your friends" messages that are sent to guild owners in new servers.
+     */
+    GUILD_INVITE_REMINDER(22),
+
+    /**
      * Unknown MessageType.
      */
     UNKNOWN(-1);
 
-    protected final int id;
+    private final int id;
+    private final boolean system;
 
     MessageType(int id)
     {
+        this(id, true); // true as default because the majority are system
+    }
+
+    MessageType(int id, boolean system)
+    {
         this.id = id;
+        this.system = system;
     }
 
     /**
@@ -108,6 +166,18 @@ public enum MessageType
     public int getId()
     {
         return id;
+    }
+
+    /**
+     * Whether this message type is for system messages.
+     * <br>These are messages that are sent by discord and don't look like messages from users.
+     * Messages like this have some special restrictions.
+     *
+     * @return True, if this type is for a system message
+     */
+    public boolean isSystem()
+    {
+        return system;
     }
 
     /**

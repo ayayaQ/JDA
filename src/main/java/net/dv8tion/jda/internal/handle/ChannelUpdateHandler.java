@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,9 @@ public class ChannelUpdateHandler extends SocketHandler
     @Override
     protected Long handleInternally(DataObject content)
     {
-        ChannelType type = ChannelType.fromId(content.getInt("type"));
+        int rawType = content.getInt("type");
+        boolean news = rawType == 5;
+        ChannelType type = ChannelType.fromId(rawType);
         if (type == ChannelType.GROUP)
         {
             WebSocketClient.LOG.warn("Ignoring CHANNEL_UPDATE for a group which we don't support");
@@ -169,14 +171,25 @@ public class ChannelUpdateHandler extends SocketHandler
                                     textChannel, oldSlowmode));
                 }
 
+                if (news != textChannel.isNews())
+                {
+                    textChannel.setNews(news);
+                    getJDA().handleEvent(
+                        new TextChannelUpdateNewsEvent(
+                            getJDA(), responseNumber,
+                            textChannel));
+                }
+
                 applyPermissions(textChannel, permOverwrites);
                 break;  //Finish the TextChannelUpdate case
             }
+            case STAGE:
             case VOICE:
             {
                 VoiceChannelImpl voiceChannel = (VoiceChannelImpl) getJDA().getVoiceChannelsView().get(channelId);
                 int userLimit = content.getInt("user_limit");
                 int bitrate = content.getInt("bitrate");
+                final String region = content.getString("rtc_region", null);
                 if (voiceChannel == null)
                 {
                     getJDA().getEventCache().cache(EventCache.Type.CHANNEL, channelId, responseNumber, allContent, this::handle);
@@ -187,6 +200,7 @@ public class ChannelUpdateHandler extends SocketHandler
                 final Category parent = voiceChannel.getParent();
                 final Long oldParent = parent == null ? null : parent.getIdLong();
                 final String oldName = voiceChannel.getName();
+                final String oldRegion = voiceChannel.getRegionRaw();
                 final int oldPosition = voiceChannel.getPositionRaw();
                 final int oldLimit = voiceChannel.getUserLimit();
                 final int oldBitrate = voiceChannel.getBitrate();
@@ -197,6 +211,14 @@ public class ChannelUpdateHandler extends SocketHandler
                             new VoiceChannelUpdateNameEvent(
                                     getJDA(), responseNumber,
                                     voiceChannel, oldName));
+                }
+                if (!Objects.equals(oldRegion, region))
+                {
+                    voiceChannel.setRegion(region);
+                    getJDA().handleEvent(
+                            new VoiceChannelUpdateRegionEvent(
+                                    getJDA(), responseNumber,
+                                    voiceChannel, oldRegion));
                 }
                 if (!Objects.equals(oldParent, parentId))
                 {
@@ -312,6 +334,7 @@ public class ChannelUpdateHandler extends SocketHandler
                     api, responseNumber,
                     (StoreChannel) channel, changed));
             break;
+        case STAGE:
         case VOICE:
             api.handleEvent(
                 new VoiceChannelUpdatePermissionsEvent(
@@ -336,15 +359,17 @@ public class ChannelUpdateHandler extends SocketHandler
             changed.add(holder);
     }
 
+    // True => override status changed (created/deleted/updated)
+    // False => nothing changed, ignore
     private boolean handlePermissionOverride(PermissionOverride currentOverride, DataObject override, long overrideId, AbstractChannelImpl<?,?> channel)
     {
         final long allow = override.getLong("allow");
         final long deny = override.getLong("deny");
-        final String type = override.getString("type");
-        final boolean isRole = type.equals("role");
+        final int type = override.getInt("type");
+        final boolean isRole = type == 0;
         if (!isRole)
         {
-            if (!type.equals("member"))
+            if (type != 1)
             {
                 EntityBuilder.LOG.debug("Ignoring unknown invite of type '{}'. JSON: {}", type, override);
                 return false;
@@ -355,13 +380,25 @@ public class ChannelUpdateHandler extends SocketHandler
             }
         }
 
-        if (currentOverride != null)
+        if (currentOverride != null) // Permissions were updated?
         {
             long oldAllow = currentOverride.getAllowedRaw();
             long oldDeny = currentOverride.getDeniedRaw();
             PermissionOverrideImpl impl = (PermissionOverrideImpl) currentOverride;
             if (oldAllow == allow && oldDeny == deny)
                 return false;
+
+            if (overrideId == channel.getGuild().getIdLong() && (allow | deny) == 0L)
+            {
+                // We delete empty overrides for the @everyone role because that's what the client also does, otherwise our sync checks don't work!
+                channel.getOverrideMap().remove(overrideId);
+                api.handleEvent(
+                    new PermissionOverrideDeleteEvent(
+                        api, responseNumber,
+                        channel, currentOverride));
+                return true;
+            }
+
             impl.setAllow(allow);
             impl.setDeny(deny);
             api.handleEvent(
@@ -369,8 +406,11 @@ public class ChannelUpdateHandler extends SocketHandler
                     api, responseNumber,
                     channel, currentOverride, oldAllow, oldDeny));
         }
-        else
+        else // New override?
         {
+            // Empty @everyone overrides should be treated as not existing at all
+            if (overrideId == channel.getGuild().getIdLong() && (allow | deny) == 0L)
+                return false;
             PermissionOverrideImpl impl;
             currentOverride = impl = new PermissionOverrideImpl(channel, overrideId, isRole);
             impl.setAllow(allow);

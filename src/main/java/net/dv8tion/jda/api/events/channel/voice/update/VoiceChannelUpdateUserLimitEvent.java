@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ public class VoiceChannelUpdateUserLimitEvent extends GenericVoiceChannelUpdateE
     /**
      * The old userlimit
      *
-     * @return The old userlimit
+     * @return The old userlimit, or 0 if there is no limit set.
      */
     public int getOldUserLimit()
     {
@@ -49,7 +49,7 @@ public class VoiceChannelUpdateUserLimitEvent extends GenericVoiceChannelUpdateE
     /**
      * The new userlimit
      *
-     * @return The new userlimit
+     * @return The new userlimit, or 0 if there is no limit set.
      */
     public int getNewUserLimit()
     {

@@ -1,5 +1,5 @@
-[version]: https://api.bintray.com/packages/dv8fromtheworld/maven/JDA/images/download.svg
-[download]: https://bintray.com/dv8fromtheworld/maven/JDA/_latestVersion
+[version]: https://shields.io/maven-metadata/v?metadataUrl=https%3A%2F%2Fm2.dv8tion.net%2Freleases%2Fnet%2Fdv8tion%2FJDA%2Fmaven-metadata.xml&color=informational&label=Download
+[download]: #download
 [discord-invite]: https://discord.gg/0hMr4ce0tIl3SLv5
 [migration]: https://github.com/DV8FromTheWorld/JDA/wiki/0\)-Migrating-to-V4
 [jenkins]: https://ci.dv8tion.net/job/JDA
@@ -171,7 +171,7 @@ public class MessageListener extends ListenerAdapter
         //You can also add event listeners to the already built JDA instance
         // Note that some events may not be received if the listener is added after calling build()
         // This includes events such as the ReadyEvent
-        jda.addEventListeners(new MessageListener());
+        jda.addEventListener(new MessageListener());
     }
 
     @Override
@@ -225,6 +225,40 @@ public class Bot extends ListenerAdapter
                        response.editMessageFormat("Pong: %d ms", System.currentTimeMillis() - time).queue();
                    });
         }
+    }
+}
+```
+
+**Slash-Commands**:
+
+```java
+public class Bot extends ListenerAdapter
+{
+    public static void main(String[] args) throws LoginException
+    {
+        if (args.length < 1) {
+            System.out.println("You have to provide a token as first argument!");
+            System.exit(1);
+        }
+        // args[0] should be the token
+        // We don't need any intents for this bot. Slash commands work without any intents!
+        JDA jda = JDABuilder.createLight(args[0], Collections.emptyList())
+            .addEventListeners(new Bot())
+            .setActivity(Activity.playing("Type /ping"))
+            .build();
+
+        jda.upsertCommand("ping", "Calculate ping of the bot").queue(); // This can take up to 1 hour to show up in the client
+    }
+    
+    @Override
+    public void onSlashCommand(SlashCommandEvent event)
+    {
+        if (!event.getName().equals("ping")) return; // make sure we handle the right command
+        long time = System.currentTimeMillis();
+        event.reply("Pong!").setEphemeral(true) // reply or acknowledge
+             .flatMap(v ->
+                 event.getHook().editOriginalFormat("Pong: %d ms", System.currentTimeMillis() - time) // then edit original
+             ).queue(); // Queue both reply and edit
     }
 }
 ```
@@ -319,27 +353,16 @@ public static void main(String[] args) throws Exception
 
 ## Entity Lifetimes
 
-An **Entity** is the term used to describe types such as **GuildChannel**/**Message**/**User** and other entities
-that Discord provides.
-Instances of these entities are created and deleted by JDA when Discord instructs it. This means
-the lifetime depends on signals provided by the Discord API which are used to create/update/delete entities.
+An **Entity** is the term used to describe types such as **GuildChannel**/**Message**/**User** and other entities that Discord provides.
+Instances of these entities are created and deleted by JDA when Discord instructs it. This means the lifetime depends on signals provided by the Discord API which are used to create/update/delete entities.
 This is done through Gateway Events known as "dispatches" that are handled by the JDA WebSocket handlers.
 When Discord instructs JDA to delete entities, they are simply removed from the JDA cache and lose their references.
-Once that happens, nothing in JDA interacts or updates the instances of those entities, and they become useless. Discord
-may instruct to delete these entities randomly for cache synchronization with the API.
+Once that happens, nothing in JDA interacts or updates the instances of those entities, and they become useless.
+Discord may instruct to delete these entities randomly for cache synchronization with the API.
 
 **It is not recommended to store _any_ of these entities for a longer period of time!**
 Instead of keeping (e.g.) a `User` instance in some field, an ID should be used. With the ID of a user,
 you can use `getUserById(id)` to get and keep the user reference in a local variable (see below).
-
-### Fake Entities
-
-Some entities in JDA are marked through an interface called `IFakeable`. These entities can exist outside
-of the JDA cache and are inaccessible through the common `get...ById(id)` methods.
-Fake entities are essentially instances that are not directly referenced by the JDA cache and are only
-temporarily created for a specific usage. It may be used for the author of a message that has left the guild
-when requesting the history of a `MessageChannel` or for `Emote` instances used in a `Message` that are not part
-of any of the guilds available to the bot.
 
 ### Entity Updates
 
@@ -416,11 +439,10 @@ Be sure to replace the **VERSION** key below with the one of the versions shown 
 ```
 ```xml
 <repository>
-    <id>jcenter</id>
-    <name>jcenter-bintray</name>
-    <url>https://jcenter.bintray.com</url>
+    <id>dv8tion</id>
+    <name>m2-dv8tion</name>
+    <url>https://m2.dv8tion.net/releases</url>
 </repository>
-
 ```
 
 **Maven without Audio**
@@ -441,24 +463,30 @@ Be sure to replace the **VERSION** key below with the one of the versions shown 
 **Gradle**
 ```gradle
 dependencies {
-    compile 'net.dv8tion:JDA:VERSION'
+    //Change 'implementation' to 'compile' in old Gradle versions
+    implementation("net.dv8tion:JDA:VERSION")
 }
 
 repositories {
-    jcenter()
+    mavenCentral() // for transitive dependencies
+    maven {
+      name 'm2-dv8tion'
+      url 'https://m2.dv8tion.net/releases'
+    }
 }
 ```
 
 **Gradle without Audio**
 ```gradle
 dependencies {
-    compile ('net.dv8tion:JDA:VERSION') {
+    //Change 'implementation' to 'compile' in old Gradle versions
+    implementation("net.dv8tion:JDA:VERSION") {
         exclude module: 'opus-java'
     }
 }
 ```
 
-The builds are distributed using JCenter through Bintray [JDA JCenter Bintray](https://bintray.com/dv8fromtheworld/maven/JDA/)
+The builds are distributed using a custom S3 instance.
 
 If you do not need any opus de-/encoding done by JDA (voice receive/send with PCM) you can exclude `opus-java` entirely.
 This can be done if you only send audio with an `AudioSendHandler` which only sends opus (`isOpus() = true`). (See [lavaplayer](https://github.com/sedmelluq/lavaplayer))
@@ -534,9 +562,9 @@ to understand a proper implementation.
 <br>Sedmelluq provided a demo in his repository which presents an example implementation for JDA:
 https://github.com/sedmelluq/lavaplayer/tree/master/demo-jda
 
-### [Lavalink](https://github.com/frederikam/Lavalink)
+### [Lavalink](https://github.com/freyacodes/Lavalink)
 
-Created and maintained by [Frederik Mikkelsen](https://github.com/Frederikam), the creator of FredBoat.
+Maintained by [Freya Arbjerg](https://github.com/freyacodes).
 
 Lavalink is a popular standalone audio sending node based on Lavaplayer. Lavalink was built with scalability in mind,
 and allows streaming music via many servers. It supports most of Lavaplayer's features.
@@ -547,28 +575,6 @@ as it is easier.
 
 [Lavalink-Client](https://github.com/FredBoat/Lavalink-Client) is the official Lavalink client for JDA.
 
-### [JDA-Utilities](https://github.com/JDA-Applications/JDA-Utilities)
-
-Created and maintained by [jagrosh](https://github.com/jagrosh).
-<br>JDA-Utilities provides a Command-Extension and several utilities to make using JDA very simple.
-
-Features include:
-- Paginated Message using Reactions
-- EventWaiter allowing to wait for a response and other events
-
-
-<!--
-TODO: Ensure this is compatible with version 4
-### [JDAction](https://github.com/sedmelluq/jdaction)
-
-Created and maintained by [sedmelluq](https://github.com/sedmelluq)
-<br>JDAction is a [Gradle](https://gradle.org/) plugin which makes sure that the return values of all methods which return a RestAction are used.
-Since it is a common mistake to forget to `.queue()`/`.complete()`/`.submit()` RestActions,
-and it is often only discovered after noticing that something doesn't work,
-this plugin will help catch those cases quickly as it will cause a build failure in such case.
-
-More info about RestAction: [Wiki](https://github.com/DV8FromTheWorld/JDA/wiki/7\)-Using-RestAction)
--->
 
 ### [jda-nas](https://github.com/sedmelluq/jda-nas)
 
@@ -583,27 +589,28 @@ JDABuilder builder = JDABuilder.createDefault(BOT_TOKEN)
     .setAudioSendFactory(new NativeAudioSendFactory());
 ```
 
-### [jda-reactor](https://github.com/MinnDevelopment/jda-reactor)
+### [jda-ktx](https://github.com/MinnDevelopment/jda-ktx)
 
 Created and maintained by [MinnDevelopment](https://github.com/MinnDevelopment).
-<br>Provides [Kotlin](https://kotlinlang.org/) extensions for **RestAction** and events that provide a [reactive](http://reactivex.io/intro.html) alternative to common JDA interfaces.
+<br>Provides [Kotlin](https://kotlinlang.org/) extensions for **RestAction** and events that provide a more idiomatic Kotlin experience.
 
 ```kotlin
 fun main() {
-    val manager = ReactiveEventManager()
-    manager.on<ReadyEvent>()
-           .subscribe { println("Ready to serve!") }
-    manager.on<MessageReceivedEvent>()
-           .filter { it.message.contentRaw == "!ping" }
-           .subscribe { it.channel.sendMessage("Pong!").queue() }
-
     val jda = JDABuilder.createDefault(BOT_TOKEN)
-               .setEventManager(manager)
+               .injectKTX()
                .build()
+    
+    jda.onCommand("ping") { event ->
+        val time = measureTime {
+            event.reply("Pong!").await()
+        }.inWholeMilliseconds
+
+        event.hook.editOriginal("Pong: $time ms").queue()
+    }
 }
 ```
 
-An example bot for this can be found at [Reactive JDA Bot](https://github.com/MinnDevelopment/reactive-jda-bot).
+There is a number of examples available in the [README](https://github.com/MinnDevelopment/jda-ktx/#jda-ktx).
 
 ------
 
@@ -643,33 +650,26 @@ version was by looking at the [release page](https://github.com/DV8FromTheWorld/
 This project requires **Java 8+**.<br>
 All dependencies are managed automatically by Gradle.
  * NV Websocket Client
-   * Version: **2.9**
+   * Version: **2.14**
    * [Github](https://github.com/TakahikoKawasaki/nv-websocket-client)
-   * [JCenter Repository](https://bintray.com/bintray/jcenter/com.neovisionaries%3Anv-websocket-client/view)
  * OkHttp
    * Version: **3.13.0**
    * [Github](https://github.com/square/okhttp)
-   * [JCenter Repository](https://bintray.com/bintray/jcenter/com.squareup.okhttp3:okhttp)
  * Apache Commons Collections4
    * Version: **4.1**
    * [Website](https://commons.apache.org/proper/commons-collections)
-   * [JCenter Repository](https://bintray.com/bintray/jcenter/org.apache.commons%3Acommons-collections4/view)
  * jackson
    * Version: **2.10.1**
    * [Github](https://github.com/FasterXML/jackson)
-   * [JCenter Repository](https://bintray.com/bintray/jcenter/com.fasterxml.jackson.core%3Ajackson-databind/view)
  * Trove4j
    * Version: **3.0.3**
    * [BitBucket](https://bitbucket.org/trove4j/trove)
-   * [JCenter Repository](https://bintray.com/bintray/jcenter/net.sf.trove4j%3Atrove4j/view)
  * slf4j-api
    * Version: **1.7.25**
    * [Website](https://www.slf4j.org/)
-   * [JCenter Repository](https://bintray.com/bintray/jcenter/org.slf4j%3Aslf4j-api/view)
  * opus-java (optional)
-   * Version: **1.0.4**
+   * Version: **1.1.0**
    * [GitHub](https://github.com/discord-java/opus-java)
-   * [JCenter Repository](https://bintray.com/minndevelopment/maven/opus-java)
 
 ## Related Projects
 

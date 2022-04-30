@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.entities.EntityBuilder;
 import net.dv8tion.jda.internal.requests.Requester;
 import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.Helpers;
 import net.dv8tion.jda.internal.utils.IOUtil;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -140,7 +141,7 @@ public class WidgetUtil
         Checks.notNull(theme, "WidgetTheme");
         Checks.notNegative(width, "Width");
         Checks.notNegative(height, "Height");
-        return String.format(WIDGET_HTML, guildId, theme.name().toLowerCase(), width, height);
+        return Helpers.format(WIDGET_HTML, guildId, theme.name().toLowerCase(), width, height);
     }
     
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 package net.dv8tion.jda.api.entities;
+
+import net.dv8tion.jda.internal.utils.Helpers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -251,7 +253,7 @@ public interface RichPresence extends Activity
         @Override
         public String toString()
         {
-            return String.format("RichPresenceParty(%s | [%d, %d])", id, size, max);
+            return Helpers.format("RichPresenceParty(%s | [%d, %d])", id, size, max);
         }
 
         @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,24 +18,27 @@ package net.dv8tion.jda.internal.entities;
 
 import gnu.trove.set.TLongSet;
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.interactions.components.ComponentLayout;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.MessageAction;
 
 import javax.annotation.Nonnull;
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class SystemMessage extends ReceivedMessage
 {
     public SystemMessage(
-        long id, MessageChannel channel, MessageType type,
+        long id, MessageChannel channel, MessageType type, MessageReference messageReference,
         boolean fromWebhook, boolean mentionsEveryone, TLongSet mentionedUsers, TLongSet mentionedRoles,
         boolean tts, boolean pinned,
         String content, String nonce, User author, Member member, MessageActivity activity, OffsetDateTime editTime,
-        List<MessageReaction> reactions, List<Attachment> attachments, List<MessageEmbed> embeds, int flags)
+        List<MessageReaction> reactions, List<Attachment> attachments, List<MessageEmbed> embeds, List<MessageSticker> stickers, int flags)
     {
-        super(id, channel, type, fromWebhook, mentionsEveryone, mentionedUsers, mentionedRoles,
-            tts, pinned, content, nonce, author, member, activity, editTime, reactions, attachments, embeds, flags);
+        super(id, channel, type, messageReference, fromWebhook, mentionsEveryone, mentionedUsers, mentionedRoles,
+            tts, pinned, content, nonce, author, member, activity, editTime, reactions, attachments, embeds, stickers, Collections.emptyList(), flags, null);
     }
 
     @Nonnull
@@ -54,27 +57,6 @@ public class SystemMessage extends ReceivedMessage
 
     @Nonnull
     @Override
-    public RestAction<Void> addReaction(@Nonnull Emote emote)
-    {
-        throw new UnsupportedOperationException("Cannot add reactions to message of this Message Type. MessageType: " + getType());
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> addReaction(@Nonnull String unicode)
-    {
-        throw new UnsupportedOperationException("Cannot add reactions to message of this Message Type. MessageType: " + getType());
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> clearReactions()
-    {
-        throw new UnsupportedOperationException("Cannot clear reactions for message of this Message Type. MessageType: " + getType());
-    }
-
-    @Nonnull
-    @Override
     public MessageAction editMessage(@Nonnull CharSequence newContent)
     {
         throw new UnsupportedOperationException("Cannot edit message of this Message Type. MessageType: " + getType());
@@ -83,6 +65,20 @@ public class SystemMessage extends ReceivedMessage
     @Nonnull
     @Override
     public MessageAction editMessage(@Nonnull MessageEmbed newContent)
+    {
+        throw new UnsupportedOperationException("Cannot edit message of this Message Type. MessageType: " + getType());
+    }
+
+    @Nonnull
+    @Override
+    public MessageAction editMessageEmbeds(@Nonnull Collection<? extends MessageEmbed> embeds)
+    {
+        throw new UnsupportedOperationException("Cannot edit message of this Message Type. MessageType: " + getType());
+    }
+
+    @Nonnull
+    @Override
+    public MessageAction editMessageComponents(@Nonnull Collection<? extends ComponentLayout> components)
     {
         throw new UnsupportedOperationException("Cannot edit message of this Message Type. MessageType: " + getType());
     }

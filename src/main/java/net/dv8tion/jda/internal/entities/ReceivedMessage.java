@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,14 @@ package net.dv8tion.jda.internal.entities;
 
 import gnu.trove.set.TLongSet;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.MessageBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
+import net.dv8tion.jda.api.exceptions.MissingAccessException;
+import net.dv8tion.jda.api.exceptions.PermissionException;
+import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.ComponentLayout;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.api.requests.restaction.MessageAction;
@@ -30,8 +34,10 @@ import net.dv8tion.jda.api.utils.MarkdownSanitizer;
 import net.dv8tion.jda.api.utils.MiscUtil;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
+import net.dv8tion.jda.internal.requests.CompletedRestAction;
 import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.requests.restaction.AuditableRestActionImpl;
+import net.dv8tion.jda.internal.requests.restaction.MessageActionImpl;
 import net.dv8tion.jda.internal.utils.Checks;
 import org.apache.commons.collections4.Bag;
 import org.apache.commons.collections4.CollectionUtils;
@@ -53,6 +59,7 @@ public class ReceivedMessage extends AbstractMessage
     protected final long id;
     protected final MessageType type;
     protected final MessageChannel channel;
+    protected final MessageReference messageReference;
     protected final boolean fromWebhook;
     protected final boolean mentionsEveryone;
     protected final boolean pinned;
@@ -63,9 +70,14 @@ public class ReceivedMessage extends AbstractMessage
     protected final List<MessageReaction> reactions;
     protected final List<Attachment> attachments;
     protected final List<MessageEmbed> embeds;
+    protected final List<MessageSticker> stickers;
+    protected final List<ActionRow> components;
     protected final TLongSet mentionedUsers;
     protected final TLongSet mentionedRoles;
     protected final int flags;
+    protected final Message.Interaction interaction;
+
+    protected InteractionHook interactionHook = null; // late-init
 
     // LAZY EVALUATED
     protected String altContent = null;
@@ -79,14 +91,15 @@ public class ReceivedMessage extends AbstractMessage
     protected List<String> invites = null;
 
     public ReceivedMessage(
-        long id, MessageChannel channel, MessageType type,
+        long id, MessageChannel channel, MessageType type, MessageReference messageReference,
         boolean fromWebhook, boolean mentionsEveryone, TLongSet mentionedUsers, TLongSet mentionedRoles, boolean tts, boolean pinned,
         String content, String nonce, User author, Member member, MessageActivity activity, OffsetDateTime editTime,
-        List<MessageReaction> reactions, List<Attachment> attachments, List<MessageEmbed> embeds, int flags)
+        List<MessageReaction> reactions, List<Attachment> attachments, List<MessageEmbed> embeds, List<MessageSticker> stickers, List<ActionRow> components, int flags, Message.Interaction interaction)
     {
         super(content, nonce, tts);
         this.id = id;
         this.channel = channel;
+        this.messageReference = messageReference;
         this.type = type;
         this.api = (channel != null) ? (JDAImpl) channel.getJDA() : null;
         this.fromWebhook = fromWebhook;
@@ -99,9 +112,18 @@ public class ReceivedMessage extends AbstractMessage
         this.reactions = Collections.unmodifiableList(reactions);
         this.attachments = Collections.unmodifiableList(attachments);
         this.embeds = Collections.unmodifiableList(embeds);
+        this.stickers = Collections.unmodifiableList(stickers);
+        this.components = Collections.unmodifiableList(components);
         this.mentionedUsers = mentionedUsers;
         this.mentionedRoles = mentionedRoles;
         this.flags = flags;
+        this.interaction = interaction;
+    }
+
+    public ReceivedMessage withHook(InteractionHook hook)
+    {
+        this.interactionHook = hook;
+        return this;
     }
 
     @Nonnull
@@ -109,6 +131,13 @@ public class ReceivedMessage extends AbstractMessage
     public JDA getJDA()
     {
         return api;
+    }
+
+    @Nullable
+    @Override
+    public MessageReference getMessageReference()
+    {
+        return messageReference;
     }
 
     @Override
@@ -121,6 +150,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> pin()
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot pin ephemeral messages.");
+        
         return channel.pinMessageById(getId());
     }
 
@@ -128,6 +160,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> unpin()
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot unpin ephemeral messages.");
+        
         return channel.unpinMessageById(getId());
     }
 
@@ -135,6 +170,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> addReaction(@Nonnull Emote emote)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot add reactions to ephemeral messages.");
+        
         Checks.notNull(emote, "Emote");
 
         boolean missingReaction = reactions.stream()
@@ -154,6 +192,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> addReaction(@Nonnull String unicode)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot add reactions to ephemeral messages.");
+        
         return channel.addReactionById(getId(), unicode);
     }
 
@@ -161,6 +202,8 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> clearReactions()
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot clear reactions from ephemeral messages.");
         if (!isFromGuild())
             throw new IllegalStateException("Cannot clear reactions from a message in a Group or PrivateChannel.");
         return getTextChannel().clearReactionsById(getId());
@@ -170,6 +213,8 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> clearReactions(@Nonnull String unicode)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot clear reactions from ephemeral messages.");
         if (!isFromGuild())
             throw new IllegalStateException("Cannot clear reactions from a message in a Group or PrivateChannel.");
         return getTextChannel().clearReactionsById(getId(), unicode);
@@ -179,6 +224,8 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> clearReactions(@Nonnull Emote emote)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot clear reactions from ephemeral messages.");
         if (!isFromGuild())
             throw new IllegalStateException("Cannot clear reactions from a message in a Group or PrivateChannel.");
         return getTextChannel().clearReactionsById(getId(), emote);
@@ -188,6 +235,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> removeReaction(@Nonnull Emote emote)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
+        
         return channel.removeReactionById(getId(), emote);
     }
 
@@ -196,6 +246,8 @@ public class ReceivedMessage extends AbstractMessage
     public RestAction<Void> removeReaction(@Nonnull Emote emote, @Nonnull User user)
     {
         Checks.notNull(user, "User");  // to prevent NPEs
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
         // check if the passed user is the SelfUser, then the ChannelType doesn't matter and
         // we can safely remove that
         if (user.equals(getJDA().getSelfUser()))
@@ -210,6 +262,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public RestAction<Void> removeReaction(@Nonnull String unicode)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
+        
         return channel.removeReactionById(getId(), unicode);
     }
 
@@ -221,6 +276,8 @@ public class ReceivedMessage extends AbstractMessage
         if (user.equals(getJDA().getSelfUser()))
             return channel.removeReactionById(getIdLong(), unicode);
 
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
         if (!isFromGuild())
             throw new IllegalStateException("Cannot remove reactions of others from a message in a Group or PrivateChannel.");
         return getTextChannel().removeReactionById(getId(), unicode, user);
@@ -230,6 +287,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public ReactionPaginationAction retrieveReactionUsers(@Nonnull Emote emote)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot retrieve reactions on ephemeral messages.");
+        
         return channel.retrieveReactionUsersById(id, emote);
     }
 
@@ -237,6 +297,9 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public ReactionPaginationAction retrieveReactionUsers(@Nonnull String unicode)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot retrieve reactions on ephemeral messages.");
+        
         return channel.retrieveReactionUsersById(id, unicode);
     }
 
@@ -274,6 +337,13 @@ public class ReceivedMessage extends AbstractMessage
         return type;
     }
 
+    @Nullable
+    @Override
+    public Interaction getInteraction()
+    {
+        return interaction;
+    }
+
     @Override
     public long getIdLong()
     {
@@ -293,8 +363,6 @@ public class ReceivedMessage extends AbstractMessage
         if (!mentionedUsers.contains(userId))
             return null;
         User user = getJDA().getUserById(userId);
-        if (user == null)
-            user = api.getFakeUserMap().get(userId);
         if (user == null && userMentions != null)
             user = userMentions.stream().filter(it -> it.getIdLong() == userId).findFirst().orElse(null);
         return user;
@@ -714,6 +782,13 @@ public class ReceivedMessage extends AbstractMessage
         return embeds;
     }
 
+    @Nonnull
+    @Override
+    public List<ActionRow> getActionRows()
+    {
+        return components;
+    }
+
     private Emote matchEmote(Matcher m)
     {
         long emoteId = MiscUtil.parseSnowflake(m.group(2));
@@ -748,6 +823,13 @@ public class ReceivedMessage extends AbstractMessage
         return reactions;
     }
 
+    @Nonnull
+    @Override
+    public List<MessageSticker> getStickers()
+    {
+        return this.stickers;
+    }
+
     @Override
     public boolean isWebhookMessage()
     {
@@ -771,42 +853,61 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public MessageAction editMessage(@Nonnull CharSequence newContent)
     {
-        return editMessage(new MessageBuilder().append(newContent).build());
+        checkUser();
+        return ((MessageActionImpl) channel.editMessageById(getId(), newContent)).withHook(interactionHook);
     }
 
     @Nonnull
     @Override
-    public MessageAction editMessage(@Nonnull MessageEmbed newContent)
+    public MessageAction editMessageEmbeds(@Nonnull Collection<? extends MessageEmbed> embeds)
     {
-        return editMessage(new MessageBuilder().setEmbed(newContent).build());
+        checkUser();
+        return ((MessageActionImpl) channel.editMessageEmbedsById(getId(), embeds)).withHook(interactionHook);
+    }
+
+    @Nonnull
+    @Override
+    public MessageAction editMessageComponents(@Nonnull Collection<? extends ComponentLayout> components)
+    {
+        checkUser();
+        return ((MessageActionImpl) channel.editMessageComponentsById(getId(), components)).withHook(interactionHook);
     }
 
     @Nonnull
     @Override
     public MessageAction editMessageFormat(@Nonnull String format, @Nonnull Object... args)
     {
-        Checks.notBlank(format, "Format String");
-        return editMessage(new MessageBuilder().appendFormat(format, args).build());
+        checkUser();
+        return ((MessageActionImpl) channel.editMessageFormatById(getId(), format, args)).withHook(interactionHook);
     }
 
     @Nonnull
     @Override
     public MessageAction editMessage(@Nonnull Message newContent)
     {
+        checkUser();
+        return ((MessageActionImpl) channel.editMessageById(getId(), newContent)).withHook(interactionHook);
+    }
+
+    private void checkUser()
+    {
         if (!getJDA().getSelfUser().equals(getAuthor()))
             throw new IllegalStateException("Attempted to update message that was not sent by this account. You cannot modify other User's messages!");
-
-        return getChannel().editMessageById(getIdLong(), newContent);
     }
 
     @Nonnull
     @Override
     public AuditableRestAction<Void> delete()
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot delete ephemeral messages.");
+        
         if (!getJDA().getSelfUser().equals(getAuthor()))
         {
             if (isFromType(ChannelType.PRIVATE))
                 throw new IllegalStateException("Cannot delete another User's messages in a PrivateChannel.");
+            else if (!getGuild().getSelfMember().hasAccess(getTextChannel()))
+                throw new MissingAccessException(getTextChannel(), Permission.VIEW_CHANNEL);
             else if (!getGuild().getSelfMember()
                     .hasPermission((TextChannel) getChannel(), Permission.MESSAGE_MANAGE))
                 throw new InsufficientPermissionException(getTextChannel(), Permission.MESSAGE_MANAGE);
@@ -818,6 +919,16 @@ public class ReceivedMessage extends AbstractMessage
     @Override
     public AuditableRestAction<Void> suppressEmbeds(boolean suppressed)
     {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot suppress embeds on ephemeral messages.");
+        
+        if (!getJDA().getSelfUser().equals(getAuthor()))
+        {
+            if (isFromType(ChannelType.PRIVATE))
+                throw new PermissionException("Cannot suppress embeds of others in a PrivateChannel.");
+            else if (!getGuild().getSelfMember().hasPermission(getTextChannel(), Permission.MESSAGE_MANAGE))
+                throw new InsufficientPermissionException(getTextChannel(), Permission.MESSAGE_MANAGE);
+        }
         JDAImpl jda = (JDAImpl) getJDA();
         Route.CompiledRoute route = Route.Messages.EDIT_MESSAGE.compile(getChannel().getId(), getId());
         int newFlags = flags;
@@ -827,6 +938,23 @@ public class ReceivedMessage extends AbstractMessage
         else
             newFlags &= ~suppressionValue;
         return new AuditableRestActionImpl<>(jda, route, DataObject.empty().put("flags", newFlags));
+    }
+
+    @Nonnull
+    @Override
+    public RestAction<Message> crosspost()
+    {
+        if (isEphemeral())
+            throw new IllegalStateException("Cannot crosspost ephemeral messages.");
+        
+        if (getFlags().contains(MessageFlag.CROSSPOSTED))
+            return new CompletedRestAction<>(getJDA(), this);
+        TextChannel textChannel = getTextChannel();
+        if (!getGuild().getSelfMember().hasAccess(textChannel))
+            throw new MissingAccessException(textChannel, Permission.VIEW_CHANNEL);
+        if (!getAuthor().equals(getJDA().getSelfUser()) && !getGuild().getSelfMember().hasPermission(textChannel, Permission.MESSAGE_MANAGE))
+            throw new InsufficientPermissionException(textChannel, Permission.MESSAGE_MANAGE);
+        return textChannel.crosspostMessageById(getId());
     }
 
     @Override
@@ -840,6 +968,18 @@ public class ReceivedMessage extends AbstractMessage
     public EnumSet<MessageFlag> getFlags()
     {
         return MessageFlag.fromBitField(flags);
+    }
+
+    @Override
+    public long getFlagsRaw()
+    {
+        return flags;
+    }
+
+    @Override
+    public boolean isEphemeral()
+    {
+        return (this.flags & MessageFlag.EPHEMERAL.getValue()) != 0;
     }
 
     @Override

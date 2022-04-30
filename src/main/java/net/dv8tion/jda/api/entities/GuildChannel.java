@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.managers.ChannelManager;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
@@ -39,25 +37,8 @@ import java.util.List;
  * @see JDA#getGuildChannelById(long)
  * @see JDA#getGuildChannelById(ChannelType, long)
  */
-public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
+public interface GuildChannel extends AbstractChannel, IMentionable, Comparable<GuildChannel>
 {
-    /**
-     * The {@link net.dv8tion.jda.api.entities.ChannelType ChannelType} for this GuildChannel
-     *
-     * @return The channel type
-     */
-    @Nonnull
-    ChannelType getType();
-
-    /**
-     * The human readable name of the  GuildChannel.
-     * <br>If no name has been set, this returns null.
-     *
-     * @return The name of this GuildChannel
-     */
-    @Nonnull
-    String getName();
-
     /**
      * Returns the {@link net.dv8tion.jda.api.entities.Guild Guild} that this GuildChannel is part of.
      *
@@ -68,8 +49,8 @@ public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
 
     /**
      * Parent {@link net.dv8tion.jda.api.entities.Category Category} of this
-     * GuildChannel. Channels need not have a parent Category.
-     * <br>Note that an {@link net.dv8tion.jda.api.entities.Category Category} will
+     * GuildChannel. Channels don't need to have a parent Category.
+     * <br>Note that a {@link net.dv8tion.jda.api.entities.Category Category} will
      * always return {@code null} for this method as nested categories are not supported.
      *
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.Category Category} for this GuildChannel
@@ -114,14 +95,6 @@ public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
      * @return The true, Discord stored, position of the {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}.
      */
     int getPositionRaw();
-
-    /**
-     * Returns the {@link net.dv8tion.jda.api.JDA JDA} instance of this GuildChannel
-     *
-     * @return the corresponding JDA instance
-     */
-    @Nonnull
-    JDA getJDA();
 
     /**
      * The {@link PermissionOverride} relating to the specified {@link net.dv8tion.jda.api.entities.Member Member} or {@link net.dv8tion.jda.api.entities.Role Role}.
@@ -180,6 +153,19 @@ public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
      */
     @Nonnull
     List<PermissionOverride> getRolePermissionOverrides();
+
+    /**
+     * Whether or not this GuildChannel's {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverrides} match
+     * those of {@link #getParent() its parent category}. If the channel doesn't have a parent category, this will return true.
+     *
+     * <p>This requires {@link net.dv8tion.jda.api.utils.cache.CacheFlag#MEMBER_OVERRIDES CacheFlag.MEMBER_OVERRIDES} to be enabled.
+     * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables this CacheFlag by default.
+     *
+     * @return True, if this channel is synced with its parent category
+     *
+     * @since  4.2.1
+     */
+    boolean isSynced();
 
     /**
      * Creates a copy of the specified {@link GuildChannel GuildChannel}
@@ -260,6 +246,9 @@ public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
      * Returns the {@link ChannelManager ChannelManager} for this GuildChannel.
      * <br>In the ChannelManager, you can modify the name, topic and position of this GuildChannel.
      * You modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
+     *
+     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
+     * This getter is not thread-safe and would require guards by the user.
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL Permission.MANAGE_CHANNEL}
@@ -368,8 +357,6 @@ public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
     @CheckReturnValue
     default PermissionOverrideAction upsertPermissionOverride(@Nonnull IPermissionHolder permissionHolder)
     {
-        if (!getGuild().getSelfMember().hasPermission(this, Permission.MANAGE_PERMISSIONS))
-            throw new InsufficientPermissionException(this, Permission.MANAGE_PERMISSIONS);
         PermissionOverride override = getPermissionOverride(permissionHolder);
         if (override != null)
             return override.getManager();
@@ -397,7 +384,7 @@ public interface GuildChannel extends ISnowflake, Comparable<GuildChannel>
     /**
      * Returns all invites for this channel.
      * <br>Requires {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL MANAGE_CHANNEL} in this channel.
-     * Will throw a {@link net.dv8tion.jda.api.exceptions.InsufficientPermissionException InsufficientPermissionException} otherwise.
+     * Will throw an {@link net.dv8tion.jda.api.exceptions.InsufficientPermissionException InsufficientPermissionException} otherwise.
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         if the account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL MANAGE_CHANNEL} in this channel

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,8 +83,8 @@ public class WebhookActionImpl extends AuditableRestActionImpl<Webhook> implemen
     @CheckReturnValue
     public WebhookActionImpl setName(@Nonnull String name)
     {
-        Checks.notNull(name, "Webhook name");
-        Checks.check(name.length() >= 2 && name.length() <= 100, "The webhook name must be in the range of 2-100!");
+        Checks.notEmpty(name, "Name");
+        Checks.notLonger(name, 100, "Name");
 
         this.name = name;
         return this;

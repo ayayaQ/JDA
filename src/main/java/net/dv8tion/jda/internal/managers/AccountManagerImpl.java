@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,6 @@ public class AccountManagerImpl extends ManagerBase<AccountManager> implements A
 
     protected String name;
     protected Icon avatar;
-    protected String email;
-    protected String password;
 
     /**
      * Creates a new AccountManager instance
@@ -93,7 +91,9 @@ public class AccountManagerImpl extends ManagerBase<AccountManager> implements A
     public AccountManagerImpl setName(@Nonnull String name)
     {
         Checks.notBlank(name, "Name");
-        Checks.check(name.length() >= 2 && name.length() <= 32, "Name must be between 2-32 characters long");
+        name = name.trim();
+        Checks.notEmpty(name, "Name");
+        Checks.notLonger(name, 32, "Name");
         this.name = name;
         set |= NAME;
         return this;

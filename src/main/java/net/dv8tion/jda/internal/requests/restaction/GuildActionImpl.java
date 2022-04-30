@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,8 @@ public class GuildActionImpl extends RestActionImpl<Void> implements GuildAction
     {
         Checks.notBlank(name, "Name");
         name = name.trim();
-        Checks.check(name.length() >= 2 && name.length() <= 100, "Name must have 2-100 characters in length!");
+        Checks.notEmpty(name, "Name");
+        Checks.notLonger(name, 100, "Name");
         this.name = name;
         return this;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.requests.DeferredRestAction;
 import net.dv8tion.jda.internal.requests.RestActionImpl;
 import net.dv8tion.jda.internal.requests.Route;
+import net.dv8tion.jda.internal.utils.Helpers;
 
 import javax.annotation.Nonnull;
 import java.util.EnumSet;
@@ -33,22 +34,23 @@ import java.util.FormattableFlags;
 import java.util.Formatter;
 import java.util.List;
 
-public class UserImpl implements User
+public class UserImpl extends UserById implements User
 {
-    protected final long id;
     protected final JDAImpl api;
 
     protected short discriminator;
     protected String name;
     protected String avatarId;
+    protected Profile profile;
     protected long privateChannel = 0L;
     protected boolean bot;
+    protected boolean system;
     protected boolean fake = false;
     protected int flags;
 
     public UserImpl(long id, JDAImpl api)
     {
-        this.id = id;
+        super(id);
         this.api = api;
     }
 
@@ -63,13 +65,35 @@ public class UserImpl implements User
     @Override
     public String getDiscriminator()
     {
-        return String.format("%04d", discriminator);
+        return Helpers.format("%04d", discriminator);
     }
 
     @Override
     public String getAvatarId()
     {
         return avatarId;
+    }
+
+    @Nonnull
+    @Override
+    public RestAction<Profile> retrieveProfile()
+    {
+        return new DeferredRestAction<>(getJDA(), Profile.class, this::getProfile, () -> {
+            Route.CompiledRoute route = Route.Users.GET_USER.compile(getId());
+            return new RestActionImpl<>(getJDA(), route, (response, request) -> {
+                DataObject json = response.getObject();
+
+                String bannerId = json.getString("banner", null);
+                int accentColor = json.getInt("accent_color", User.DEFAULT_ACCENT_COLOR_RAW);
+
+                return new Profile(getIdLong(), bannerId, accentColor);
+            });
+        });
+    }
+
+    public Profile getProfile()
+    {
+        return profile;
     }
 
     @Nonnull
@@ -113,8 +137,6 @@ public class UserImpl implements User
         if (!hasPrivateChannel())
             return null;
         PrivateChannel channel = getJDA().getPrivateChannelById(privateChannel);
-        if (channel == null)
-            channel = getJDA().getFakePrivateChannelMap().get(privateChannel);
         return channel != null ? channel : new PrivateChannelImpl(privateChannel, this);
     }
 
@@ -131,30 +153,17 @@ public class UserImpl implements User
         return bot;
     }
 
+    @Override
+    public boolean isSystem()
+    {
+        return system;
+    }
+
     @Nonnull
     @Override
     public JDAImpl getJDA()
     {
         return api;
-    }
-
-    @Nonnull
-    @Override
-    public String getAsMention()
-    {
-        return "<@" + getId() + '>';
-    }
-
-    @Override
-    public long getIdLong()
-    {
-        return id;
-    }
-
-    @Override
-    public boolean isFake()
-    {
-        return fake;
     }
 
     @Nonnull
@@ -171,26 +180,9 @@ public class UserImpl implements User
     }
 
     @Override
-    public boolean equals(Object o)
-    {
-        if (o == this)
-            return true;
-        if (!(o instanceof UserImpl))
-            return false;
-        UserImpl oUser = (UserImpl) o;
-        return this.id == oUser.id;
-    }
-
-    @Override
-    public int hashCode()
-    {
-        return Long.hashCode(id);
-    }
-
-    @Override
     public String toString()
     {
-        return "U:" + getName() + '(' + id + ')';
+        return "U:" + getName() + '(' + getId() + ')';
     }
 
     // -- Setters --
@@ -213,6 +205,12 @@ public class UserImpl implements User
         return this;
     }
 
+    public UserImpl setProfile(Profile profile)
+    {
+        this.profile = profile;
+        return this;
+    }
+
     public UserImpl setPrivateChannel(PrivateChannel privateChannel)
     {
         if (privateChannel != null)
@@ -223,6 +221,12 @@ public class UserImpl implements User
     public UserImpl setBot(boolean bot)
     {
         this.bot = bot;
+        return this;
+    }
+
+    public UserImpl setSystem(boolean system)
+    {
+        this.system = system;
         return this;
     }
 

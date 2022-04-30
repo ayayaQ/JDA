@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,14 @@ package net.dv8tion.jda.internal.utils;
 import org.jetbrains.annotations.Contract;
 
 import java.util.Collection;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class Checks
 {
+    public static final Pattern ALPHANUMERIC_WITH_DASH = Pattern.compile("[\\w-]+");
+    public static final Pattern ALPHANUMERIC = Pattern.compile("[\\w]+");
+
     @Contract("null -> fail")
     public static void isSnowflake(final String snowflake)
     {
@@ -33,7 +38,7 @@ public class Checks
     {
         notNull(snowflake, message);
         if (snowflake.length() > 20 || !Helpers.isNumeric(snowflake))
-            throw new IllegalArgumentException(message + " is not a valid snowflake value!");
+            throw new IllegalArgumentException(message + " is not a valid snowflake value! Provided: \"" + snowflake + "\"");
     }
 
     @Contract("false, _ -> fail")
@@ -85,7 +90,7 @@ public class Checks
     {
         notNull(argument, name);
         if (Helpers.containsWhitespace(argument))
-            throw new IllegalArgumentException(name + " may not contain blanks");
+            throw new IllegalArgumentException(name + " may not contain blanks. Provided: \"" + argument + "\"");
     }
 
     @Contract("null, _ -> fail")
@@ -139,6 +144,33 @@ public class Checks
     {
         notNull(argument, name);
         argument.forEach(it -> noWhitespace(it, name));
+    }
+
+    public static void inRange(final String input, final int min, final int max, final String name)
+    {
+        notNull(input, name);
+        int length = Helpers.codePointLength(input);
+        check(min <= length && length <= max,
+                "%s must be between %d and %d characters long! Provided: \"%s\"",
+                name, min, max, input);
+    }
+
+    public static void notLonger(final String input, final int length, final String name)
+    {
+        notNull(input, name);
+        check(Helpers.codePointLength(input) <= length, "%s may not be longer than %d characters! Provided: \"%s\"", name, length, input);
+    }
+
+    public static void matches(final String input, final Pattern pattern, final String name)
+    {
+        notNull(input, name);
+        check(pattern.matcher(input).matches(), "%s must match regex ^%s$. Provided: \"%s\"", name, pattern.pattern(), input);
+    }
+
+    public static void isLowercase(final String input, final String name)
+    {
+        notNull(input, name);
+        check(input.toLowerCase(Locale.ROOT).equals(input), "%s must be lowercase only! Provided: \"%s\"", name, input);
     }
 
     public static void positive(final int n, final String name)

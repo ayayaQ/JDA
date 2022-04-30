@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
+ * Copyright 2015 Austin Keener, Michael Ritter, Florian Spieß, and the JDA contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import net.dv8tion.jda.api.entities.Guild;
  * <p>Each constant in this enum has elaborate documentation on expected values for the
  * returned {@link AuditLogChange AuditLogChange}.
  * <br>There is no guarantee that the resulting type is accurate or that the value selected is not {@code null}!
+ *
+ * @see <a href="https://discord.com/developers/docs/resources/audit-log#audit-log-change-object-audit-log-change-key" target="_blank">Audit Log Change Key</a>
  */
 public enum AuditLogKey
 {
@@ -97,6 +99,22 @@ public enum AuditLogKey
      * <p>Expected type: <b>String</b>
      */
     GUILD_SYSTEM_CHANNEL("system_channel_id"),
+
+    /**
+     * Change of the {@link net.dv8tion.jda.api.entities.Guild#getRulesChannel() Guild.getRulesChannel()} value represented by a TextChannel ID.
+     * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getTextChannelById(String) Guild.getTextChannelById(String)}
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    GUILD_RULES_CHANNEL("rules_channel_id"),
+
+    /**
+     * Change of the {@link net.dv8tion.jda.api.entities.Guild#getCommunityUpdatesChannel() Guild.getCommunityUpdatesChannel()} value represented by a TextChannel ID.
+     * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getTextChannelById(String) Guild.getTextChannelById(String)}
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    GUILD_COMMUNITY_UPDATES_CHANNEL("public_updates_channel_id"),
 
     /**
      * Change of the {@link net.dv8tion.jda.api.entities.Guild#getExplicitContentLevel() Guild.getExplicitContentLevel()} of a Guild.
@@ -230,6 +248,14 @@ public enum AuditLogKey
     CHANNEL_NSFW("nsfw"),
 
     /**
+     * Change of the {@link net.dv8tion.jda.api.Region Region} value.
+     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#VOICE ChannelType.VOICE} and {@link net.dv8tion.jda.api.entities.ChannelType#STAGE ChannelType.STAGE}
+     *
+     * <p>Expected type: <b>String</b></p>
+     */
+    CHANNEL_REGION("rtc_region"),
+
+    /**
      * The integer type of this channel.
      * <br>Use with {@link net.dv8tion.jda.api.entities.ChannelType#fromId(int) ChannelType.fromId(int)}.
      *
@@ -243,6 +269,16 @@ public enum AuditLogKey
      * <p>Expected type: <b>List{@literal <Map<String, Object>>}</b>
      */
     CHANNEL_OVERRIDES("permission_overwrites"),
+
+    // STAGE_INSTANCE
+
+    /**
+     * Change of the {@link net.dv8tion.jda.api.entities.StageInstance#getPrivacyLevel() StageInstance.getPrivacyLevel()} value
+     * <br>Use with {@link net.dv8tion.jda.api.entities.StageInstance.PrivacyLevel#fromKey(int) StageInstance.PrivacyLevel.fromKey(int)}
+     *
+     * <p>Expected type: <b>Integer</b>
+     */
+    PRIVACY_LEVEL("privacy_level"),
 
 
     // MEMBER
