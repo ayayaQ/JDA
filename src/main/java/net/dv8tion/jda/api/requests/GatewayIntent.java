@@ -143,6 +143,10 @@ public enum GatewayIntent
      * Typing events in private channels.
      */
     DIRECT_MESSAGE_TYPING(14),
+    /**
+     * Privileged Intent. Access to message content.
+     */
+    MESSAGE_CONTENT(15),
     ;
 
     /**
