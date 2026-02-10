@@ -26,7 +26,7 @@ plugins {
     `maven-publish`
 
     id("com.github.ben-manes.versions") version "0.19.0"
-    id("com.github.johnrengelman.shadow") version "5.1.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 val versionObj = Version(major = "4", minor = "4", revision = "0")
@@ -108,7 +108,7 @@ val clean: Task by tasks
 val test: Test by tasks
 val check: Task by tasks
 
-shadowJar.classifier = "withDependencies"
+shadowJar.archiveClassifier.set("withDependencies")
 
 val sourcesForRelease = task<Copy>("sourcesForRelease") {
     from("src/main/java") {
@@ -138,7 +138,7 @@ val generateJavaSources = task<SourceTask>("generateJavaSources") {
 
 val noOpusJar = task<ShadowJar>("noOpusJar") {
     dependsOn(shadowJar)
-    classifier = shadowJar.classifier + "-no-opus"
+    archiveClassifier.set(shadowJar.archiveClassifier.get() + "-no-opus")
 
     configurations = shadowJar.configurations
     from(sourceSets["main"].output)
@@ -153,7 +153,7 @@ val noOpusJar = task<ShadowJar>("noOpusJar") {
 val minimalJar = task<ShadowJar>("minimalJar") {
     dependsOn(shadowJar)
     minimize()
-    classifier = shadowJar.classifier + "-min"
+    archiveClassifier.set(shadowJar.archiveClassifier.get() + "-min")
     configurations = shadowJar.configurations
     from(sourceSets["main"].output)
     exclude("natives/**")     // ~2 MB
@@ -164,7 +164,7 @@ val minimalJar = task<ShadowJar>("minimalJar") {
 }
 
 val sourcesJar = task<Jar>("sourcesJar") {
-    classifier = "sources"
+    archiveClassifier.set("sources")
     from("src/main/java") {
         exclude("**/JDAInfo.java")
     }
@@ -175,7 +175,7 @@ val sourcesJar = task<Jar>("sourcesJar") {
 
 val javadocJar = task<Jar>("javadocJar") {
     dependsOn(javadoc)
-    classifier = "javadoc"
+    archiveClassifier.set("javadoc")
     from(javadoc.destinationDir)
 }
 
@@ -202,7 +202,7 @@ compileJava.apply {
 }
 
 jar.apply {
-    baseName = project.name
+    archiveBaseName.set(project.name)
     manifest.attributes(mapOf(
             "Implementation-Version" to version,
             "Automatic-Module-Name" to "net.dv8tion.jda"))
