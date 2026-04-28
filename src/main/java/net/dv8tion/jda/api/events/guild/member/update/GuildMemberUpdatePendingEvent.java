@@ -25,11 +25,11 @@ import javax.annotation.Nonnull;
 /**
  * Indicates that a {@link Member Member} has agreed to Membership Screening requirements.
  *
- * <p>Can be used to retrieve members who have agreed to Membership Screening requirements.
+ * <p>Can be used to retrieve members who have agreed to Membership Screening requirements and the triggering guild.
  *
  * <p>Identifier: {@code pending}
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -41,16 +41,13 @@ import javax.annotation.Nonnull;
  * need to have the old member cached to compare against.
  *
  * @incubating Discord is still trying to figure this out
- *
- * @since  4.2.1
  */
 @Incubating
-public class GuildMemberUpdatePendingEvent extends GenericGuildMemberUpdateEvent<Boolean>
-{
+public class GuildMemberUpdatePendingEvent extends GenericGuildMemberUpdateEvent<Boolean> {
     public static final String IDENTIFIER = "pending";
 
-    public GuildMemberUpdatePendingEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, boolean previous)
-    {
+    public GuildMemberUpdatePendingEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, boolean previous) {
         super(api, responseNumber, member, previous, member.isPending(), IDENTIFIER);
     }
 
@@ -59,8 +56,7 @@ public class GuildMemberUpdatePendingEvent extends GenericGuildMemberUpdateEvent
      *
      * @return The old pending status
      */
-    public boolean getOldPending()
-    {
+    public boolean getOldPending() {
         return getOldValue();
     }
 
@@ -69,8 +65,7 @@ public class GuildMemberUpdatePendingEvent extends GenericGuildMemberUpdateEvent
      *
      * @return The new pending status
      */
-    public boolean getNewPending()
-    {
+    public boolean getNewPending() {
         return getNewValue();
     }
 }

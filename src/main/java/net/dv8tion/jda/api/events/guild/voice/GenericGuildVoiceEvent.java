@@ -29,24 +29,17 @@ import javax.annotation.Nonnull;
  *
  * <p>Can be used to detect any GuildVoiceEvent.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>These events require the {@link net.dv8tion.jda.api.utils.cache.CacheFlag#VOICE_STATE VOICE_STATE} CacheFlag to be enabled, which requires
  * the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_VOICE_STATES GUILD_VOICE_STATES} intent.
  *
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables that CacheFlag by default!
- *
- * <p>Additionally, these events require the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}
- * to cache the updated members. Discord does not specifically tell us about the updates, but merely tells us the
- * member was updated and gives us the updated member object. In order to fire specific events like these we
- * need to have the old member cached to compare against.
  */
-public abstract class GenericGuildVoiceEvent extends GenericGuildEvent
-{
+public abstract class GenericGuildVoiceEvent extends GenericGuildEvent {
     protected final Member member;
 
-    public GenericGuildVoiceEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member)
-    {
+    public GenericGuildVoiceEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member) {
         super(api, responseNumber, member.getGuild());
         this.member = member;
     }
@@ -57,8 +50,7 @@ public abstract class GenericGuildVoiceEvent extends GenericGuildEvent
      * @return The affected Member
      */
     @Nonnull
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 
@@ -69,8 +61,7 @@ public abstract class GenericGuildVoiceEvent extends GenericGuildEvent
      * @return The {@link net.dv8tion.jda.api.entities.GuildVoiceState GuildVoiceState} of the member
      */
     @Nonnull
-    public GuildVoiceState getVoiceState()
-    {
+    public GuildVoiceState getVoiceState() {
         return member.getVoiceState();
     }
 }

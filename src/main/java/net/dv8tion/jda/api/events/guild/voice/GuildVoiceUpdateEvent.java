@@ -16,70 +16,98 @@
 
 package net.dv8tion.jda.api.events.guild.voice;
 
-import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.VoiceChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.events.UpdateEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Indicates that a {@link net.dv8tion.jda.api.entities.Member Member} joined or left a {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}.
- * <br>Generic event that combines
- * {@link net.dv8tion.jda.api.events.guild.voice.GuildVoiceLeaveEvent GuildVoiceLeaveEvent},
- * {@link net.dv8tion.jda.api.events.guild.voice.GuildVoiceJoinEvent GuildVoiceJoinEvent}, and
- * {@link net.dv8tion.jda.api.events.guild.voice.GuildVoiceMoveEvent GuildVoiceMoveEvent} for convenience.
+ * Indicates that a {@link net.dv8tion.jda.api.entities.Member Member} joined or left an {@link AudioChannel}.
+ * <p>Can be used to detect when a Member leaves/joins an AudioChannel.
  *
- * <p>Can be used to detect when a Member leaves/joins a channel
+ * <p><b>Example</b><br>
+ * {@snippet lang="java":
+ * AudioChannelUnion joinedChannel = event.getChannelJoined();
+ * AudioChannelUnion leftChannel = event.getChannelLeft();
  *
- * <h2>Requirements</h2>
+ * if (joinedChannel != null) {
+ *   // the member joined an audio channel
+ * }
+ * if (leftChannel != null) {
+ *   // the member left an audio channel
+ * }
+ * if (joinedChannel != null && leftChannel != null) {
+ *   // the member moved between two audio channels in the same guild
+ * }
+ * }
+ *
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.utils.cache.CacheFlag#VOICE_STATE VOICE_STATE} CacheFlag to be enabled, which requires
  * the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_VOICE_STATES GUILD_VOICE_STATES} intent.
  *
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables that CacheFlag by default!
  *
- * <p>Additionally, this event requires the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}
- * to cache the updated members. Discord does not specifically tell us about the updates, but merely tells us the
- * member was updated and gives us the updated member object. In order to fire a specific event like this we
- * need to have the old member cached to compare against.
- *
- * <p>Identifier: {@code voice-channel}
+ * <p>Identifier: {@code audio-channel}
  */
-public interface GuildVoiceUpdateEvent extends UpdateEvent<Member, VoiceChannel>
-{
-    String IDENTIFIER = "voice-channel";
+public class GuildVoiceUpdateEvent extends GenericGuildVoiceEvent implements UpdateEvent<Member, AudioChannel> {
+    public static final String IDENTIFIER = "audio-channel";
+
+    private final AudioChannel previous;
+    private final AudioChannel next;
+
+    public GuildVoiceUpdateEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nullable AudioChannel previous) {
+        super(api, responseNumber, member);
+        this.previous = previous;
+        this.next = member.getVoiceState().getChannel();
+    }
 
     /**
-     * The affected {@link net.dv8tion.jda.api.entities.Member Member}
+     * The {@link AudioChannelUnion} that the {@link Member} is moved from
      *
-     * @return The affected Member
-     */
-    @Nonnull
-    Member getMember();
-
-    /**
-     * The {@link net.dv8tion.jda.api.entities.Guild Guild}
-     *
-     * @return The Guild
-     */
-    @Nonnull
-    Guild getGuild();
-
-    /**
-     * The {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} that the {@link net.dv8tion.jda.api.entities.Member Member} is moved from
-     *
-     * @return The {@link net.dv8tion.jda.api.entities.VoiceChannel}
+     * @return The {@link AudioChannelUnion}, or {@code null} if the member was not connected to a channel before
      */
     @Nullable
-    VoiceChannel getChannelLeft();
+    public AudioChannelUnion getChannelLeft() {
+        return (AudioChannelUnion) previous;
+    }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} that was joined
+     * The {@link AudioChannelUnion} that was joined
      *
-     * @return The {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}
+     * @return The {@link AudioChannelUnion}, or {@code null} if the member has disconnected
      */
     @Nullable
-    VoiceChannel getChannelJoined();
+    public AudioChannelUnion getChannelJoined() {
+        return (AudioChannelUnion) next;
+    }
+
+    @Nonnull
+    @Override
+    public String getPropertyIdentifier() {
+        return IDENTIFIER;
+    }
+
+    @Nonnull
+    @Override
+    public Member getEntity() {
+        return member;
+    }
+
+    @Nullable
+    @Override
+    public AudioChannel getOldValue() {
+        return previous;
+    }
+
+    @Nullable
+    @Override
+    public AudioChannel getNewValue() {
+        return next;
+    }
 }

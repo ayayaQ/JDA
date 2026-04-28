@@ -27,25 +27,25 @@ import javax.annotation.Nullable;
  * Manager providing functionality to update one or more fields for the logged in account.
  *
  * <p><b>Example</b>
- * <pre>{@code
- * manager.setName("Minn")
- *        .setAvatar(null)
- *        .queue();
- * manager.reset(AccountManager.NAME | AccountManager.AVATAR)
- *        .setName("DV8FromTheWorld")
+ * {@snippet lang="java":
+ * manager.setAvatar(null).queue();
+ * manager.reset(AccountManager.AVATAR)
  *        .setAvatar(icon)
  *        .queue();
- * }</pre>
+ * }
  *
  * @see net.dv8tion.jda.api.JDA#getSelfUser() JDA.getSelfUser()
  * @see net.dv8tion.jda.api.entities.SelfUser#getManager()
  */
-public interface AccountManager extends Manager<AccountManager>
-{
-    /** Used to reset the name field */
-    long NAME = 0x1;
+public interface AccountManager extends Manager<AccountManager> {
+    /**
+     * Used to reset the name field
+     */
+    long NAME = 1;
     /** Used to reset the avatar field */
-    long AVATAR = 0x2;
+    long AVATAR = 1 << 1;
+    /** Used to reset the banner field */
+    long BANNER = 1 << 2;
 
     /**
      * The {@link net.dv8tion.jda.api.entities.SelfUser SelfUser} that will be
@@ -66,6 +66,7 @@ public interface AccountManager extends Manager<AccountManager>
      * <ul>
      *     <li>{@link #NAME}</li>
      *     <li>{@link #AVATAR}</li>
+     *     <li>{@link #BANNER}</li>
      * </ul>
      *
      * @param  fields
@@ -80,13 +81,13 @@ public interface AccountManager extends Manager<AccountManager>
 
     /**
      * Resets the fields specified by the provided bit-flag patterns.
-     * You can specify a combination by using a bitwise OR concat of the flag constants.
      * <br>Example: {@code manager.reset(AccountManager.NAME, AccountManager.AVATAR);}
      *
      * <p><b>Flag Constants:</b>
      * <ul>
      *     <li>{@link #NAME}</li>
      *     <li>{@link #AVATAR}</li>
+     *     <li>{@link #BANNER}</li>
      * </ul>
      *
      * @param  fields
@@ -97,7 +98,7 @@ public interface AccountManager extends Manager<AccountManager>
     @Nonnull
     @Override
     @CheckReturnValue
-    AccountManager reset(long... fields);
+    AccountManager reset(@Nonnull long... fields);
 
     /**
      * Sets the username for the currently logged in account
@@ -130,4 +131,17 @@ public interface AccountManager extends Manager<AccountManager>
     @Nonnull
     @CheckReturnValue
     AccountManager setAvatar(@Nullable Icon avatar);
+
+    /**
+     * Sets the banner for the currently logged in account
+     *
+     * @param  banner
+     *         An {@link net.dv8tion.jda.api.entities.Icon Icon} instance representing
+     *         the new banner for the current account, {@code null} to reset the banner to the default banner.
+     *
+     * @return AccountManager for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    AccountManager setBanner(@Nullable Icon banner);
 }

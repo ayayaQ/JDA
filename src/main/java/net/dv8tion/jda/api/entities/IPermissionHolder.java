@@ -17,25 +17,25 @@
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.internal.utils.Checks;
 
-import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.EnumSet;
+
+import javax.annotation.Nonnull;
 
 /**
  * Marker for entities that hold Permissions within JDA
  *
- * @since 3.0
- *
  * @see Role
  * @see Member
  */
-public interface IPermissionHolder extends ISnowflake
-{
+public interface IPermissionHolder extends ISnowflake {
     /**
      * The Guild to which this PermissionHolder is related
-     * 
+     *
      * @return A never-null Guild to which this PermissionHolder is linked
      */
     @Nonnull
@@ -44,6 +44,9 @@ public interface IPermissionHolder extends ISnowflake
     /**
      * The Guild-Wide Permissions this PermissionHolder holds.
      * <br><u>Changes to the returned set do not affect this entity directly.</u>
+     *
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Member#isDetached() detached} member
      *
      * @return An EnumSet of Permissions granted to this PermissionHolder.
      */
@@ -61,6 +64,12 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws java.lang.IllegalArgumentException
      *         If the channel is null
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Role#isDetached() detached} role
+     * @throws net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException
+     *         If this is a {@link Member#isDetached() detached} member,
+     *         and the combination of Member and GuildChannel doesn't have permission data,
+     *         see {@link net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException MissingEntityInteractionPermissionsException}
      *
      * @return Set of Permissions granted to this Permission Holder in the specified channel.
      */
@@ -72,6 +81,9 @@ public interface IPermissionHolder extends ISnowflake
      * <br>This disregards owner and administrator privileges.
      * For a role this is identical to {@link #getPermissions()} and members have all their roles taken into consideration.
      * <br><u>Changes to the returned set do not affect this entity directly.</u>
+     *
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Member#isDetached() detached} member
      *
      * @return EnumSet of the explicitly granted permissions
      */
@@ -90,6 +102,12 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws java.lang.IllegalArgumentException
      *         If the channel is null
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Role#isDetached() detached} role
+     * @throws net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException
+     *         If this is a {@link Member#isDetached() detached} member,
+     *         and the combination of Member and GuildChannel doesn't have permission data,
+     *         see {@link net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException MissingEntityInteractionPermissionsException}
      *
      * @return EnumSet of the explicitly granted permissions in the specified channel
      */
@@ -104,6 +122,8 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws IllegalArgumentException
      *         If null is provided
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Member#isDetached() detached} member.
      *
      * @return True, if all of the specified Permissions are granted to this PermissionHolder.
      */
@@ -118,12 +138,17 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws IllegalArgumentException
      *         If null is provided
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Member#isDetached() detached} member.
      *
      * @return True, if all of the specified Permissions are granted to this PermissionHolder.
      *
      * @see    java.util.EnumSet EnumSet
      */
-    boolean hasPermission(@Nonnull Collection<Permission> permissions);
+    default boolean hasPermission(@Nonnull Collection<Permission> permissions) {
+        Checks.notNull(permissions, "Permission Collection");
+        return hasPermission(permissions.toArray(Permission.EMPTY_PERMISSIONS));
+    }
 
     /**
      * Checks whether or not this PermissionHolder has the given {@link net.dv8tion.jda.api.Permission Permissions} in the specified GuildChannel.
@@ -135,6 +160,12 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws IllegalArgumentException
      *         If null is provided
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Role#isDetached() detached} role
+     * @throws net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException
+     *         If this is a {@link Member#isDetached() detached} member,
+     *         and the combination of Member and GuildChannel doesn't have permission data,
+     *         see {@link net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException MissingEntityInteractionPermissionsException}
      *
      * @return True, if all of the specified Permissions are granted to this PermissionHolder in the provided GuildChannel.
      *
@@ -153,10 +184,19 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws IllegalArgumentException
      *         If null is provided
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Role#isDetached() detached} role
+     * @throws net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException
+     *         If this is a {@link Member#isDetached() detached} member,
+     *         and the combination of Member and GuildChannel doesn't have permission data,
+     *         see {@link net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException MissingEntityInteractionPermissionsException}
      *
      * @return True, if all of the specified Permissions are granted to this PermissionHolder in the provided GuildChannel.
      */
-    boolean hasPermission(@Nonnull GuildChannel channel, @Nonnull Collection<Permission> permissions);
+    default boolean hasPermission(@Nonnull GuildChannel channel, @Nonnull Collection<Permission> permissions) {
+        Checks.notNull(permissions, "Permission Collection");
+        return hasPermission(channel, permissions.toArray(Permission.EMPTY_PERMISSIONS));
+    }
 
     /**
      * Checks whether or not this PermissionHolder has {@link Permission#VIEW_CHANNEL VIEW_CHANNEL}
@@ -167,13 +207,18 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws IllegalArgumentException
      *         If null is provided
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this is a {@link Role#isDetached() detached} role
+     * @throws net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException
+     *         If this is a {@link Member#isDetached() detached} member,
+     *         and the combination of Member and GuildChannel doesn't have permission data,
+     *         see {@link net.dv8tion.jda.api.exceptions.MissingEntityInteractionPermissionsException MissingEntityInteractionPermissionsException}
      *
      * @return True, if the PermissionHolder has access
      */
-    default boolean hasAccess(@Nonnull GuildChannel channel)
-    {
+    default boolean hasAccess(@Nonnull GuildChannel channel) {
         Checks.notNull(channel, "Channel");
-        return channel.getType() == ChannelType.VOICE || channel.getType() == ChannelType.STAGE
+        return channel.getType().isAudio()
                 ? hasPermission(channel, Permission.VOICE_CONNECT, Permission.VIEW_CHANNEL)
                 : hasPermission(channel, Permission.VIEW_CHANNEL);
     }
@@ -188,14 +233,16 @@ public interface IPermissionHolder extends ISnowflake
      * @param  targetChannel
      *         The target channel to check
      * @param  syncSource
-     *         The sync source, for example the parent category (see {@link GuildChannel#getParent()})
+     *         The sync source, for example the parent category (see {@link net.dv8tion.jda.api.entities.channel.attribute.ICategorizableChannel#getParentCategory()})
      *
      * @throws IllegalArgumentException
      *         If either of the channels is null or not from the same guild as this permission holder
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this entity is {@link net.dv8tion.jda.api.entities.detached.IDetachableEntity#isDetached() detached}
      *
      * @return True, if the channels can be synced
      */
-    boolean canSync(@Nonnull GuildChannel targetChannel, @Nonnull GuildChannel syncSource);
+    boolean canSync(@Nonnull IPermissionContainer targetChannel, @Nonnull IPermissionContainer syncSource);
 
     /**
      * Whether the permissions of this PermissionHolder are good enough to sync the target channel with any other channel.
@@ -208,8 +255,10 @@ public interface IPermissionHolder extends ISnowflake
      *
      * @throws IllegalArgumentException
      *         If the channel is null or not from the same guild as this permission holder
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this entity is {@link net.dv8tion.jda.api.entities.detached.IDetachableEntity#isDetached() detached}
      *
      * @return True, if the channel can be synced
      */
-    boolean canSync(@Nonnull GuildChannel channel);
+    boolean canSync(@Nonnull IPermissionContainer channel);
 }

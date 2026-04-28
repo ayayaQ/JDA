@@ -41,7 +41,7 @@ import javax.annotation.Nonnull;
  * Iterate the list of activities and check if an activity of the same {@link Activity#getType() type}
  * exists, if that is the case it was replaced and not finished.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -55,13 +55,12 @@ import javax.annotation.Nonnull;
  * <p>This also requires {@link net.dv8tion.jda.api.utils.cache.CacheFlag#ACTIVITY CacheFlag.ACTIVITY} to be enabled.
  * You can enable the cache flag with {@link net.dv8tion.jda.api.JDABuilder#enableCache(CacheFlag, CacheFlag...) enableCache(CacheFlag.ACTIVITY)}.
  */
-public class UserActivityEndEvent extends GenericUserEvent implements GenericUserPresenceEvent
-{
+public class UserActivityEndEvent extends GenericUserEvent implements GenericUserPresenceEvent {
     private final Activity oldActivity;
     private final Member member;
 
-    public UserActivityEndEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull Activity oldActivity)
-    {
+    public UserActivityEndEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull Activity oldActivity) {
         super(api, responseNumber, member.getUser());
         this.oldActivity = oldActivity;
         this.member = member;
@@ -73,22 +72,19 @@ public class UserActivityEndEvent extends GenericUserEvent implements GenericUse
      * @return The old activity
      */
     @Nonnull
-    public Activity getOldActivity()
-    {
+    public Activity getOldActivity() {
         return oldActivity;
     }
 
     @Nonnull
     @Override
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return member.getGuild();
     }
 
     @Nonnull
     @Override
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 }

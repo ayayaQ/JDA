@@ -17,164 +17,243 @@
 package net.dv8tion.jda.internal.interactions;
 
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.interactions.Interaction;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.exceptions.InteractionExpiredException;
 import net.dv8tion.jda.api.interactions.InteractionHook;
-import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.interactions.response.InteractionCallbackResponse;
+import net.dv8tion.jda.api.requests.Route;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageDeleteAction;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageRetrieveAction;
 import net.dv8tion.jda.api.utils.MiscUtil;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.entities.AbstractWebhookClient;
-import net.dv8tion.jda.internal.requests.Route;
-import net.dv8tion.jda.internal.requests.restaction.TriggerRestAction;
-import net.dv8tion.jda.internal.requests.restaction.WebhookMessageActionImpl;
-import net.dv8tion.jda.internal.requests.restaction.WebhookMessageUpdateActionImpl;
+import net.dv8tion.jda.internal.entities.ReceivedMessage;
+import net.dv8tion.jda.internal.interactions.response.InteractionCallbackResponseImpl;
+import net.dv8tion.jda.internal.requests.restaction.*;
 import net.dv8tion.jda.internal.utils.Checks;
 import net.dv8tion.jda.internal.utils.JDALogger;
 
-import javax.annotation.Nonnull;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 
-public class InteractionHookImpl extends AbstractWebhookClient<Message> implements InteractionHook
-{
+import javax.annotation.Nonnull;
+
+public class InteractionHookImpl extends AbstractWebhookClient<Message> implements InteractionHook {
     public static final String TIMEOUT_MESSAGE = "Timed out waiting for interaction acknowledgement";
-    private final InteractionImpl interaction;
+    private final DeferrableInteractionImpl interaction;
     private final List<TriggerRestAction<?>> readyCallbacks = new LinkedList<>();
     private final Future<?> timeoutHandle;
     private final ReentrantLock mutex = new ReentrantLock();
+    private final String token;
     private Exception exception;
     private boolean isReady;
     private boolean ephemeral;
+    private InteractionCallbackResponseImpl callbackResponse;
 
-    //This is used to give a proper error when an interaction is ack'd twice
-    // By default, discord only responds with "unknown interaction" which is horrible UX so we add a check manually here
-    private volatile boolean isAck;
-
-    public InteractionHookImpl(@Nonnull InteractionImpl interaction, @Nonnull JDA api)
-    {
+    public InteractionHookImpl(@Nonnull DeferrableInteractionImpl interaction, @Nonnull JDA api) {
         super(api.getSelfUser().getApplicationIdLong(), interaction.getToken(), api);
         this.interaction = interaction;
+        this.token = interaction.getToken();
         // 10 second timeout for our failure
-        this.timeoutHandle = api.getGatewayPool().schedule(() -> this.fail(new TimeoutException(TIMEOUT_MESSAGE)), 10, TimeUnit.SECONDS);
+        this.timeoutHandle = api.getGatewayPool()
+                .schedule(() -> this.fail(new TimeoutException(TIMEOUT_MESSAGE)), 10, TimeUnit.SECONDS);
     }
 
-    public synchronized boolean ack()
-    {
-        boolean wasAck = isAck;
-        this.isAck = true;
-        return wasAck;
+    public InteractionHookImpl(@Nonnull JDA api, @Nonnull String token) {
+        super(api.getSelfUser().getApplicationIdLong(), token, api);
+        this.interaction = null;
+        this.token = token;
+        this.timeoutHandle = null;
+        this.isReady = true;
     }
 
-    public synchronized boolean isAck()
-    {
-        return isAck;
+    public boolean ack() {
+        return interaction == null || interaction.ack();
     }
 
-    public void ready()
-    {
+    public boolean isAck() {
+        return interaction == null || interaction.isAcknowledged();
+    }
+
+    public void ready() {
         MiscUtil.locked(mutex, () -> {
-            timeoutHandle.cancel(false);
+            if (timeoutHandle != null) {
+                timeoutHandle.cancel(false);
+            }
             isReady = true;
             readyCallbacks.forEach(TriggerRestAction::run);
         });
     }
 
-    public void fail(Exception exception)
-    {
+    public void fail(Exception exception) {
         MiscUtil.locked(mutex, () -> {
-            if (!isReady && this.exception == null)
-            {
+            if (!isReady && this.exception == null) {
                 this.exception = exception;
                 if (!readyCallbacks.isEmpty()) // only log this if we even tried any responses
                 {
-                    if (exception instanceof TimeoutException)
-                        JDALogger.getLog(InteractionHook.class).warn("Up to {} Interaction Followup Messages Timed out! Did you forget to acknowledge the interaction?", readyCallbacks.size());
+                    if (exception instanceof TimeoutException) {
+                        JDALogger.getLog(InteractionHook.class)
+                                .warn(
+                                        "Up to {} Interaction Followup Messages Timed out! Did you forget to acknowledge the interaction?",
+                                        readyCallbacks.size());
+                    }
                     readyCallbacks.forEach(callback -> callback.fail(exception));
                 }
             }
         });
     }
 
-    private <T extends TriggerRestAction<R>, R> T onReady(T runnable)
-    {
+    private <T extends TriggerRestAction<R>, R> T onReady(T runnable) {
         return MiscUtil.locked(mutex, () -> {
-            if (isReady)
+            if (isReady) {
                 runnable.run();
-            else if (exception != null)
+            } else if (exception != null) {
                 runnable.fail(exception);
-            else
+            } else {
                 readyCallbacks.add(runnable);
+            }
             return runnable;
         });
     }
 
+    public InteractionHookImpl setCallbackResponse(InteractionCallbackResponseImpl callbackResponse) {
+        this.callbackResponse = callbackResponse;
+        return this;
+    }
+
     @Nonnull
     @Override
-    public Interaction getInteraction()
-    {
+    public InteractionImpl getInteraction() {
+        if (interaction == null) {
+            throw new IllegalStateException("Cannot get interaction instance from this webhook.");
+        }
         return interaction;
     }
 
     @Nonnull
     @Override
-    public InteractionHook setEphemeral(boolean ephemeral)
-    {
+    public InteractionCallbackResponse getCallbackResponse() {
+        if (!hasCallbackResponse()) {
+            throw new IllegalStateException(
+                    "Cannot get callback response. Has this interaction been acknowledged yet?");
+        }
+        return callbackResponse;
+    }
+
+    @Override
+    public boolean hasCallbackResponse() {
+        return callbackResponse != null;
+    }
+
+    @Override
+    public long getExpirationTimestamp() {
+        OffsetDateTime creationTime = interaction == null ? OffsetDateTime.now() : interaction.getTimeCreated();
+        return creationTime.plus(15, ChronoUnit.MINUTES).toEpochSecond() * 1000;
+    }
+
+    @Nonnull
+    @Override
+    public InteractionHook setEphemeral(boolean ephemeral) {
         this.ephemeral = ephemeral;
         return this;
     }
 
     @Nonnull
     @Override
-    public JDA getJDA()
-    {
-        return api;
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Message> retrieveOriginal()
-    {
-        JDAImpl jda = (JDAImpl) getJDA();
-        Route.CompiledRoute route = Route.Interactions.GET_ORIGINAL.compile(jda.getSelfUser().getApplicationId(), interaction.getToken());
-        return onReady(new TriggerRestAction<>(jda, route, (response, request) ->
-                jda.getEntityBuilder().createMessage(response.getObject(), getInteraction().getMessageChannel(), false)));
-    }
-
-    @Nonnull
-    @Override
-    public WebhookMessageActionImpl<Message> sendRequest()
-    {
-        Route.CompiledRoute route = Route.Interactions.CREATE_FOLLOWUP.compile(getJDA().getSelfUser().getApplicationId(), interaction.getToken());
+    public WebhookMessageCreateActionImpl<Message> sendRequest() {
+        Route.CompiledRoute route =
+                Route.Interactions.CREATE_FOLLOWUP.compile(api.getSelfUser().getApplicationId(), token);
         route = route.withQueryParams("wait", "true");
-        Function<DataObject, Message> transform = (json) -> ((JDAImpl) api).getEntityBuilder().createMessage(json, getInteraction().getMessageChannel(), false).withHook(this);
-        return onReady(new WebhookMessageActionImpl<>(getJDA(), interaction.getMessageChannel(), route, transform)).setEphemeral(ephemeral);
+        WebhookMessageCreateActionImpl<Message> action =
+                new WebhookMessageCreateActionImpl<>(api, route, this::buildMessage).setEphemeral(ephemeral);
+        action.setCheck(this::checkExpired);
+        return onReady(action);
     }
 
     @Nonnull
     @Override
-    public WebhookMessageUpdateActionImpl<Message> editRequest(String messageId)
-    {
-        if (!"@original".equals(messageId))
+    public WebhookMessageEditActionImpl<Message> editRequest(String messageId) {
+        if (!"@original".equals(messageId)) {
             Checks.isSnowflake(messageId);
-        Route.CompiledRoute route = Route.Interactions.EDIT_FOLLOWUP.compile(getJDA().getSelfUser().getApplicationId(), interaction.getToken(), messageId);
+        }
+
+        Route.CompiledRoute route =
+                Route.Interactions.EDIT_FOLLOWUP.compile(api.getSelfUser().getApplicationId(), token, messageId);
         route = route.withQueryParams("wait", "true");
-        Function<DataObject, Message> transform = (json) -> ((JDAImpl) api).getEntityBuilder().createMessage(json, getInteraction().getMessageChannel(), false).withHook(this);
-        return onReady(new WebhookMessageUpdateActionImpl<>(getJDA(), route, transform));
+        WebhookMessageEditActionImpl<Message> action =
+                new WebhookMessageEditActionImpl<>(api, route, this::buildMessage);
+        action.setCheck(this::checkExpired);
+        return onReady(action);
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> deleteMessageById(@Nonnull String messageId)
-    {
-        if (!"@original".equals(messageId))
+    public WebhookMessageDeleteAction deleteMessageById(@Nonnull String messageId) {
+        if (!"@original".equals(messageId)) {
             Checks.isSnowflake(messageId);
-        Route.CompiledRoute route = Route.Interactions.DELETE_FOLLOWUP.compile(getJDA().getSelfUser().getApplicationId(), interaction.getToken(), messageId);
-        return onReady(new TriggerRestAction<>(getJDA(), route));
+        }
+        Route.CompiledRoute route =
+                Route.Interactions.DELETE_FOLLOWUP.compile(api.getSelfUser().getApplicationId(), token, messageId);
+        WebhookMessageDeleteActionImpl action = new WebhookMessageDeleteActionImpl(api, route);
+        action.setCheck(this::checkExpired);
+        return onReady(action);
+    }
+
+    @Nonnull
+    @Override
+    public WebhookMessageRetrieveAction retrieveMessageById(@Nonnull String messageId) {
+        if (!"@original".equals(messageId)) {
+            Checks.isSnowflake(messageId);
+        }
+        Route.CompiledRoute route =
+                Route.Interactions.GET_MESSAGE.compile(api.getSelfUser().getApplicationId(), token, messageId);
+        WebhookMessageRetrieveActionImpl action = new WebhookMessageRetrieveActionImpl(
+                api, route, (response, request) -> buildMessage(response.getObject()));
+        action.setCheck(this::checkExpired);
+        return onReady(action);
+    }
+
+    private boolean checkExpired() {
+        if (isExpired()) {
+            throw new InteractionExpiredException();
+        }
+        return true;
+    }
+
+    // Creates a message with the resolved channel context from the interaction
+    // Sometimes we can't resolve the channel and report an unknown type
+    // Currently known cases where channels can't be resolved:
+    //  - InteractionHook created using id/token factory,
+    //    has no interaction object to use as context
+    public Message buildMessage(DataObject json) {
+        JDAImpl jda = (JDAImpl) api;
+        MessageChannel channel = null;
+        Guild guild = null;
+
+        // Try getting context from interaction if available
+        // This might not be present if the hook was created from id/token instead of an event
+        if (interaction != null) {
+            channel = (MessageChannel) interaction.getChannel();
+            guild = interaction.getGuild();
+        }
+
+        // Try finding the channel in cache through the id in the message
+        long channelId = json.getUnsignedLong("channel_id");
+        if (channel == null) {
+            channel = api.getChannelById(MessageChannel.class, channelId);
+        }
+
+        // Then build the message with the information we have
+        ReceivedMessage message = jda.getEntityBuilder().createMessageBestEffort(json, channel, guild);
+        return message.withHook(this);
     }
 }

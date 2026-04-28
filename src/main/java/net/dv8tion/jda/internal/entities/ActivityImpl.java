@@ -13,41 +13,53 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.internal.entities;
 
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.RichPresence;
+import net.dv8tion.jda.api.entities.emoji.EmojiUnion;
+import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.EntityString;
+
+import java.util.Objects;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Objects;
 
-public class ActivityImpl implements Activity
-{
+public class ActivityImpl implements Activity {
     protected final String name;
     protected final String url;
+    protected final String state;
     protected final ActivityType type;
     protected final Timestamps timestamps;
-    protected final Emoji emoji;
+    protected final EmojiUnion emoji;
 
-    protected ActivityImpl(String name)
-    {
-        this(name, null, ActivityType.DEFAULT);
+    protected ActivityImpl(String name) {
+        this(name, null, ActivityType.PLAYING);
     }
 
-    protected ActivityImpl(String name, String url)
-    {
+    protected ActivityImpl(String name, String url) {
         this(name, url, ActivityType.STREAMING);
     }
 
-    protected ActivityImpl(String name, String url, ActivityType type)
-    {
-        this(name, url, type, null, null);
+    protected ActivityImpl(String name, String url, ActivityType type) {
+        this(name, null, url, type, null, null);
     }
 
-    protected ActivityImpl(String name, String url, ActivityType type, RichPresence.Timestamps timestamps, Emoji emoji)
-    {
+    protected ActivityImpl(String name, String state, String url, ActivityType type) {
+        this(name, state, url, type, null, null);
+    }
+
+    protected ActivityImpl(
+            String name,
+            String state,
+            String url,
+            ActivityType type,
+            Activity.Timestamps timestamps,
+            EmojiUnion emoji) {
         this.name = name;
+        this.state = state;
         this.url = url;
         this.type = type;
         this.timestamps = timestamps;
@@ -55,77 +67,93 @@ public class ActivityImpl implements Activity
     }
 
     @Override
-    public boolean isRich()
-    {
+    public boolean isRich() {
         return false;
     }
 
     @Override
-    public RichPresence asRichPresence()
-    {
+    public RichPresence asRichPresence() {
         return null;
     }
 
     @Nonnull
     @Override
-    public String getName()
-    {
+    public String getName() {
         return name;
     }
 
+    @Nullable
     @Override
-    public String getUrl()
-    {
+    public String getState() {
+        return state;
+    }
+
+    @Override
+    public String getUrl() {
         return url;
     }
 
     @Nonnull
     @Override
-    public ActivityType getType()
-    {
+    public ActivityType getType() {
         return type;
     }
 
     @Nullable
-    public RichPresence.Timestamps getTimestamps()
-    {
+    public Activity.Timestamps getTimestamps() {
         return timestamps;
     }
 
     @Nullable
     @Override
-    public Emoji getEmoji()
-    {
+    public EmojiUnion getEmoji() {
         return emoji;
     }
 
+    @Nonnull
     @Override
-    public boolean equals(Object o)
-    {
-        if (o == this)
+    public Activity withState(@Nullable String state) {
+        if (state != null) {
+            state = state.trim();
+            if (state.isEmpty()) {
+                state = null;
+            } else {
+                Checks.notLonger(state, MAX_ACTIVITY_STATE_LENGTH, "State");
+            }
+        }
+
+        return new ActivityImpl(name, state, url, type);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
             return true;
-        if (!(o instanceof ActivityImpl))
+        }
+        if (!(o instanceof ActivityImpl)) {
             return false;
+        }
 
         ActivityImpl oGame = (ActivityImpl) o;
         return oGame.getType() == type
-               && Objects.equals(name, oGame.getName())
-               && Objects.equals(url, oGame.getUrl())
-               && Objects.equals(timestamps, oGame.timestamps);
+                && Objects.equals(name, oGame.getName())
+                && Objects.equals(state, oGame.state)
+                && Objects.equals(url, oGame.getUrl())
+                && Objects.equals(timestamps, oGame.timestamps);
     }
 
     @Override
-    public int hashCode()
-    {
-        return Objects.hash(name, type, url, timestamps);
+    public int hashCode() {
+        return Objects.hash(name, state, type, url, timestamps);
     }
 
     @Override
-    public String toString()
-    {
-        if (url != null)
-            return String.format("Activity(%s | %s)", name, url);
-        else
-            return String.format("Activity(%s)", name);
+    public String toString() {
+        EntityString entityString = new EntityString(this).setType(type).setName(name);
+        if (url != null) {
+            entityString.addMetadata("url", url);
+        }
+
+        return entityString.toString();
     }
 }

@@ -16,27 +16,28 @@
 
 package net.dv8tion.jda.api.requests.restaction;
 
+import net.dv8tion.jda.api.interactions.IntegrationType;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
 import net.dv8tion.jda.api.interactions.commands.Command;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.CommandData;
-import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
-import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
+import net.dv8tion.jda.api.interactions.commands.build.*;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.internal.utils.Checks;
 
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 /**
  * Specialized {@link RestAction} used to edit an existing command.
  */
-public interface CommandEditAction extends RestAction<Command>
-{
+public interface CommandEditAction extends RestAction<Command> {
     @Nonnull
     @Override
     @CheckReturnValue
@@ -67,23 +68,13 @@ public interface CommandEditAction extends RestAction<Command>
      *         If null is provided
      *
      * @return The CommandEditAction instance, for chaining
+     *
+     * @see    Commands
+     * @see    CommandCreateAction
      */
     @Nonnull
     @CheckReturnValue
     CommandEditAction apply(@Nonnull CommandData commandData);
-
-    /**
-     * Whether this command is available to everyone by default.
-     * <br>If this is disabled, you need to explicitly whitelist users and roles per guild.
-     *
-     * @param  enabled
-     *         True, if this command is enabled by default for everyone. (Default: true)
-     *
-     * @return The CommandEditAction instance, for chaining
-     */
-    @Nonnull
-    @CheckReturnValue
-    CommandEditAction setDefaultEnabled(boolean enabled);
 
     /**
      * Configure the name
@@ -99,6 +90,108 @@ public interface CommandEditAction extends RestAction<Command>
     @Nonnull
     @CheckReturnValue
     CommandEditAction setName(@Nullable String name);
+
+    /**
+     * Sets the contexts in which this command can be executed (Default: Guild and Bot DMs).
+     * <br>This only has an effect if this command is registered globally.
+     *
+     * @param  contexts
+     *         The contexts in which this command can be executed
+     *
+     * @throws IllegalArgumentException
+     *         If {@code null} or no interaction context types were passed
+     *
+     * @return The builder instance, for chaining
+     */
+    @Nonnull
+    @CheckReturnValue
+    default CommandEditAction setContexts(@Nonnull InteractionContextType... contexts) {
+        return setContexts(Arrays.asList(contexts));
+    }
+
+    /**
+     * Sets the contexts in which this command can be executed (Default: Guild and Bot DMs).
+     * <br>This only has an effect if this command is registered globally.
+     *
+     * @param  contexts
+     *         The contexts in which this command can be executed
+     *
+     * @throws IllegalArgumentException
+     *         If {@code null} or no interaction context types were passed
+     *
+     * @return The builder instance, for chaining
+     */
+    @Nonnull
+    @CheckReturnValue
+    CommandEditAction setContexts(@Nonnull Collection<InteractionContextType> contexts);
+
+    /**
+     * Sets the integration types on which this command can be installed on (Default: Guilds).
+     * <br>This only has an effect if this command is registered globally.
+     *
+     * @param  integrationTypes
+     *         The integration types on which this command can be installed on
+     *
+     * @throws IllegalArgumentException
+     *         If {@code null} or no integration types were passed
+     *
+     * @return The builder instance, for chaining
+     */
+    @Nonnull
+    @CheckReturnValue
+    default CommandEditAction setIntegrationTypes(@Nonnull IntegrationType... integrationTypes) {
+        return setIntegrationTypes(Arrays.asList(integrationTypes));
+    }
+
+    /**
+     * Sets the integration types on which this command can be installed on (Default: Guilds).
+     * <br>This only has an effect if this command is registered globally.
+     *
+     * @param  integrationTypes
+     *         The integration types on which this command can be installed on
+     *
+     * @throws IllegalArgumentException
+     *         If {@code null} or no integration types were passed
+     *
+     * @return The builder instance, for chaining
+     */
+    @Nonnull
+    @CheckReturnValue
+    CommandEditAction setIntegrationTypes(@Nonnull Collection<IntegrationType> integrationTypes);
+
+    /**
+     * Sets whether this command should only be usable in NSFW (age-restricted) channels.
+     * <br>Default: false
+     *
+     * <p>Note: Age-restricted commands will not show up in direct messages by default unless the user enables them in their settings.
+     *
+     * @param  nsfw
+     *         True, to make this command nsfw
+     *
+     * @return The CommandEditAction instance, for chaining
+     *
+     * @see <a href="https://support.discord.com/hc/en-us/articles/10123937946007" target="_blank">Age-Restricted Commands FAQ</a>
+     */
+    @Nonnull
+    @CheckReturnValue
+    CommandEditAction setNSFW(boolean nsfw);
+
+    /**
+     * Sets the {@link net.dv8tion.jda.api.Permission Permissions} that a user must have in a specific channel to be able to use this command.
+     * <br>By default, everyone can use this command ({@link DefaultMemberPermissions#ENABLED}). Additionally, a command can be disabled for everyone but admins via {@link DefaultMemberPermissions#DISABLED}.
+     * <p>These configurations can be overwritten by moderators in each guild. See {@link Command#retrievePrivileges(net.dv8tion.jda.api.entities.Guild)} to get moderator defined overrides.
+     *
+     * @param  permission
+     *         {@link DefaultMemberPermissions} representing the default permissions of this command.
+     *
+     * @return The CommandEditAction instance, for chaining
+     *
+     * @see DefaultMemberPermissions#ENABLED
+     * @see DefaultMemberPermissions#DISABLED
+     */
+    @Nonnull
+    @CheckReturnValue
+    CommandEditAction setDefaultPermissions(@Nonnull DefaultMemberPermissions permission);
 
     /**
      * Configure the description
@@ -170,8 +263,7 @@ public interface CommandEditAction extends RestAction<Command>
      */
     @Nonnull
     @CheckReturnValue
-    default CommandEditAction addOptions(@Nonnull Collection<? extends OptionData> options)
-    {
+    default CommandEditAction addOptions(@Nonnull Collection<? extends OptionData> options) {
         Checks.noneNull(options, "Options");
         return addOptions(options.toArray(new OptionData[0]));
     }
@@ -204,8 +296,8 @@ public interface CommandEditAction extends RestAction<Command>
      */
     @Nonnull
     @CheckReturnValue
-    default CommandEditAction addOption(@Nonnull OptionType type, @Nonnull String name, @Nonnull String description, boolean required)
-    {
+    default CommandEditAction addOption(
+            @Nonnull OptionType type, @Nonnull String name, @Nonnull String description, boolean required) {
         return addOptions(new OptionData(type, name, description).setRequired(required));
     }
 
@@ -235,8 +327,7 @@ public interface CommandEditAction extends RestAction<Command>
      */
     @Nonnull
     @CheckReturnValue
-    default CommandEditAction addOption(@Nonnull OptionType type, @Nonnull String name, @Nonnull String description)
-    {
+    default CommandEditAction addOption(@Nonnull OptionType type, @Nonnull String name, @Nonnull String description) {
         return addOption(type, name, description, false);
     }
 
@@ -272,8 +363,7 @@ public interface CommandEditAction extends RestAction<Command>
      */
     @Nonnull
     @CheckReturnValue
-    default CommandEditAction addSubcommands(@Nonnull Collection<? extends SubcommandData> subcommands)
-    {
+    default CommandEditAction addSubcommands(@Nonnull Collection<? extends SubcommandData> subcommands) {
         Checks.noneNull(subcommands, "Subcommands");
         return addSubcommands(subcommands.toArray(new SubcommandData[0]));
     }
@@ -310,8 +400,7 @@ public interface CommandEditAction extends RestAction<Command>
      */
     @Nonnull
     @CheckReturnValue
-    default CommandEditAction addSubcommandGroups(@Nonnull Collection<? extends SubcommandGroupData> groups)
-    {
+    default CommandEditAction addSubcommandGroups(@Nonnull Collection<? extends SubcommandGroupData> groups) {
         Checks.noneNull(groups, "SubcommandGroups");
         return addSubcommandGroups(groups.toArray(new SubcommandGroupData[0]));
     }

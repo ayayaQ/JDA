@@ -16,6 +16,8 @@
 
 package net.dv8tion.jda.api.entities;
 
+import net.dv8tion.jda.internal.utils.Checks;
+
 import javax.annotation.Nonnull;
 
 /**
@@ -25,8 +27,7 @@ import javax.annotation.Nonnull;
  * @see ApplicationTeam#getMember(User)
  * @see ApplicationTeam#getMemberById(long)
  */
-public interface TeamMember
-{
+public interface TeamMember {
     /**
      * User for the team member.
      *
@@ -46,13 +47,20 @@ public interface TeamMember
     MembershipState getMembershipState();
 
     /**
+     * The role of this member.
+     *
+     * @return The {@link RoleType}, or {@link RoleType#UNKNOWN UNKNOWN}
+     */
+    @Nonnull
+    RoleType getRoleType();
+
+    /**
      * The id for the team this member belongs to.
      *
      * @return The team id.
      */
     @Nonnull
-    default String getTeamId()
-    {
+    default String getTeamId() {
         return Long.toUnsignedString(getTeamIdLong());
     }
 
@@ -66,8 +74,7 @@ public interface TeamMember
     /**
      * The membership state on the team.
      */
-    enum MembershipState
-    {
+    enum MembershipState {
         /** The user has a pending invite */
         INVITED(1),
         /** The user has accepted an invite as is a member of this team */
@@ -77,8 +84,7 @@ public interface TeamMember
 
         private final int key;
 
-        MembershipState(int key)
-        {
+        MembershipState(int key) {
             this.key = key;
         }
 
@@ -87,8 +93,7 @@ public interface TeamMember
          *
          * @return The key for this state
          */
-        public int getKey()
-        {
+        public int getKey() {
             return key;
         }
 
@@ -101,12 +106,86 @@ public interface TeamMember
          * @return The MembershipState, or {@link #UNKNOWN}
          */
         @Nonnull
-        public static MembershipState fromKey(int key)
-        {
-            for (MembershipState state : values())
-            {
-                if (state.key == key)
+        public static MembershipState fromKey(int key) {
+            for (MembershipState state : values()) {
+                if (state.key == key) {
                     return state;
+                }
+            }
+            return UNKNOWN;
+        }
+    }
+
+    /**
+     * The role in the team.
+     */
+    enum RoleType {
+        /**
+         * Owners are the most permissible role, and can take destructive,
+         * irreversible actions like deleting team-owned apps or the team itself.
+         *
+         * <p>Teams are limited to one owner.
+         */
+        OWNER(""),
+        /**
+         * Admins have similar access as owners,
+         * except they cannot take destructive actions on the team or team-owned apps.
+         */
+        ADMIN("admin"),
+        /**
+         * Members which can access information about team-owned apps, like the client secret or public key.
+         * <br>They can also take limited actions on team-owned apps, like configuring interaction endpoints or resetting the bot token.
+         * <br>Members with the Developer role cannot manage the team or its members, or take destructive actions on team-owned apps.
+         */
+        DEVELOPER("developer"),
+        /**
+         * Members which can access information about a team and any team-owned apps.
+         * <br>Some examples include getting the IDs of applications and exporting payout records.
+         * <br>Members can also invite bots associated with team-owned apps that are marked private.
+         */
+        READ_ONLY("read_only"),
+        /**
+         * Placeholder for future types
+         */
+        UNKNOWN("");
+
+        private final String key;
+
+        RoleType(String key) {
+            this.key = key;
+        }
+
+        /**
+         * The key for this role that is used in the API.
+         *
+         * @return The key for this role
+         */
+        @Nonnull
+        public String getKey() {
+            return key;
+        }
+
+        /**
+         * Resolves the provided key to the correct RoleType.
+         *
+         * <p><b>Note:</b> {@link #OWNER} will never be returned, check the team owner ID instead.
+         *
+         * @param  key
+         *         The key to resolve
+         *
+         * @return The RoleType, or {@link #UNKNOWN}
+         */
+        @Nonnull
+        public static RoleType fromKey(@Nonnull String key) {
+            Checks.notNull(key, "Key");
+            if (key.isEmpty()) {
+                return UNKNOWN;
+            }
+
+            for (RoleType state : values()) {
+                if (state.key.equals(key)) {
+                    return state;
+                }
             }
             return UNKNOWN;
         }

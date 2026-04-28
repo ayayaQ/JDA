@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  *
  * <p>Can be used to track when a user adds a reaction to a message
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires at least one of the following intents (Will not fire at all if neither is enabled):
  * <ul>
@@ -38,11 +38,39 @@ import javax.annotation.Nullable;
  *     <li>{@link net.dv8tion.jda.api.requests.GatewayIntent#DIRECT_MESSAGE_REACTIONS DIRECT_MESSAGE_REACTIONS} to work in private channels</li>
  * </ul>
  */
-public class MessageReactionAddEvent extends GenericMessageReactionEvent
-{
-    public MessageReactionAddEvent(@Nonnull JDA api, long responseNumber, @Nonnull User user,
-                                   @Nullable Member member, @Nonnull MessageReaction reaction, long userId)
-    {
+public class MessageReactionAddEvent extends GenericMessageReactionEvent {
+    private final long messageAuthorId;
+
+    public MessageReactionAddEvent(
+            @Nonnull JDA api,
+            long responseNumber,
+            @Nullable User user,
+            @Nullable Member member,
+            @Nonnull MessageReaction reaction,
+            long userId,
+            long messageAuthorId) {
         super(api, responseNumber, user, member, reaction, userId);
+        this.messageAuthorId = messageAuthorId;
+    }
+
+    /**
+     * The user id of the original message author.
+     * <br>This might be 0 for webhook messages.
+     *
+     * @return The user id of the original message author.
+     */
+    @Nonnull
+    public String getMessageAuthorId() {
+        return Long.toUnsignedString(messageAuthorId);
+    }
+
+    /**
+     * The user id of the original message author.
+     * <br>This might be 0 for webhook messages.
+     *
+     * @return The user id of the original message author.
+     */
+    public long getMessageAuthorIdLong() {
+        return messageAuthorId;
     }
 }

@@ -16,15 +16,18 @@
 
 package net.dv8tion.jda.api.utils;
 
+import net.dv8tion.jda.annotations.UnknownNullability;
 import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.EntityString;
 
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Represents a computation or task result.
@@ -34,16 +37,12 @@ import java.util.function.Supplier;
  *
  * @param <T>
  *        The success type
- *
- * @since  4.2.1
  */
-public class Result<T>
-{
+public class Result<T> {
     private final T value;
     private final Throwable error;
 
-    private Result(T value, Throwable error)
-    {
+    private Result(T value, Throwable error) {
         this.value = value;
         this.error = error;
     }
@@ -60,8 +59,7 @@ public class Result<T>
      */
     @Nonnull
     @CheckReturnValue
-    public static <E> Result<E> success(@Nullable E value)
-    {
+    public static <E> Result<E> success(@Nullable E value) {
         return new Result<>(value, null);
     }
 
@@ -80,8 +78,7 @@ public class Result<T>
      */
     @Nonnull
     @CheckReturnValue
-    public static <E> Result<E> failure(@Nonnull Throwable error)
-    {
+    public static <E> Result<E> failure(@Nonnull Throwable error) {
         Checks.notNull(error, "Error");
         return new Result<>(null, error);
     }
@@ -102,15 +99,11 @@ public class Result<T>
      */
     @Nonnull
     @CheckReturnValue
-    public static <E> Result<E> defer(@Nonnull Supplier<? extends E> supplier)
-    {
+    public static <E> Result<E> defer(@Nonnull Supplier<? extends E> supplier) {
         Checks.notNull(supplier, "Supplier");
-        try
-        {
+        try {
             return Result.success(supplier.get());
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             return Result.failure(ex);
         }
     }
@@ -121,8 +114,7 @@ public class Result<T>
      *
      * @return True, if this is a failure result
      */
-    public boolean isFailure()
-    {
+    public boolean isFailure() {
         return error != null;
     }
 
@@ -132,8 +124,7 @@ public class Result<T>
      *
      * @return True, if this is a successful result
      */
-    public boolean isSuccess()
-    {
+    public boolean isSuccess() {
         return error == null;
     }
 
@@ -151,11 +142,11 @@ public class Result<T>
      * @return The same result instance
      */
     @Nonnull
-    public Result<T> onFailure(@Nonnull Consumer<? super Throwable> callback)
-    {
+    public Result<T> onFailure(@Nonnull Consumer<? super Throwable> callback) {
         Checks.notNull(callback, "Callback");
-        if (isFailure())
+        if (isFailure()) {
             callback.accept(error);
+        }
         return this;
     }
 
@@ -173,11 +164,11 @@ public class Result<T>
      * @return The same result instance
      */
     @Nonnull
-    public Result<T> onSuccess(@Nonnull Consumer<? super T> callback)
-    {
+    public Result<T> onSuccess(@Nonnull Consumer<? super T> callback) {
         Checks.notNull(callback, "Callback");
-        if (isSuccess())
+        if (isSuccess()) {
             callback.accept(value);
+        }
         return this;
     }
 
@@ -200,11 +191,11 @@ public class Result<T>
     @Nonnull
     @CheckReturnValue
     @SuppressWarnings("unchecked")
-    public <U> Result<U> map(@Nonnull Function<? super T, ? extends U> function)
-    {
+    public <U> Result<U> map(@Nonnull Function<? super T, ? extends U> function) {
         Checks.notNull(function, "Function");
-        if (isSuccess())
+        if (isSuccess()) {
             return Result.defer(() -> function.apply(value));
+        }
         return (Result<U>) this;
     }
 
@@ -225,16 +216,13 @@ public class Result<T>
     @Nonnull
     @CheckReturnValue
     @SuppressWarnings("unchecked")
-    public <U> Result<U> flatMap(@Nonnull Function<? super T, ? extends Result<U>> function)
-    {
+    public <U> Result<U> flatMap(@Nonnull Function<? super T, ? extends Result<U>> function) {
         Checks.notNull(function, "Function");
-        try
-        {
-            if (isSuccess())
+        try {
+            if (isSuccess()) {
                 return function.apply(value);
-        }
-        catch (Exception ex)
-        {
+            }
+        } catch (Exception ex) {
             return Result.failure(ex);
         }
         return (Result<U>) this;
@@ -249,10 +237,11 @@ public class Result<T>
      *
      * @return The result value
      */
-    public T get()
-    {
-        if (isFailure())
+    @UnknownNullability
+    public T get() {
+        if (isFailure()) {
             throw new IllegalStateException(error);
+        }
         return value;
     }
 
@@ -263,8 +252,7 @@ public class Result<T>
      * @return The error or null
      */
     @Nullable
-    public Throwable getFailure()
-    {
+    public Throwable getFailure() {
         return error;
     }
 
@@ -284,17 +272,23 @@ public class Result<T>
      * @return The same result instance
      */
     @Nonnull
-    public Result<T> expect(@Nonnull Predicate<? super Throwable> predicate)
-    {
+    public Result<T> expect(@Nonnull Predicate<? super Throwable> predicate) {
         Checks.notNull(predicate, "Predicate");
-        if (isFailure() && predicate.test(error))
+        if (isFailure() && predicate.test(error)) {
             throw new IllegalStateException(error);
+        }
         return this;
     }
 
     @Override
-    public String toString()
-    {
-        return isSuccess() ? "Result(success=" + value + ")" : "Result(error=" + error + ")";
+    public String toString() {
+        EntityString entityString = new EntityString(this);
+        if (isSuccess()) {
+            entityString.addMetadata("success", value);
+        } else {
+            entityString.addMetadata("error", error);
+        }
+
+        return entityString.toString();
     }
 }

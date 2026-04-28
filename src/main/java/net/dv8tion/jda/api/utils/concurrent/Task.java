@@ -16,8 +16,14 @@
 
 package net.dv8tion.jda.api.utils.concurrent;
 
-import javax.annotation.Nonnull;
+import net.dv8tion.jda.internal.utils.Checks;
+import org.jetbrains.annotations.Blocking;
+
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import javax.annotation.Nonnull;
 
 /**
  * Represents an asynchronous task.
@@ -26,8 +32,7 @@ import java.util.function.Consumer;
  * @param <T>
  *        The result type
  */
-public interface Task<T>
-{
+public interface Task<T> {
     /**
      * Whether this task has started.
      *
@@ -69,6 +74,47 @@ public interface Task<T>
     Task<T> onSuccess(@Nonnull Consumer<? super T> callback);
 
     /**
+     * Change the timeout duration for this task.
+     * <br>This may be ignored for certain operations.
+     *
+     * <p>The provided timeout is relative to the start time of the task.
+     * If the time has already passed, this will immediately cancel the task.
+     *
+     * @param  timeout
+     *         The new timeout duration
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided or the timeout is not positive
+     *
+     * @return The current Task instance for chaining
+     */
+    @Nonnull
+    Task<T> setTimeout(@Nonnull Duration timeout);
+
+    /**
+     * Change the timeout duration for this task.
+     * <br>This may be ignored for certain operations.
+     *
+     * <p>The provided timeout is relative to the start time of the task.
+     * If the time has already passed, this will immediately cancel the task.
+     *
+     * @param  timeout
+     *         The new timeout duration
+     * @param  unit
+     *         The time unit of the timeout
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided or the timeout is not positive
+     *
+     * @return The current Task instance for chaining
+     */
+    @Nonnull
+    default Task<T> setTimeout(long timeout, @Nonnull TimeUnit unit) {
+        Checks.notNull(unit, "TimeUnit");
+        return setTimeout(Duration.ofMillis(unit.toMillis(timeout)));
+    }
+
+    /**
      * Blocks the current thread until the result is ready.
      * <br>This will not work on the default JDA event thread because it might depend on other events to be processed,
      * which could lead to a deadlock.
@@ -83,6 +129,7 @@ public interface Task<T>
      * @return The result value
      */
     @Nonnull
+    @Blocking
     T get();
 
     /**

@@ -13,20 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api;
 
 /**
  * Contains information to this specific build of JDA.
  */
-public class JDAInfo
-{
-    public static final int DISCORD_GATEWAY_VERSION = 8;
-    public static final int DISCORD_REST_VERSION = 8;
-    public static final int AUDIO_GATEWAY_VERSION = 4;
-    public static final String GITHUB = "https://github.com/DV8FromTheWorld/JDA";
-    public static final String VERSION_MAJOR = "@versionMajor@";
-    public static final String VERSION_MINOR = "@versionMinor@";
-    public static final String VERSION_REVISION = "@versionRevision@";
-    public static final String VERSION_BUILD = "@versionBuild@";
-    public static final String VERSION = VERSION_MAJOR.startsWith("@") ? "dev" : String.format("%s.%s.%s_%s", VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION, VERSION_BUILD);
+public class JDAInfo {
+    public static final int DISCORD_GATEWAY_VERSION = 10;
+    public static final int DISCORD_REST_VERSION = 10;
+    public static final int AUDIO_GATEWAY_VERSION = 8;
+    public static final String GITHUB = "https://github.com/discord-jda/JDA";
+    public static final String VERSION_MAJOR = "6";
+    public static final String VERSION_MINOR = "3";
+    public static final String VERSION_REVISION = "0";
+    public static final String VERSION_CLASSIFIER = null;
+    public static final String COMMIT_HASH = "DEV";
+    public static final String VERSION = String.format(
+            "%s.%s.%s%s%s",
+            VERSION_MAJOR,
+            VERSION_MINOR,
+            VERSION_REVISION,
+            VERSION_CLASSIFIER == null ? "" : "-" + VERSION_CLASSIFIER,
+            COMMIT_HASH == null ? "" : "_" + COMMIT_HASH);
 }

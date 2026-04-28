@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.events.user.update;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.utils.ImageProxy;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,7 +30,7 @@ import javax.annotation.Nullable;
  *
  * <p>Identifier: {@code avatar}
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -40,12 +41,11 @@ import javax.annotation.Nullable;
  * member was updated and gives us the updated member object. In order to fire a specific event like this we
  * need to have the old member cached to compare against.
  */
-public class UserUpdateAvatarEvent extends GenericUserUpdateEvent<String>
-{
+public class UserUpdateAvatarEvent extends GenericUserUpdateEvent<String> {
     public static final String IDENTIFIER = "avatar";
 
-    public UserUpdateAvatarEvent(@Nonnull JDA api, long responseNumber, @Nonnull User user, @Nullable String oldAvatar)
-    {
+    public UserUpdateAvatarEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull User user, @Nullable String oldAvatar) {
         super(api, responseNumber, user, oldAvatar, user.getAvatarId(), IDENTIFIER);
     }
 
@@ -55,8 +55,7 @@ public class UserUpdateAvatarEvent extends GenericUserUpdateEvent<String>
      * @return The previous avatar id
      */
     @Nullable
-    public String getOldAvatarId()
-    {
+    public String getOldAvatarId() {
         return getOldValue();
     }
 
@@ -66,9 +65,26 @@ public class UserUpdateAvatarEvent extends GenericUserUpdateEvent<String>
      * @return The previous avatar url
      */
     @Nullable
-    public String getOldAvatarUrl()
-    {
-        return previous == null ? null : String.format(User.AVATAR_URL, getUser().getId(), previous, previous.startsWith("a_") ? "gif" : "png");
+    public String getOldAvatarUrl() {
+        return previous == null
+                ? null
+                : String.format(
+                        User.AVATAR_URL, getUser().getId(), previous, previous.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this user's old avatar image.
+     * <p>
+     * <b>Note:</b> the old avatar may not always be downloadable as it might have been removed from Discord.
+     *
+     * @return Possibly-null {@link ImageProxy} of this user's old avatar image
+     *
+     * @see    #getOldAvatarUrl()
+     */
+    @Nullable
+    public ImageProxy getOldAvatar() {
+        String oldAvatarUrl = getOldAvatarUrl();
+        return oldAvatarUrl == null ? null : new ImageProxy(oldAvatarUrl);
     }
 
     /**
@@ -77,8 +93,7 @@ public class UserUpdateAvatarEvent extends GenericUserUpdateEvent<String>
      * @return The new avatar id
      */
     @Nullable
-    public String getNewAvatarId()
-    {
+    public String getNewAvatarId() {
         return getNewValue();
     }
 
@@ -88,8 +103,22 @@ public class UserUpdateAvatarEvent extends GenericUserUpdateEvent<String>
      * @return The url of the new avatar
      */
     @Nullable
-    public String getNewAvatarUrl()
-    {
-        return next == null ? null : String.format(User.AVATAR_URL, getUser().getId(), next, next.startsWith("a_") ? "gif" : "png");
+    public String getNewAvatarUrl() {
+        return next == null
+                ? null
+                : String.format(User.AVATAR_URL, getUser().getId(), next, next.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this user's new avatar image.
+     *
+     * @return Possibly-null {@link ImageProxy} of this user's new avatar image
+     *
+     * @see    #getNewAvatarUrl()
+     */
+    @Nullable
+    public ImageProxy getNewAvatar() {
+        String newAvatarUrl = getNewAvatarUrl();
+        return newAvatarUrl == null ? null : new ImageProxy(newAvatarUrl);
     }
 }

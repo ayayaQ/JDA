@@ -16,35 +16,37 @@
 
 package net.dv8tion.jda.api.events.interaction;
 
-import net.dv8tion.jda.annotations.Incubating;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.AbstractChannel;
+import net.dv8tion.jda.api.entities.Entitlement;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.events.Event;
+import net.dv8tion.jda.api.interactions.DiscordLocale;
+import net.dv8tion.jda.api.interactions.IntegrationOwners;
 import net.dv8tion.jda.api.interactions.Interaction;
-import net.dv8tion.jda.api.interactions.InteractionHook;
-import net.dv8tion.jda.api.requests.restaction.interactions.ReplyAction;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
+
+import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Indicates that an {@link Interaction} was created in a channel.
+ * Indicates that an {@link Interaction} was created.
  * <br>Every interaction event is derived from this event.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  * To receive these events, you must unset the <b>Interactions Endpoint URL</b> in your application dashboard.
  * You can simply remove the URL for this endpoint in your settings at the <a href="https://discord.com/developers/applications" target="_blank">Discord Developers Portal</a>.
+ *
+ * @see Interaction
  */
-@Incubating
-public class GenericInteractionCreateEvent extends Event implements Interaction
-{
+public class GenericInteractionCreateEvent extends Event implements Interaction {
     private final Interaction interaction;
 
-    public GenericInteractionCreateEvent(@Nonnull JDA api, long responseNumber, @Nonnull Interaction interaction)
-    {
+    public GenericInteractionCreateEvent(@Nonnull JDA api, long responseNumber, @Nonnull Interaction interaction) {
         super(api, responseNumber);
         this.interaction = interaction;
     }
@@ -56,75 +58,87 @@ public class GenericInteractionCreateEvent extends Event implements Interaction
      * @return The {@link Interaction}
      */
     @Nonnull
-    public Interaction getInteraction()
-    {
+    public Interaction getInteraction() {
         return interaction;
     }
 
     @Nonnull
     @Override
-    public String getToken()
-    {
+    public String getToken() {
         return interaction.getToken();
     }
 
     @Override
-    public int getTypeRaw()
-    {
+    public int getTypeRaw() {
         return interaction.getTypeRaw();
     }
 
     @Nullable
     @Override
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return interaction.getGuild();
     }
 
     @Nullable
     @Override
-    public AbstractChannel getChannel()
-    {
+    public Channel getChannel() {
         return interaction.getChannel();
+    }
+
+    @Override
+    public long getChannelIdLong() {
+        return interaction.getChannelIdLong();
     }
 
     @Nonnull
     @Override
-    public InteractionHook getHook()
-    {
-        return interaction.getHook();
+    public DiscordLocale getUserLocale() {
+        return interaction.getUserLocale();
+    }
+
+    @Nonnull
+    @Override
+    public DiscordLocale getGuildLocale() {
+        return interaction.getGuildLocale();
+    }
+
+    @Nonnull
+    @Override
+    public InteractionContextType getContext() {
+        return interaction.getContext();
+    }
+
+    @Nonnull
+    @Override
+    public IntegrationOwners getIntegrationOwners() {
+        return interaction.getIntegrationOwners();
     }
 
     @Nullable
     @Override
-    public Member getMember()
-    {
+    public Member getMember() {
         return interaction.getMember();
     }
 
     @Nonnull
     @Override
-    public User getUser()
-    {
+    public User getUser() {
         return interaction.getUser();
-    }
-
-    @Override
-    public long getIdLong()
-    {
-        return interaction.getIdLong();
-    }
-
-    @Override
-    public boolean isAcknowledged()
-    {
-        return interaction.isAcknowledged();
     }
 
     @Nonnull
     @Override
-    public ReplyAction deferReply()
-    {
-        return interaction.deferReply();
+    public List<Entitlement> getEntitlements() {
+        return interaction.getEntitlements();
+    }
+
+    @Override
+    public long getIdLong() {
+        return interaction.getIdLong();
+    }
+
+    @Override
+    public boolean isAcknowledged() {
+        return interaction.isAcknowledged();
     }
 }

@@ -28,26 +28,19 @@ import javax.annotation.Nonnull;
  *
  * <p>Can be used to detect when a member is deafened or un-deafened.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.utils.cache.CacheFlag#VOICE_STATE VOICE_STATE} CacheFlag to be enabled, which requires
  * the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_VOICE_STATES GUILD_VOICE_STATES} intent.
  *
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables that CacheFlag by default!
- *
- * <p>Additionally, this event requires the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}
- * to cache the updated members. Discord does not specifically tell us about the updates, but merely tells us the
- * member was updated and gives us the updated member object. In order to fire a specific event like this we
- * need to have the old member cached to compare against.
  */
-public class GuildVoiceDeafenEvent extends GenericGuildVoiceEvent
-{
+public class GuildVoiceDeafenEvent extends GenericGuildVoiceEvent {
     protected final boolean deafened;
 
-    public GuildVoiceDeafenEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member)
-    {
+    public GuildVoiceDeafenEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, boolean deafened) {
         super(api, responseNumber, member);
-        this.deafened = member.getVoiceState().isDeafened();
+        this.deafened = deafened;
     }
 
     /**
@@ -56,8 +49,7 @@ public class GuildVoiceDeafenEvent extends GenericGuildVoiceEvent
      * @return True, if the member was deafened with this event
      *         <br>False, if the member was un-deafened in this event
      */
-    public boolean isDeafened()
-    {
+    public boolean isDeafened() {
         return deafened;
     }
 }

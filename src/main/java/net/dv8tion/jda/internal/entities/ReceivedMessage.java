@@ -16,668 +16,511 @@
 
 package net.dv8tion.jda.internal.entities;
 
-import gnu.trove.set.TLongSet;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.MessageTopLevelComponent;
+import net.dv8tion.jda.api.components.MessageTopLevelComponentUnion;
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.attribute.ICategorizableChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.Category;
+import net.dv8tion.jda.api.entities.channel.concrete.NewsChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.entities.channel.unions.GuildMessageChannelUnion;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
+import net.dv8tion.jda.api.entities.emoji.CustomEmoji;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
+import net.dv8tion.jda.api.entities.messages.MessagePoll;
+import net.dv8tion.jda.api.entities.messages.MessageSnapshot;
+import net.dv8tion.jda.api.entities.sticker.StickerItem;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
-import net.dv8tion.jda.api.exceptions.MissingAccessException;
 import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.interactions.InteractionHook;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.ComponentLayout;
+import net.dv8tion.jda.api.requests.ErrorResponse;
+import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
-import net.dv8tion.jda.api.requests.restaction.MessageAction;
+import net.dv8tion.jda.api.requests.restaction.MessageEditAction;
+import net.dv8tion.jda.api.requests.restaction.ThreadChannelAction;
 import net.dv8tion.jda.api.requests.restaction.pagination.ReactionPaginationAction;
+import net.dv8tion.jda.api.utils.AttachedFile;
 import net.dv8tion.jda.api.utils.MarkdownSanitizer;
-import net.dv8tion.jda.api.utils.MiscUtil;
 import net.dv8tion.jda.api.utils.data.DataObject;
+import net.dv8tion.jda.api.utils.messages.MessageEditData;
 import net.dv8tion.jda.internal.JDAImpl;
+import net.dv8tion.jda.internal.interactions.InteractionHookImpl;
 import net.dv8tion.jda.internal.requests.CompletedRestAction;
-import net.dv8tion.jda.internal.requests.Route;
+import net.dv8tion.jda.internal.requests.ErrorMapper;
+import net.dv8tion.jda.internal.requests.RestActionImpl;
 import net.dv8tion.jda.internal.requests.restaction.AuditableRestActionImpl;
-import net.dv8tion.jda.internal.requests.restaction.MessageActionImpl;
+import net.dv8tion.jda.internal.requests.restaction.MessageEditActionImpl;
+import net.dv8tion.jda.internal.requests.restaction.pagination.ReactionPaginationActionImpl;
 import net.dv8tion.jda.internal.utils.Checks;
-import org.apache.commons.collections4.Bag;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.bag.HashBag;
+import net.dv8tion.jda.internal.utils.EncodingUtil;
+import net.dv8tion.jda.internal.utils.EntityString;
+import net.dv8tion.jda.internal.utils.Helpers;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.OffsetDateTime;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class ReceivedMessage extends AbstractMessage
-{
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+public class ReceivedMessage implements Message {
+    public static boolean didContentIntentWarning = false;
     private final Object mutex = new Object();
 
     protected final JDAImpl api;
     protected final long id;
+    protected final long channelId;
+    protected final long guildId;
+    protected final long applicationId;
+    protected final int flags;
+    protected final int position;
+    protected final boolean fromWebhook;
+    protected final boolean pinned;
+    protected final boolean isTTS;
     protected final MessageType type;
     protected final MessageChannel channel;
+    protected final Guild guild;
     protected final MessageReference messageReference;
-    protected final boolean fromWebhook;
-    protected final boolean mentionsEveryone;
-    protected final boolean pinned;
     protected final User author;
     protected final Member member;
+    protected final String content;
+    protected final String nonce;
     protected final MessageActivity activity;
+    protected final MessagePoll poll;
     protected final OffsetDateTime editedTime;
+    protected final Mentions mentions;
+
+    @SuppressWarnings("deprecation")
+    protected final Message.Interaction interaction;
+
+    protected final Message.InteractionMetadata interactionMetadata;
+    protected final ThreadChannel startedThread;
     protected final List<MessageReaction> reactions;
     protected final List<Attachment> attachments;
     protected final List<MessageEmbed> embeds;
-    protected final List<MessageSticker> stickers;
-    protected final List<ActionRow> components;
-    protected final TLongSet mentionedUsers;
-    protected final TLongSet mentionedRoles;
-    protected final int flags;
-    protected final Message.Interaction interaction;
+    protected final List<StickerItem> stickers;
+    protected final List<MessageTopLevelComponentUnion> components;
+    protected final List<MessageSnapshot> messageSnapshots;
 
-    protected InteractionHook interactionHook = null; // late-init
+    protected WebhookClient<Message> webhook;
 
     // LAZY EVALUATED
     protected String altContent = null;
     protected String strippedContent = null;
 
-    protected List<User> userMentions = null;
-    protected List<Member> memberMentions = null;
-    protected List<Emote> emoteMentions = null;
-    protected List<Role> roleMentions = null;
-    protected List<TextChannel> channelMentions = null;
     protected List<String> invites = null;
 
+    @SuppressWarnings("deprecation")
     public ReceivedMessage(
-        long id, MessageChannel channel, MessageType type, MessageReference messageReference,
-        boolean fromWebhook, boolean mentionsEveryone, TLongSet mentionedUsers, TLongSet mentionedRoles, boolean tts, boolean pinned,
-        String content, String nonce, User author, Member member, MessageActivity activity, OffsetDateTime editTime,
-        List<MessageReaction> reactions, List<Attachment> attachments, List<MessageEmbed> embeds, List<MessageSticker> stickers, List<ActionRow> components, int flags, Message.Interaction interaction)
-    {
-        super(content, nonce, tts);
+            long id,
+            long channelId,
+            long guildId,
+            JDA jda,
+            Guild guild,
+            MessageChannel channel,
+            MessageType type,
+            MessageReference messageReference,
+            boolean fromWebhook,
+            long applicationId,
+            boolean tts,
+            boolean pinned,
+            String content,
+            String nonce,
+            User author,
+            Member member,
+            MessageActivity activity,
+            MessagePoll poll,
+            OffsetDateTime editTime,
+            Mentions mentions,
+            List<MessageReaction> reactions,
+            List<Attachment> attachments,
+            List<MessageEmbed> embeds,
+            List<StickerItem> stickers,
+            List<MessageTopLevelComponentUnion> components,
+            List<MessageSnapshot> messageSnapshots,
+            int flags,
+            Message.Interaction interaction,
+            Message.InteractionMetadata interactionMetadata,
+            ThreadChannel startedThread,
+            int position) {
         this.id = id;
+        this.channelId = channelId;
         this.channel = channel;
+        this.guildId = guildId;
+        this.guild = guild;
         this.messageReference = messageReference;
         this.type = type;
-        this.api = (channel != null) ? (JDAImpl) channel.getJDA() : null;
+        this.api = (JDAImpl) jda;
         this.fromWebhook = fromWebhook;
-        this.mentionsEveryone = mentionsEveryone;
+        this.applicationId = applicationId;
         this.pinned = pinned;
+        this.content = content;
+        this.nonce = nonce;
+        this.isTTS = tts;
         this.author = author;
         this.member = member;
         this.activity = activity;
         this.editedTime = editTime;
+        this.mentions = mentions;
         this.reactions = Collections.unmodifiableList(reactions);
         this.attachments = Collections.unmodifiableList(attachments);
         this.embeds = Collections.unmodifiableList(embeds);
         this.stickers = Collections.unmodifiableList(stickers);
         this.components = Collections.unmodifiableList(components);
-        this.mentionedUsers = mentionedUsers;
-        this.mentionedRoles = mentionedRoles;
+        this.messageSnapshots = Collections.unmodifiableList(messageSnapshots);
         this.flags = flags;
         this.interaction = interaction;
+        this.interactionMetadata = interactionMetadata;
+        this.startedThread = startedThread;
+        this.position = position;
+        this.poll = poll;
     }
 
-    public ReceivedMessage withHook(InteractionHook hook)
-    {
-        this.interactionHook = hook;
+    private void checkSystem(String comment) {
+        if (type.isSystem()) {
+            throw new IllegalStateException("Cannot " + comment + " a system message!");
+        }
+    }
+
+    private void checkUser() {
+        if (!getJDA().getSelfUser().equals(getAuthor())) {
+            throw new IllegalStateException(
+                    "Attempted to update message that was not sent by this account. You cannot modify other User's messages!");
+        }
+    }
+
+    private void checkIntent() {
+        // Checks whether access to content is limited and the message content intent is not enabled
+        if (!didContentIntentWarning && !api.isIntent(GatewayIntent.MESSAGE_CONTENT)) {
+            SelfUser selfUser = api.getSelfUser();
+            boolean isBotOwnedWebhookMessage =
+                    selfUser.getApplicationIdLong() == getApplicationIdLong() && isWebhookMessage();
+
+            if (!Objects.equals(selfUser, author)
+                    && !mentions.getUsers().contains(selfUser)
+                    && isFromGuild()
+                    && !isBotOwnedWebhookMessage) {
+                didContentIntentWarning = true;
+                JDAImpl.LOG.warn(
+                        "Attempting to access message content without GatewayIntent.MESSAGE_CONTENT.\n"
+                                + "Discord now requires to explicitly enable access to this using the MESSAGE_CONTENT intent.\n"
+                                + "Useful resources to learn more:\n"
+                                + "\t- https://support-dev.discord.com/hc/en-us/articles/4404772028055-Message-Content-Privileged-Intent-FAQ\n"
+                                + "\t- https://jda.wiki/using-jda/gateway-intents-and-member-cache-policy/\n"
+                                + "\t- https://jda.wiki/using-jda/troubleshooting/#cannot-get-message-content-attempting-to-access-message-content-without-gatewayintent\n"
+                                + "Or suppress this warning if this is intentional with Message.suppressContentIntentWarning()");
+            }
+        }
+    }
+
+    public ReceivedMessage withHook(WebhookClient<Message> hook) {
+        this.webhook = hook;
         return this;
     }
 
     @Nonnull
     @Override
-    public JDA getJDA()
-    {
+    public JDA getJDA() {
         return api;
     }
 
     @Nullable
     @Override
-    public MessageReference getMessageReference()
-    {
+    public MessageReference getMessageReference() {
         return messageReference;
     }
 
     @Override
-    public boolean isPinned()
-    {
+    public boolean isPinned() {
         return pinned;
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> pin()
-    {
-        if (isEphemeral())
+    public AuditableRestAction<Void> pin() {
+        checkSystem("pin");
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot pin ephemeral messages.");
-        
-        return channel.pinMessageById(getId());
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> unpin()
-    {
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot unpin ephemeral messages.");
-        
-        return channel.unpinMessageById(getId());
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> addReaction(@Nonnull Emote emote)
-    {
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot add reactions to ephemeral messages.");
-        
-        Checks.notNull(emote, "Emote");
-
-        boolean missingReaction = reactions.stream()
-                   .map(MessageReaction::getReactionEmote)
-                   .filter(MessageReaction.ReactionEmote::isEmote)
-                   .noneMatch(r -> r.getIdLong() == emote.getIdLong());
-
-        if (missingReaction)
-        {
-            Checks.check(emote.canInteract(getJDA().getSelfUser(), channel),
-                         "Cannot react with the provided emote because it is not available in the current channel.");
         }
-        return channel.addReactionById(getId(), emote);
+
+        if (hasChannel()) {
+            return getChannel().pinMessageById(getIdLong());
+        }
+
+        Route.CompiledRoute route = Route.Messages.PIN_MESSAGE.compile(getChannelId(), getId());
+        return new AuditableRestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> addReaction(@Nonnull String unicode)
-    {
-        if (isEphemeral())
+    public AuditableRestAction<Void> unpin() {
+        checkSystem("unpin");
+        if (isEphemeral()) {
+            throw new IllegalStateException("Cannot unpin ephemeral messages.");
+        }
+
+        if (hasChannel()) {
+            return getChannel().unpinMessageById(getIdLong());
+        }
+
+        Route.CompiledRoute route = Route.Messages.UNPIN_MESSAGE.compile(getChannelId(), getId());
+        return new AuditableRestActionImpl<>(getJDA(), route);
+    }
+
+    @Nonnull
+    @Override
+    public RestAction<Void> addReaction(@Nonnull Emoji emoji) {
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot add reactions to ephemeral messages.");
-        
-        return channel.addReactionById(getId(), unicode);
+        }
+
+        Checks.notNull(emoji, "Emoji");
+
+        if (hasChannel()) {
+            boolean missingReaction = reactions.stream()
+                    .map(MessageReaction::getEmoji)
+                    .noneMatch(r -> r.getAsReactionCode().equals(emoji.getAsReactionCode()));
+
+            if (missingReaction && emoji instanceof RichCustomEmoji) {
+                Checks.check(
+                        ((RichCustomEmoji) emoji).canInteract(getJDA().getSelfUser(), getChannel()),
+                        "Cannot react with the provided emoji because it is not available in the current getChannel().");
+            }
+
+            return getChannel().addReactionById(getId(), emoji);
+        }
+
+        String encoded = EncodingUtil.encodeReaction(emoji.getAsReactionCode());
+        Route.CompiledRoute route = Route.Messages.ADD_REACTION.compile(getChannelId(), getId(), encoded, "@me");
+        return new RestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> clearReactions()
-    {
-        if (isEphemeral())
+    public RestAction<Void> clearReactions() {
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot clear reactions from ephemeral messages.");
-        if (!isFromGuild())
+        }
+        if (!isFromGuild()) {
             throw new IllegalStateException("Cannot clear reactions from a message in a Group or PrivateChannel.");
-        return getTextChannel().clearReactionsById(getId());
+        }
+
+        if (channel instanceof GuildMessageChannel) {
+            return ((GuildMessageChannel) channel).clearReactionsById(getId());
+        }
+
+        Route.CompiledRoute route = Route.Messages.REMOVE_ALL_REACTIONS.compile(getChannelId(), getId());
+        return new RestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> clearReactions(@Nonnull String unicode)
-    {
-        if (isEphemeral())
+    public RestAction<Void> clearReactions(@Nonnull Emoji emoji) {
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot clear reactions from ephemeral messages.");
-        if (!isFromGuild())
+        }
+        if (!isFromGuild()) {
             throw new IllegalStateException("Cannot clear reactions from a message in a Group or PrivateChannel.");
-        return getTextChannel().clearReactionsById(getId(), unicode);
+        }
+
+        if (channel instanceof GuildMessageChannel) {
+            return ((GuildMessageChannel) channel).clearReactionsById(getId(), emoji);
+        }
+
+        String encoded = EncodingUtil.encodeReaction(emoji.getAsReactionCode());
+        Route.CompiledRoute route = Route.Messages.CLEAR_EMOJI_REACTIONS.compile(getChannelId(), getId(), encoded);
+        return new RestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> clearReactions(@Nonnull Emote emote)
-    {
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot clear reactions from ephemeral messages.");
-        if (!isFromGuild())
-            throw new IllegalStateException("Cannot clear reactions from a message in a Group or PrivateChannel.");
-        return getTextChannel().clearReactionsById(getId(), emote);
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> removeReaction(@Nonnull Emote emote)
-    {
-        if (isEphemeral())
+    public RestAction<Void> removeReaction(@Nonnull Emoji emoji) {
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
-        
-        return channel.removeReactionById(getId(), emote);
+        }
+
+        if (hasChannel()) {
+            return getChannel().removeReactionById(getId(), emoji);
+        }
+
+        String encoded = EncodingUtil.encodeReaction(emoji.getAsReactionCode());
+        Route.CompiledRoute route = Route.Messages.REMOVE_REACTION.compile(getChannelId(), getId(), encoded, "@me");
+        return new RestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public RestAction<Void> removeReaction(@Nonnull Emote emote, @Nonnull User user)
-    {
-        Checks.notNull(user, "User");  // to prevent NPEs
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
-        // check if the passed user is the SelfUser, then the ChannelType doesn't matter and
-        // we can safely remove that
-        if (user.equals(getJDA().getSelfUser()))
-            return channel.removeReactionById(getIdLong(), emote);
-
-        if (!isFromGuild())
-            throw new IllegalStateException("Cannot remove reactions of others from a message in a Group or PrivateChannel.");
-        return getTextChannel().removeReactionById(getIdLong(), emote, user);
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> removeReaction(@Nonnull String unicode)
-    {
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
-        
-        return channel.removeReactionById(getId(), unicode);
-    }
-
-    @Nonnull
-    @Override
-    public RestAction<Void> removeReaction(@Nonnull String unicode, @Nonnull User user)
-    {
+    public RestAction<Void> removeReaction(@Nonnull Emoji emoji, @Nonnull User user) {
         Checks.notNull(user, "User");
-        if (user.equals(getJDA().getSelfUser()))
-            return channel.removeReactionById(getIdLong(), unicode);
-
-        if (isEphemeral())
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot remove reactions from ephemeral messages.");
-        if (!isFromGuild())
-            throw new IllegalStateException("Cannot remove reactions of others from a message in a Group or PrivateChannel.");
-        return getTextChannel().removeReactionById(getId(), unicode, user);
+        }
+
+        // check if the passed user is the SelfUser,
+        // then the ChannelType doesn't matter and we can safely remove that
+        if (user.equals(getJDA().getSelfUser())) {
+            return removeReaction(emoji);
+        }
+
+        if (!isFromGuild()) {
+            throw new IllegalStateException(
+                    "Cannot remove reactions of others from a message in a Group or PrivateChannel.");
+        }
+
+        if (channel instanceof GuildMessageChannel) {
+            return ((GuildMessageChannel) channel).removeReactionById(getIdLong(), emoji, user);
+        }
+
+        String encoded = EncodingUtil.encodeReaction(emoji.getAsReactionCode());
+        Route.CompiledRoute route =
+                Route.Messages.REMOVE_REACTION.compile(getChannelId(), getId(), encoded, user.getId());
+        return new RestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public ReactionPaginationAction retrieveReactionUsers(@Nonnull Emote emote)
-    {
-        if (isEphemeral())
+    public ReactionPaginationAction retrieveReactionUsers(
+            @Nonnull Emoji emoji, @Nonnull MessageReaction.ReactionType type) {
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot retrieve reactions on ephemeral messages.");
-        
-        return channel.retrieveReactionUsersById(id, emote);
+        }
+
+        if (hasChannel()) {
+            return getChannel().retrieveReactionUsersById(id, emoji, type);
+        }
+
+        Checks.notNull(type, "ReactionType");
+        Checks.notNull(emoji, "Emoji");
+
+        return new ReactionPaginationActionImpl(this, emoji.getAsReactionCode(), type);
+    }
+
+    @Nullable
+    @Override
+    public MessageReaction getReaction(@Nonnull Emoji emoji) {
+        Checks.notNull(emoji, "Emoji");
+        String code = emoji.getAsReactionCode();
+        return this.reactions.stream()
+                .filter(r -> code.equals(r.getEmoji().getAsReactionCode()))
+                .findFirst()
+                .orElse(null);
     }
 
     @Nonnull
     @Override
-    public ReactionPaginationAction retrieveReactionUsers(@Nonnull String unicode)
-    {
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot retrieve reactions on ephemeral messages.");
-        
-        return channel.retrieveReactionUsersById(id, unicode);
-    }
-
-    @Override
-    public MessageReaction.ReactionEmote getReactionByUnicode(@Nonnull String unicode)
-    {
-        Checks.notEmpty(unicode, "Emoji");
-        Checks.noWhitespace(unicode, "Emoji");
-
-        return this.reactions.stream()
-            .map(MessageReaction::getReactionEmote)
-            .filter(r -> r.isEmoji() && r.getEmoji().equals(unicode))
-            .findFirst().orElse(null);
-    }
-
-    @Override
-    public MessageReaction.ReactionEmote getReactionById(@Nonnull String id)
-    {
-        return getReactionById(MiscUtil.parseSnowflake(id));
-    }
-
-    @Override
-    public MessageReaction.ReactionEmote getReactionById(long id)
-    {
-        return this.reactions.stream()
-            .map(MessageReaction::getReactionEmote)
-            .filter(r -> r.isEmote() && r.getIdLong() == id)
-            .findFirst().orElse(null);
-    }
-
-    @Nonnull
-    @Override
-    public MessageType getType()
-    {
+    public MessageType getType() {
         return type;
     }
 
     @Nullable
     @Override
-    public Interaction getInteraction()
-    {
+    @SuppressWarnings("deprecation")
+    public Interaction getInteraction() {
         return interaction;
     }
 
+    @Nullable
     @Override
-    public long getIdLong()
-    {
+    public InteractionMetadata getInteractionMetadata() {
+        return interactionMetadata;
+    }
+
+    @Override
+    public long getIdLong() {
         return id;
     }
 
     @Nonnull
     @Override
-    public String getJumpUrl()
-    {
-        return String.format("https://discord.com/channels/%s/%s/%s", isFromGuild() ? getGuild().getId() : "@me", getChannel().getId(), getId());
-    }
-
-    private User matchUser(Matcher matcher)
-    {
-        long userId = MiscUtil.parseSnowflake(matcher.group(1));
-        if (!mentionedUsers.contains(userId))
-            return null;
-        User user = getJDA().getUserById(userId);
-        if (user == null && userMentions != null)
-            user = userMentions.stream().filter(it -> it.getIdLong() == userId).findFirst().orElse(null);
-        return user;
-    }
-
-    @Nonnull
-    @Override
-    public synchronized List<User> getMentionedUsers()
-    {
-        if (userMentions == null)
-            userMentions = Collections.unmodifiableList(processMentions(MentionType.USER, new ArrayList<>(), true, this::matchUser));
-        return userMentions;
-    }
-
-    @Nonnull
-    @Override
-    public Bag<User> getMentionedUsersBag()
-    {
-        return processMentions(MentionType.USER, new HashBag<>(), false, this::matchUser);
-    }
-
-    private TextChannel matchTextChannel(Matcher matcher)
-    {
-        long channelId = MiscUtil.parseSnowflake(matcher.group(1));
-        return getJDA().getTextChannelById(channelId);
-    }
-
-    @Nonnull
-    @Override
-    public synchronized List<TextChannel> getMentionedChannels()
-    {
-        if (channelMentions == null)
-            channelMentions = Collections.unmodifiableList(processMentions(MentionType.CHANNEL, new ArrayList<>(), true, this::matchTextChannel));
-        return channelMentions;
-    }
-
-    @Nonnull
-    @Override
-    public Bag<TextChannel> getMentionedChannelsBag()
-    {
-        return processMentions(MentionType.CHANNEL, new HashBag<>(), false, this::matchTextChannel);
-    }
-
-    private Role matchRole(Matcher matcher)
-    {
-        long roleId = MiscUtil.parseSnowflake(matcher.group(1));
-        if (!mentionedRoles.contains(roleId))
-            return null;
-        if (getChannelType().isGuild())
-            return getGuild().getRoleById(roleId);
-        else
-            return getJDA().getRoleById(roleId);
-    }
-
-    @Nonnull
-    @Override
-    public synchronized List<Role> getMentionedRoles()
-    {
-        if (roleMentions == null)
-            roleMentions = Collections.unmodifiableList(processMentions(MentionType.ROLE, new ArrayList<>(), true, this::matchRole));
-        return roleMentions;
-    }
-
-    @Nonnull
-    @Override
-    public Bag<Role> getMentionedRolesBag()
-    {
-        return processMentions(MentionType.ROLE, new HashBag<>(), false, this::matchRole);
-    }
-
-    @Nonnull
-    @Override
-    public List<Member> getMentionedMembers(@Nonnull Guild guild)
-    {
-        Checks.notNull(guild, "Guild");
-        if (isFromGuild() && guild.equals(getGuild()) && memberMentions != null)
-            return memberMentions;
-        List<User> mentionedUsers = getMentionedUsers();
-        List<Member> members = new ArrayList<>();
-        for (User user : mentionedUsers)
-        {
-            Member member = guild.getMember(user);
-            if (member != null)
-                members.add(member);
-        }
-
-        return Collections.unmodifiableList(members);
-    }
-
-    @Nonnull
-    @Override
-    public List<Member> getMentionedMembers()
-    {
-        if (isFromGuild())
-            return getMentionedMembers(getGuild());
-        else
-            throw new IllegalStateException("You must specify a Guild for Messages which are not sent from a TextChannel!");
-    }
-
-    @Nonnull
-    @Override
-    public List<IMentionable> getMentions(@Nonnull MentionType... types)
-    {
-        if (types == null || types.length == 0)
-            return getMentions(MentionType.values());
-        List<IMentionable> mentions = new ArrayList<>();
-        // boolean duplicate checks
-        // not using Set because channel and role might have the same ID
-        boolean channel = false;
-        boolean role = false;
-        boolean user = false;
-        boolean emote = false;
-        for (MentionType type : types)
-        {
-            switch (type)
-            {
-                case EVERYONE:
-                case HERE:
-                default: continue;
-                case CHANNEL:
-                    if (!channel)
-                        mentions.addAll(getMentionedChannels());
-                    channel = true;
-                    break;
-                case USER:
-                    if (!user)
-                        mentions.addAll(getMentionedUsers());
-                    user = true;
-                    break;
-                case ROLE:
-                    if (!role)
-                        mentions.addAll(getMentionedRoles());
-                    role = true;
-                    break;
-                case EMOTE:
-                    if (!emote)
-                        mentions.addAll(getEmotes());
-                    emote = true;
-            }
-        }
-        return Collections.unmodifiableList(mentions);
+    public String getJumpUrl() {
+        return Helpers.format(Message.JUMP_URL, isFromGuild() ? getGuildId() : "@me", getChannelId(), getId());
     }
 
     @Override
-    public boolean isMentioned(@Nonnull IMentionable mentionable, @Nonnull MentionType... types)
-    {
-        Checks.notNull(types, "Mention Types");
-        if (types.length == 0)
-            return isMentioned(mentionable, MentionType.values());
-        final boolean isUserEntity = mentionable instanceof User || mentionable instanceof Member;
-        for (MentionType type : types)
-        {
-            switch (type)
-            {
-                case HERE:
-                {
-                    if (isMass("@here") && isUserEntity)
-                        return true;
-                    break;
-                }
-                case EVERYONE:
-                {
-                    if (isMass("@everyone") && isUserEntity)
-                        return true;
-                    break;
-                }
-                case USER:
-                {
-                    if (isUserMentioned(mentionable))
-                        return true;
-                    break;
-                }
-                case ROLE:
-                {
-                    if (isRoleMentioned(mentionable))
-                        return true;
-                    break;
-                }
-                case CHANNEL:
-                {
-                    if (mentionable instanceof TextChannel)
-                    {
-                        if (getMentionedChannels().contains(mentionable))
-                            return true;
-                    }
-                    break;
-                }
-                case EMOTE:
-                {
-                    if (mentionable instanceof Emote)
-                    {
-                        if (getEmotes().contains(mentionable))
-                            return true;
-                    }
-                    break;
-                }
-//              default: continue;
-            }
-        }
-        return false;
-    }
-
-    private boolean isUserMentioned(IMentionable mentionable)
-    {
-        if (mentionable instanceof User)
-        {
-            return getMentionedUsers().contains(mentionable);
-        }
-        else if (mentionable instanceof Member)
-        {
-            final Member member = (Member) mentionable;
-            return getMentionedUsers().contains(member.getUser());
-        }
-        return false;
-    }
-
-    private boolean isRoleMentioned(IMentionable mentionable)
-    {
-        if (mentionable instanceof Role)
-        {
-            return getMentionedRoles().contains(mentionable);
-        }
-        else if (mentionable instanceof Member)
-        {
-            final Member member = (Member) mentionable;
-            return CollectionUtils.containsAny(getMentionedRoles(), member.getRoles());
-        }
-        else if (isFromGuild() && mentionable instanceof User)
-        {
-            final Member member = getGuild().getMember((User) mentionable);
-            return member != null && CollectionUtils.containsAny(getMentionedRoles(), member.getRoles());
-        }
-        return false;
-    }
-
-    private boolean isMass(String s)
-    {
-        return mentionsEveryone && content.contains(s);
-    }
-
-    @Override
-    public boolean mentionsEveryone()
-    {
-        return mentionsEveryone;
-    }
-
-    @Override
-    public boolean isEdited()
-    {
+    public boolean isEdited() {
         return editedTime != null;
     }
 
     @Override
-    public OffsetDateTime getTimeEdited()
-    {
+    public OffsetDateTime getTimeEdited() {
         return editedTime;
     }
 
     @Nonnull
     @Override
-    public User getAuthor()
-    {
+    public User getAuthor() {
         return author;
     }
 
     @Override
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
+    }
+
+    @Override
+    public int getApproximatePosition() {
+        if (!getChannelType().isThread()) {
+            throw new IllegalStateException("This message was not sent in a thread.");
+        }
+
+        return position;
     }
 
     @Nonnull
     @Override
-    public String getContentStripped()
-    {
-        if (strippedContent != null)
+    public String getContentStripped() {
+        if (strippedContent != null) {
             return strippedContent;
-        synchronized (mutex)
-        {
-            if (strippedContent != null)
+        }
+        synchronized (mutex) {
+            if (strippedContent != null) {
                 return strippedContent;
+            }
             return strippedContent = MarkdownSanitizer.sanitize(getContentDisplay());
         }
     }
 
     @Nonnull
     @Override
-    public String getContentDisplay()
-    {
-        if (altContent != null)
+    public String getContentDisplay() {
+        if (altContent != null) {
             return altContent;
-        synchronized (mutex)
-        {
-            if (altContent != null)
+        }
+
+        synchronized (mutex) {
+            if (altContent != null) {
                 return altContent;
-            String tmp = content;
-            for (User user : getMentionedUsers())
-            {
+            }
+            String tmp = getContentRaw();
+            for (User user : mentions.getUsers()) {
                 String name;
-                if (isFromGuild() && getGuild().isMember(user))
+                if (hasGuild() && getGuild().isMember(user)) {
                     name = getGuild().getMember(user).getEffectiveName();
-                else
+                } else {
                     name = user.getName();
+                }
                 tmp = tmp.replaceAll("<@!?" + Pattern.quote(user.getId()) + '>', '@' + Matcher.quoteReplacement(name));
             }
-            for (Emote emote : getEmotes())
-            {
-                tmp = tmp.replace(emote.getAsMention(), ":" + emote.getName() + ":");
+            for (CustomEmoji emoji : mentions.getCustomEmojis()) {
+                tmp = tmp.replace(emoji.getAsMention(), ":" + emoji.getName() + ":");
             }
-            for (TextChannel mentionedChannel : getMentionedChannels())
-            {
+            for (GuildChannel mentionedChannel : mentions.getChannels()) {
                 tmp = tmp.replace(mentionedChannel.getAsMention(), '#' + mentionedChannel.getName());
             }
-            for (Role mentionedRole : getMentionedRoles())
-            {
+            for (Role mentionedRole : mentions.getRoles()) {
                 tmp = tmp.replace(mentionedRole.getAsMention(), '@' + mentionedRole.getName());
             }
             return altContent = tmp;
@@ -686,389 +529,553 @@ public class ReceivedMessage extends AbstractMessage
 
     @Nonnull
     @Override
-    public String getContentRaw()
-    {
+    public String getContentRaw() {
+        checkIntent();
         return content;
     }
 
     @Nonnull
     @Override
-    public List<String> getInvites()
-    {
-        if (invites != null)
+    public List<String> getInvites() {
+        if (invites != null) {
             return invites;
-        synchronized (mutex)
-        {
-            if (invites != null)
+        }
+        synchronized (mutex) {
+            if (invites != null) {
                 return invites;
+            }
             invites = new ArrayList<>();
             Matcher m = INVITE_PATTERN.matcher(getContentRaw());
-            while (m.find())
+            while (m.find()) {
                 invites.add(m.group(1));
+            }
             return invites = Collections.unmodifiableList(invites);
         }
     }
 
     @Override
-    public String getNonce()
-    {
+    public String getNonce() {
         return nonce;
     }
 
     @Override
-    public boolean isFromType(@Nonnull ChannelType type)
-    {
+    public boolean isFromType(@Nonnull ChannelType type) {
         return getChannelType() == type;
     }
 
-    @Nonnull
     @Override
-    public ChannelType getChannelType()
-    {
-        return channel.getType();
+    public boolean isFromGuild() {
+        return guildId != 0L;
     }
 
     @Nonnull
     @Override
-    public MessageChannel getChannel()
-    {
-        return channel;
+    public ChannelType getChannelType() {
+        return channel == null ? ChannelType.UNKNOWN : getChannel().getType();
     }
 
     @Nonnull
     @Override
-    public PrivateChannel getPrivateChannel()
-    {
-        if (!isFromType(ChannelType.PRIVATE))
-            throw new IllegalStateException("This message was not sent in a private channel");
-        return (PrivateChannel) channel;
+    public MessageChannelUnion getChannel() {
+        if (channel != null) {
+            return (MessageChannelUnion) channel;
+        }
+        throw new IllegalStateException("Channel is unavailable in this context. Use getChannelIdLong() instead!");
     }
 
     @Nonnull
     @Override
-    public TextChannel getTextChannel()
-    {
-        // might be the reason why other methods calling this throw that exception
-        // in case of other GuildChannels being able to receive messages in the future
-        if (!isFromType(ChannelType.TEXT))
-            throw new IllegalStateException("This message was not sent in a text channel");
-        return (TextChannel) channel;
+    public GuildMessageChannelUnion getGuildChannel() {
+        if (channel == null || channel instanceof GuildMessageChannelUnion) {
+            return (GuildMessageChannelUnion) getChannel();
+        }
+        throw new IllegalStateException("This message was not sent in a guild.");
     }
 
     @Override
-    public Category getCategory()
-    {
-        return isFromGuild() ? getTextChannel().getParent() : null;
+    public Category getCategory() {
+        Channel channel = this.channel;
+        if (channel instanceof ThreadChannel) {
+            channel = ((ThreadChannel) channel).getParentChannel();
+        }
+
+        return channel instanceof ICategorizableChannel ? ((ICategorizableChannel) channel).getParentCategory() : null;
+    }
+
+    @Override
+    public boolean hasGuild() {
+        return guild != null;
+    }
+
+    @Override
+    public long getGuildIdLong() {
+        return guildId;
     }
 
     @Nonnull
     @Override
-    public Guild getGuild()
-    {
-        return getTextChannel().getGuild();
+    public Guild getGuild() {
+        if (guild == null) {
+            ChannelType channelType = getChannelType();
+            if (channelType == ChannelType.UNKNOWN || channelType.isGuild()) {
+                throw new IllegalStateException(
+                        "This message instance does not provide a guild instance! Use getGuildId() instead.");
+            } else {
+                throw new IllegalStateException("This message was not sent in a guild");
+            }
+        }
+        return guild;
     }
 
     @Nonnull
     @Override
-    public List<Attachment> getAttachments()
-    {
+    public List<Attachment> getAttachments() {
+        checkIntent();
         return attachments;
     }
 
     @Nonnull
     @Override
-    public List<MessageEmbed> getEmbeds()
-    {
+    public List<MessageEmbed> getEmbeds() {
+        checkIntent();
         return embeds;
     }
 
     @Nonnull
     @Override
-    public List<ActionRow> getActionRows()
-    {
+    public List<MessageTopLevelComponentUnion> getComponents() {
+        checkIntent();
         return components;
     }
 
-    private Emote matchEmote(Matcher m)
-    {
-        long emoteId = MiscUtil.parseSnowflake(m.group(2));
-        String name = m.group(1);
-        boolean animated = m.group(0).startsWith("<a:");
-        Emote emote = getJDA().getEmoteById(emoteId);
-        if (emote == null)
-            emote = new EmoteImpl(emoteId, api).setName(name).setAnimated(animated);
-        return emote;
+    @Override
+    public boolean isUsingComponentsV2() {
+        return (this.flags & MessageFlag.IS_COMPONENTS_V2.getValue()) != 0;
+    }
+
+    @Override
+    public MessagePoll getPoll() {
+        checkIntent();
+        return poll;
     }
 
     @Nonnull
     @Override
-    public synchronized List<Emote> getEmotes()
-    {
-        if (this.emoteMentions == null)
-            emoteMentions = Collections.unmodifiableList(processMentions(MentionType.EMOTE, new ArrayList<>(), true, this::matchEmote));
-        return emoteMentions;
+    public AuditableRestAction<Message> endPoll() {
+        checkUser();
+        if (poll == null) {
+            throw new IllegalStateException("This message does not contain a poll");
+        }
+        return new AuditableRestActionImpl<>(
+                getJDA(), Route.Messages.END_POLL.compile(getChannelId(), getId()), (response, request) -> {
+                    JDAImpl jda = (JDAImpl) getJDA();
+                    EntityBuilder entityBuilder = jda.getEntityBuilder();
+                    if (hasChannel()) {
+                        return entityBuilder.createMessageWithChannel(response.getObject(), channel, false);
+                    }
+                    return entityBuilder.createMessageFromWebhook(response.getObject(), hasGuild() ? getGuild() : null);
+                });
     }
 
     @Nonnull
     @Override
-    public Bag<Emote> getEmotesBag()
-    {
-        return processMentions(MentionType.EMOTE, new HashBag<>(), false, this::matchEmote);
+    public Mentions getMentions() {
+        return mentions;
     }
 
     @Nonnull
     @Override
-    public List<MessageReaction> getReactions()
-    {
+    public List<MessageReaction> getReactions() {
         return reactions;
     }
 
     @Nonnull
     @Override
-    public List<MessageSticker> getStickers()
-    {
+    public List<StickerItem> getStickers() {
         return this.stickers;
     }
 
+    @Nonnull
     @Override
-    public boolean isWebhookMessage()
-    {
+    public List<MessageSnapshot> getMessageSnapshots() {
+        return messageSnapshots;
+    }
+
+    @Override
+    public boolean isWebhookMessage() {
         return fromWebhook;
     }
 
     @Override
-    public boolean isTTS()
-    {
+    public long getApplicationIdLong() {
+        return applicationId;
+    }
+
+    @Override
+    public boolean hasChannel() {
+        return channel != null;
+    }
+
+    @Override
+    public long getChannelIdLong() {
+        return channelId;
+    }
+
+    @Override
+    public boolean isTTS() {
         return isTTS;
     }
 
     @Nullable
     @Override
-    public MessageActivity getActivity()
-    {
+    public MessageActivity getActivity() {
         return activity;
     }
 
     @Nonnull
     @Override
-    public MessageAction editMessage(@Nonnull CharSequence newContent)
-    {
+    public MessageEditAction editMessage(@Nonnull CharSequence newContent) {
+        MessageEditActionImpl action = editRequest();
+        action.setContent(newContent.toString());
+
+        if (isWebhookRequest()) {
+            return action.withHook(webhook, getChannelType(), channelId);
+        }
+
+        checkSystem("edit");
         checkUser();
-        return ((MessageActionImpl) channel.editMessageById(getId(), newContent)).withHook(interactionHook);
+
+        return action.setContent(newContent.toString());
     }
 
     @Nonnull
     @Override
-    public MessageAction editMessageEmbeds(@Nonnull Collection<? extends MessageEmbed> embeds)
-    {
+    public MessageEditAction editMessageEmbeds(@Nonnull Collection<? extends MessageEmbed> embeds) {
+        MessageEditActionImpl action = editRequest();
+        action.setEmbeds(embeds);
+
+        if (isWebhookRequest()) {
+            return action.withHook(webhook, getChannelType(), channelId);
+        }
+
+        checkSystem("edit");
         checkUser();
-        return ((MessageActionImpl) channel.editMessageEmbedsById(getId(), embeds)).withHook(interactionHook);
+
+        return action;
     }
 
     @Nonnull
     @Override
-    public MessageAction editMessageComponents(@Nonnull Collection<? extends ComponentLayout> components)
-    {
+    public MessageEditAction editMessageComponents(@Nonnull Collection<? extends MessageTopLevelComponent> components) {
+        MessageEditActionImpl action = editRequest();
+        action.setComponents(components);
+
+        if (isWebhookRequest()) {
+            return action.withHook(webhook, getChannelType(), channelId);
+        }
+
+        checkSystem("edit");
         checkUser();
-        return ((MessageActionImpl) channel.editMessageComponentsById(getId(), components)).withHook(interactionHook);
+
+        return action;
     }
 
     @Nonnull
     @Override
-    public MessageAction editMessageFormat(@Nonnull String format, @Nonnull Object... args)
-    {
+    public MessageEditAction editMessageFormat(@Nonnull String format, @Nonnull Object... args) {
+        MessageEditActionImpl action = editRequest();
+        action.setContent(String.format(format, args));
+
+        if (isWebhookRequest()) {
+            return action.withHook(webhook, getChannelType(), channelId);
+        }
+
+        checkSystem("edit");
         checkUser();
-        return ((MessageActionImpl) channel.editMessageFormatById(getId(), format, args)).withHook(interactionHook);
+
+        return action;
     }
 
     @Nonnull
     @Override
-    public MessageAction editMessage(@Nonnull Message newContent)
-    {
-        checkUser();
-        return ((MessageActionImpl) channel.editMessageById(getId(), newContent)).withHook(interactionHook);
-    }
+    public MessageEditAction editMessageAttachments(@Nonnull Collection<? extends AttachedFile> attachments) {
+        MessageEditActionImpl action = editRequest();
+        action.setAttachments(attachments);
 
-    private void checkUser()
-    {
-        if (!getJDA().getSelfUser().equals(getAuthor()))
-            throw new IllegalStateException("Attempted to update message that was not sent by this account. You cannot modify other User's messages!");
+        if (isWebhookRequest()) {
+            return action.withHook(webhook, getChannelType(), channelId);
+        }
+
+        checkSystem("edit");
+        checkUser();
+
+        return action;
     }
 
     @Nonnull
     @Override
-    public AuditableRestAction<Void> delete()
-    {
-        if (isEphemeral())
+    public MessageEditAction editMessage(@Nonnull MessageEditData newContent) {
+        MessageEditActionImpl action = editRequest();
+        action.applyData(newContent);
+
+        if (isWebhookRequest()) {
+            return action.withHook(webhook, getChannelType(), channelId);
+        }
+
+        checkSystem("edit");
+        checkUser();
+
+        return action;
+    }
+
+    @Nonnull
+    @Override
+    public AuditableRestAction<Void> delete() {
+        if (!type.canDelete()) {
+            throw new IllegalStateException("Cannot delete messages of type " + type);
+        }
+
+        if (isWebhookRequest()) {
+            Route.CompiledRoute route =
+                    Route.Webhooks.EXECUTE_WEBHOOK_DELETE.compile(webhook.getId(), webhook.getToken(), getId());
+            route = withThreadContext(route);
+
+            AuditableRestActionImpl<Void> action = new AuditableRestActionImpl<>(getJDA(), route);
+            action.setErrorMapper(getUnknownWebhookErrorMapper());
+            return action;
+        }
+
+        SelfUser self = getJDA().getSelfUser();
+        boolean isSelfAuthored = self.equals(getAuthor());
+
+        if (!isSelfAuthored && !isFromGuild()) {
+            throw new IllegalStateException("Cannot delete another User's messages in a PrivateChannel.");
+        }
+
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot delete ephemeral messages.");
-        
-        if (!getJDA().getSelfUser().equals(getAuthor()))
-        {
-            if (isFromType(ChannelType.PRIVATE))
-                throw new IllegalStateException("Cannot delete another User's messages in a PrivateChannel.");
-            else if (!getGuild().getSelfMember().hasAccess(getTextChannel()))
-                throw new MissingAccessException(getTextChannel(), Permission.VIEW_CHANNEL);
-            else if (!getGuild().getSelfMember()
-                    .hasPermission((TextChannel) getChannel(), Permission.MESSAGE_MANAGE))
-                throw new InsufficientPermissionException(getTextChannel(), Permission.MESSAGE_MANAGE);
         }
-        return channel.deleteMessageById(getIdLong());
+
+        if (channel instanceof GuildMessageChannel && !isSelfAuthored) {
+            GuildMessageChannel gChan = (GuildMessageChannel) channel;
+            Member sMember = getGuild().getSelfMember();
+            Checks.checkAccess(sMember, gChan);
+            if (!sMember.hasPermission(gChan, Permission.MESSAGE_MANAGE)) {
+                throw new InsufficientPermissionException(gChan, Permission.MESSAGE_MANAGE);
+            }
+        }
+
+        Route.CompiledRoute route = Route.Messages.DELETE_MESSAGE.compile(getChannelId(), getId());
+        return new AuditableRestActionImpl<>(getJDA(), route);
     }
 
     @Nonnull
     @Override
-    public AuditableRestAction<Void> suppressEmbeds(boolean suppressed)
-    {
-        if (isEphemeral())
-            throw new IllegalStateException("Cannot suppress embeds on ephemeral messages.");
-        
-        if (!getJDA().getSelfUser().equals(getAuthor()))
-        {
-            if (isFromType(ChannelType.PRIVATE))
-                throw new PermissionException("Cannot suppress embeds of others in a PrivateChannel.");
-            else if (!getGuild().getSelfMember().hasPermission(getTextChannel(), Permission.MESSAGE_MANAGE))
-                throw new InsufficientPermissionException(getTextChannel(), Permission.MESSAGE_MANAGE);
+    public AuditableRestAction<Void> suppressEmbeds(boolean suppressed) {
+        SelfUser self = api.getSelfUser();
+
+        Route.CompiledRoute route;
+        if (isWebhookRequest()) {
+            route = Route.Webhooks.EXECUTE_WEBHOOK_EDIT.compile(webhook.getId(), webhook.getToken(), getId());
+            route = withThreadContext(route);
+        } else {
+            if (isEphemeral()) {
+                throw new IllegalStateException("Cannot suppress embeds on ephemeral messages.");
+            }
+
+            if (!self.equals(getAuthor())) {
+                if (!isFromGuild()) {
+                    throw new PermissionException("Cannot suppress embeds of others in a PrivateChannel.");
+                }
+
+                if (hasChannel()) {
+                    GuildMessageChannel gChan = getGuildChannel();
+                    if (!getGuild().getSelfMember().hasPermission(gChan, Permission.MESSAGE_MANAGE)) {
+                        throw new InsufficientPermissionException(gChan, Permission.MESSAGE_MANAGE);
+                    }
+                }
+            }
+
+            route = Route.Messages.EDIT_MESSAGE.compile(getChannelId(), getId());
         }
-        JDAImpl jda = (JDAImpl) getJDA();
-        Route.CompiledRoute route = Route.Messages.EDIT_MESSAGE.compile(getChannel().getId(), getId());
+
         int newFlags = flags;
         int suppressionValue = MessageFlag.EMBEDS_SUPPRESSED.getValue();
-        if (suppressed)
+        if (suppressed) {
             newFlags |= suppressionValue;
-        else
+        } else {
             newFlags &= ~suppressionValue;
-        return new AuditableRestActionImpl<>(jda, route, DataObject.empty().put("flags", newFlags));
+        }
+        DataObject body = DataObject.empty().put("flags", newFlags);
+
+        AuditableRestActionImpl<Void> action = new AuditableRestActionImpl<>(api, route, body);
+        action.setErrorMapper(getUnknownWebhookErrorMapper());
+        return action;
     }
 
     @Nonnull
     @Override
-    public RestAction<Message> crosspost()
-    {
-        if (isEphemeral())
+    public RestAction<Message> crosspost() {
+        if (isEphemeral()) {
             throw new IllegalStateException("Cannot crosspost ephemeral messages.");
-        
-        if (getFlags().contains(MessageFlag.CROSSPOSTED))
+        }
+
+        if (getFlags().contains(MessageFlag.CROSSPOSTED)) {
             return new CompletedRestAction<>(getJDA(), this);
-        TextChannel textChannel = getTextChannel();
-        if (!getGuild().getSelfMember().hasAccess(textChannel))
-            throw new MissingAccessException(textChannel, Permission.VIEW_CHANNEL);
-        if (!getAuthor().equals(getJDA().getSelfUser()) && !getGuild().getSelfMember().hasPermission(textChannel, Permission.MESSAGE_MANAGE))
-            throw new InsufficientPermissionException(textChannel, Permission.MESSAGE_MANAGE);
-        return textChannel.crosspostMessageById(getId());
+        }
+
+        if (!hasChannel()) {
+            Route.CompiledRoute route = Route.Messages.CROSSPOST_MESSAGE.compile(getChannelId(), getId());
+            return new RestActionImpl<>(api, route, (response, request) -> api.getEntityBuilder()
+                    .createMessageFromWebhook(response.getObject(), guild));
+        }
+
+        MessageChannelUnion channel = getChannel();
+        if (!(channel instanceof NewsChannel)) {
+            throw new IllegalStateException("This message was not sent in a news channel");
+        }
+        NewsChannel newsChannel = (NewsChannel) channel;
+        Checks.checkAccess(getGuild().getSelfMember(), newsChannel);
+        if (!getAuthor().equals(getJDA().getSelfUser())
+                && !getGuild().getSelfMember().hasPermission(newsChannel, Permission.MESSAGE_MANAGE)) {
+            throw new InsufficientPermissionException(newsChannel, Permission.MESSAGE_MANAGE);
+        }
+        return newsChannel.crosspostMessageById(getId());
     }
 
     @Override
-    public boolean isSuppressedEmbeds()
-    {
+    public boolean isSuppressedEmbeds() {
         return (this.flags & MessageFlag.EMBEDS_SUPPRESSED.getValue()) > 0;
     }
 
     @Nonnull
     @Override
-    public EnumSet<MessageFlag> getFlags()
-    {
+    public EnumSet<MessageFlag> getFlags() {
         return MessageFlag.fromBitField(flags);
     }
 
     @Override
-    public long getFlagsRaw()
-    {
+    public long getFlagsRaw() {
         return flags;
     }
 
     @Override
-    public boolean isEphemeral()
-    {
+    public boolean isEphemeral() {
         return (this.flags & MessageFlag.EPHEMERAL.getValue()) != 0;
     }
 
     @Override
-    public boolean equals(Object o)
-    {
-        if (o == this)
+    public boolean isSuppressedNotifications() {
+        return (this.flags & MessageFlag.NOTIFICATIONS_SUPPRESSED.getValue()) != 0;
+    }
+
+    @Override
+    public boolean isVoiceMessage() {
+        return (this.flags & MessageFlag.IS_VOICE_MESSAGE.getValue()) != 0;
+    }
+
+    @Nullable
+    @Override
+    public ThreadChannel getStartedThread() {
+        return this.startedThread;
+    }
+
+    @Override
+    public ThreadChannelAction createThreadChannel(@Nonnull String name) {
+        return getGuildChannel().asThreadContainer().createThreadChannel(name, this.getIdLong());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
             return true;
-        if (!(o instanceof ReceivedMessage))
+        }
+        if (!(o instanceof ReceivedMessage)) {
             return false;
+        }
         ReceivedMessage oMsg = (ReceivedMessage) o;
         return this.id == oMsg.id;
     }
 
     @Override
-    public int hashCode()
-    {
+    public int hashCode() {
         return Long.hashCode(id);
     }
 
     @Override
-    public String toString()
-    {
-        return author != null
-            ? String.format("M:%#s:%.20s(%s)", author, this, getId())
-            : String.format("M:%.20s", this); // this message was made using MessageBuilder
+    @SuppressWarnings("deprecation")
+    public String toString() {
+        return new EntityString(this)
+                .addMetadata("author", author.getDiscriminator().equals("0000") ? author.getName() : author.getAsTag())
+                .addMetadata("content", String.format("%.20s ...", this))
+                .toString();
     }
 
     @Override
-    protected void unsupported()
-    {
-        throw new UnsupportedOperationException("This operation is not supported on received messages!");
-    }
-
-    @Override
-    public void formatTo(Formatter formatter, int flags, int width, int precision)
-    {
+    public void formatTo(Formatter formatter, int flags, int width, int precision) {
         boolean upper = (flags & FormattableFlags.UPPERCASE) == FormattableFlags.UPPERCASE;
         boolean leftJustified = (flags & FormattableFlags.LEFT_JUSTIFY) == FormattableFlags.LEFT_JUSTIFY;
         boolean alt = (flags & FormattableFlags.ALTERNATE) == FormattableFlags.ALTERNATE;
 
         String out = alt ? getContentRaw() : getContentDisplay();
 
-        if (upper)
+        if (upper) {
             out = out.toUpperCase(formatter.locale());
+        }
 
-        appendFormat(formatter, width, precision, leftJustified, out);
-    }
-
-    public void setMentions(List<User> users, List<Member> members)
-    {
-        users.sort(Comparator.comparing((user) ->
-                Math.max(content.indexOf("<@" + user.getId() + ">"),
-                        content.indexOf("<@!" + user.getId() + ">")
-                )));
-        members.sort(Comparator.comparing((user) ->
-                Math.max(content.indexOf("<@" + user.getId() + ">"),
-                         content.indexOf("<@!" + user.getId() + ">")
-                )));
-
-        this.userMentions = Collections.unmodifiableList(users);
-        this.memberMentions = Collections.unmodifiableList(members);
-    }
-
-    private <T, C extends Collection<T>> C processMentions(MentionType type, C collection, boolean distinct, Function<Matcher, T> map)
-    {
-        Matcher matcher = type.getPattern().matcher(getContentRaw());
-        while (matcher.find())
-        {
-            try
-            {
-                T elem = map.apply(matcher);
-                if (elem == null || (distinct && collection.contains(elem)))
-                    continue;
-                collection.add(elem);
+        try {
+            Appendable appendable = formatter.out();
+            if (precision > -1 && out.length() > precision) {
+                appendable.append(Helpers.truncate(out, precision - 3)).append("...");
+                return;
             }
-            catch (NumberFormatException ignored) {}
+
+            if (leftJustified) {
+                appendable.append(Helpers.rightPad(out, width));
+            } else {
+                appendable.append(Helpers.leftPad(out, width));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return collection;
     }
 
-    private static class FormatToken
-    {
-        public final String format;
-        public final int start;
+    private boolean isWebhookRequest() {
+        return webhook != null && (!(webhook instanceof InteractionHook) || !((InteractionHook) webhook).isExpired());
+    }
 
-        public FormatToken(String format, int start)
-        {
-            this.format = format;
-            this.start = start;
+    @Nonnull
+    private MessageEditActionImpl editRequest() {
+        MessageEditActionImpl messageEditAction = hasChannel()
+                ? new MessageEditActionImpl(getChannel(), getId())
+                : new MessageEditActionImpl(getJDA(), hasGuild() ? getGuild() : null, getChannelId(), getId());
+
+        messageEditAction.setErrorMapper(getUnknownWebhookErrorMapper());
+        return messageEditAction;
+    }
+
+    private Route.CompiledRoute withThreadContext(Route.CompiledRoute route) {
+        if (getChannelType().isThread() && !(webhook instanceof InteractionHook)) {
+            return route.withQueryParams("thread_id", getChannelId());
         }
+        return route;
+    }
+
+    private ErrorMapper getUnknownWebhookErrorMapper() {
+        if (!isWebhookRequest()) {
+            return null;
+        }
+
+        return (response, request, exception) -> {
+            if (webhook instanceof InteractionHookImpl
+                    && !((InteractionHookImpl) webhook).isAck()
+                    && exception.getErrorResponse() == ErrorResponse.UNKNOWN_WEBHOOK) {
+                return new IllegalStateException(
+                        "Sending a webhook request requires the interaction to be acknowledged before expiration",
+                        exception);
+            } else {
+                return null;
+            }
+        };
     }
 }

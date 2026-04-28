@@ -1,6 +1,8 @@
 # project files
 config.json
 tokens.json
+.version
+publishing-keyring.gpg
 
 # music files
 *.mp3
@@ -14,7 +16,7 @@ tokens.json
 /build/
 /.gradle/
 /out/
-gradle.properties
+/.kotlin/
 
 # eclipse files
 .classpath
@@ -27,6 +29,12 @@ gradle.properties
 *.iml
 *.ipr
 *.iws
+
+# fleet files
+.fleet/
+
+# vscode files
+.vscode/
 
 # netbeans files
 /.nb-gradle/
@@ -42,3 +50,6 @@ src-old/examples/java/TestReceive.java
 src-old/main/java/net/dv8tion/jda/events/audio/AudioMovedEvent.java
 src-old/main/java/net/dv8tion/jda/ratelimit/Bucket.java
 src-old/main/java/net/dv8tion/jda/ratelimit/RateLimitControl.java
+
+# Recipe jars
+src/test/resources/**/*.jar

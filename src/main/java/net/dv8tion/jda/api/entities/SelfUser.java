@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.managers.AccountManager;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 
 /**
@@ -25,8 +27,7 @@ import javax.annotation.Nonnull;
  *
  * @see JDA#getSelfUser()
  */
-public interface SelfUser extends User
-{
+public interface SelfUser extends User {
     /**
      * The associated application id for the bot account.
      * <br>For most bots this is identical to the user id.
@@ -42,11 +43,9 @@ public interface SelfUser extends User
      * @return The application id
      */
     @Nonnull
-    default String getApplicationId()
-    {
+    default String getApplicationId() {
         return Long.toUnsignedString(getApplicationIdLong());
     }
-
 
     /**
      * The status of this account's verification.
@@ -68,9 +67,9 @@ public interface SelfUser extends User
     /**
      * Returns the maximum size for files that can be uploaded with this account.
      * <br>Returns {@value net.dv8tion.jda.api.entities.Message#MAX_FILE_SIZE} for bots.
-     * 
+     *
      * @return The maximum size for files that can be uploaded with this account
-     * 
+     *
      * @see net.dv8tion.jda.api.entities.Message#MAX_FILE_SIZE
      */
     long getAllowedFileSize();
@@ -81,11 +80,9 @@ public interface SelfUser extends User
      * <br>This can be used to atomically set account fields (like avatar/username)
      * You modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
      *
-     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
-     * This getter is not thread-safe and would require guards by the user.
-     *
      * @return An AccountManager instance for the current account
      */
     @Nonnull
+    @CheckReturnValue
     AccountManager getManager();
 }

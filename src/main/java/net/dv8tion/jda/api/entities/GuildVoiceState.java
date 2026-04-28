@@ -17,21 +17,27 @@
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.channel.concrete.StageChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.requests.RestAction;
+
+import java.time.OffsetDateTime;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.time.OffsetDateTime;
 
 /**
  * Represents the voice state of a {@link net.dv8tion.jda.api.entities.Member Member} in a
  * {@link net.dv8tion.jda.api.entities.Guild Guild}.
  *
+ * <p>Voice states are only cached while the member is connected to a channel.
+ *
  * @see Member#getVoiceState()
  */
-public interface GuildVoiceState extends ISnowflake
-{
+public interface GuildVoiceState extends ISnowflake {
     /**
      * Returns the {@link net.dv8tion.jda.api.JDA JDA} instance of this VoiceState
      *
@@ -43,14 +49,14 @@ public interface GuildVoiceState extends ISnowflake
     /**
      * Returns whether the {@link net.dv8tion.jda.api.entities.Member Member} muted themselves.
      *
-     * @return The User's self-mute status
+     * @return The User's self-mute status, or false if the member is not connected to an audio channel
      */
     boolean isSelfMuted();
 
     /**
      * Returns whether the {@link net.dv8tion.jda.api.entities.Member Member} deafened themselves.
      *
-     * @return The User's self-deaf status
+     * @return The User's self-deaf status, or false if the member is not connected to an audio channel
      */
     boolean isSelfDeafened();
 
@@ -58,7 +64,7 @@ public interface GuildVoiceState extends ISnowflake
      * Returns whether the {@link net.dv8tion.jda.api.entities.Member Member} is muted, either
      * by choice {@link #isSelfMuted()} or muted by an admin {@link #isGuildMuted()}
      *
-     * @return the Member's mute status
+     * @return the Member's mute status, or false if the member is not connected to an audio channel
      */
     boolean isMuted();
 
@@ -66,28 +72,28 @@ public interface GuildVoiceState extends ISnowflake
      * Returns whether the {@link net.dv8tion.jda.api.entities.Member Member} is deafened, either
      * by choice {@link #isSelfDeafened()} or deafened by an admin {@link #isGuildDeafened()}
      *
-     * @return the Member's deaf status
+     * @return the Member's deaf status, or false if the member is not connected to an audio channel
      */
     boolean isDeafened();
 
     /**
      * Returns whether the {@link net.dv8tion.jda.api.entities.Member Member} got muted by an Admin
      *
-     * @return the Member's guild-mute status
+     * @return the Member's guild-mute status, or false if the member is not connected to an audio channel
      */
     boolean isGuildMuted();
 
     /**
      * Returns whether the {@link net.dv8tion.jda.api.entities.Member Member} got deafened by an Admin
      *
-     * @return the Member's guild-deaf status
+     * @return the Member's guild-deaf status, or false if the member is not connected to an audio channel
      */
     boolean isGuildDeafened();
 
     /**
      * Returns true if this {@link net.dv8tion.jda.api.entities.Member Member} is unable to speak because the
      * channel is actively suppressing audio communication. This occurs in
-     * {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels} where the Member either doesn't have
+     * {@link VoiceChannel VoiceChannels} where the Member either doesn't have
      * {@link net.dv8tion.jda.api.Permission#VOICE_SPEAK Permission#VOICE_SPEAK} or if the channel is the
      * designated AFK channel.
      * <br>This is also used by {@link StageChannel StageChannels} for listeners without speaker approval.
@@ -114,19 +120,16 @@ public interface GuildVoiceState extends ISnowflake
     boolean isSendingVideo();
 
     /**
-     * Returns the current {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} that the {@link net.dv8tion.jda.api.entities.Member Member}
-     * is in. If the {@link net.dv8tion.jda.api.entities.Member Member} is currently not in a
-     * {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}, this returns null.
+     * Returns the current {@link AudioChannelUnion} that the {@link Member} is in.
+     * If the {@link Member} is currently not connected to a {@link AudioChannel}, this returns null.
      *
-     * @return The VoiceChannel that the Member is in, or null.
+     * @return The AudioChannelUnion that the Member is connected to, or null if the member is not connected to an audio channel.
      */
     @Nullable
-    VoiceChannel getChannel();
+    AudioChannelUnion getChannel();
 
     /**
-     * Returns the current {@link net.dv8tion.jda.api.entities.Guild Guild} of the {@link net.dv8tion.jda.api.entities.Member Member's}
-     * {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}. If the {@link net.dv8tion.jda.api.entities.Member Member} is currently
-     * not in a {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}, this returns null
+     * Returns the {@link Guild} for the {@link Member} that this GuildVoiceState belongs to.
      *
      * @return the Member's Guild
      */
@@ -135,27 +138,25 @@ public interface GuildVoiceState extends ISnowflake
 
     /**
      * Returns the {@link net.dv8tion.jda.api.entities.Member Member} corresponding to this GuildVoiceState instance
-     * (Backreference)
      *
-     * @return the Member that holds this GuildVoiceState
+     * @return The member related to this voice state, might not be cached and thus have outdated information.
      */
     @Nonnull
     Member getMember();
 
     /**
-     * Used to determine if the {@link net.dv8tion.jda.api.entities.Member Member} is currently in a {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}
-     * in the {@link net.dv8tion.jda.api.entities.Guild Guild} returned from {@link #getGuild() getGuild()}.<br>
-     * If this is {@code false}, {@link #getChannel() getChannel()} will return {@code null}.
+     * Used to determine if the {@link Member} is currently connected to an {@link AudioChannel}
+     * in the {@link Guild} returned from {@link #getGuild()}.
+     * <br>If this is {@code false}, {@link #getChannel()} will return {@code null}.
      *
-     * @return True, if the {@link net.dv8tion.jda.api.entities.Member Member} is currently in a {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}
-     *         in this {@link net.dv8tion.jda.api.entities.Guild Guild}.
+     * @return True, if the {@link Member} is currently connected to an {@link AudioChannel} in this {@link Guild}
      */
-    boolean inVoiceChannel();
+    boolean inAudioChannel();
 
     /**
      * The Session-Id for this VoiceState
      *
-     * @return The Session-Id
+     * @return The Session-Id, or null if the member is not connected to an audio channel.
      */
     @Nullable
     String getSessionId();
@@ -187,7 +188,8 @@ public interface GuildVoiceState extends ISnowflake
     RestAction<Void> approveSpeaker();
 
     /**
-     * Reject this members {@link #getRequestToSpeakTimestamp() request to speak}.
+     * Reject this members {@link #getRequestToSpeakTimestamp() request to speak}
+     * or moves a {@link StageInstance#getSpeakers() speaker} back to the {@link StageInstance#getAudience() audience}.
      * <p>This requires a non-null {@link #getRequestToSpeakTimestamp()}.
      * The member will have to request to speak again.
      *

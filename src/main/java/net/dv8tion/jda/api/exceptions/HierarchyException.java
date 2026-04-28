@@ -16,10 +16,14 @@
 
 package net.dv8tion.jda.api.exceptions;
 
-public class HierarchyException extends PermissionException
-{
-    public HierarchyException(String reason)
-    {
+/**
+ * Exception indicating that a specific action requires to have a higher role than the target.
+ *
+ * <p>This can also indicate that the target is the owner of the guild.
+ * For instance, when trying to modify the guild owner's nickname.
+ */
+public class HierarchyException extends PermissionException {
+    public HierarchyException(String reason) {
         super(reason);
     }
 }

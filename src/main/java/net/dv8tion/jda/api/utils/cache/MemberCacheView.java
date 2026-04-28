@@ -19,11 +19,13 @@ package net.dv8tion.jda.api.utils.cache;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.utils.MiscUtil;
+import org.jetbrains.annotations.Unmodifiable;
+
+import java.util.Collection;
+import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Collection;
-import java.util.List;
 
 /**
  * {@link net.dv8tion.jda.api.utils.cache.CacheView CacheView} implementation
@@ -34,8 +36,7 @@ import java.util.List;
  *
  * @see CacheView CacheView for details on Efficient Memory Usage
  */
-public interface MemberCacheView extends SnowflakeCacheView<Member>
-{
+public interface MemberCacheView extends SnowflakeCacheView<Member> {
     /**
      * Retrieves the member represented by the provided ID.
      *
@@ -60,8 +61,7 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Possibly-null member for the specified ID
      */
     @Nullable
-    default Member getElementById(@Nonnull String id)
-    {
+    default Member getElementById(@Nonnull String id) {
         return getElementById(MiscUtil.parseSnowflake(id));
     }
 
@@ -80,6 +80,7 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Immutable list of members with the given username
      */
     @Nonnull
+    @Unmodifiable
     List<Member> getElementsByUsername(@Nonnull String name, boolean ignoreCase);
 
     /**
@@ -95,8 +96,8 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Immutable list of members with the given username
      */
     @Nonnull
-    default List<Member> getElementsByUsername(@Nonnull String name)
-    {
+    @Unmodifiable
+    default List<Member> getElementsByUsername(@Nonnull String name) {
         return getElementsByUsername(name, false);
     }
 
@@ -114,6 +115,7 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Immutable list of members with the given nickname
      */
     @Nonnull
+    @Unmodifiable
     List<Member> getElementsByNickname(@Nullable String name, boolean ignoreCase);
 
     /**
@@ -128,8 +130,8 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Immutable list of members with the given nickname
      */
     @Nonnull
-    default List<Member> getElementsByNickname(@Nullable String name)
-    {
+    @Unmodifiable
+    default List<Member> getElementsByNickname(@Nullable String name) {
         return getElementsByNickname(name, false);
     }
 
@@ -146,6 +148,7 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Immutable list of members with the given roles
      */
     @Nonnull
+    @Unmodifiable
     List<Member> getElementsWithRoles(@Nonnull Role... roles);
 
     /**
@@ -161,5 +164,6 @@ public interface MemberCacheView extends SnowflakeCacheView<Member>
      * @return Immutable list of members with the given roles
      */
     @Nonnull
+    @Unmodifiable
     List<Member> getElementsWithRoles(@Nonnull Collection<Role> roles);
 }

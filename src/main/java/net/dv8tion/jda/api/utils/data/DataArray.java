@@ -17,30 +17,30 @@
 package net.dv8tion.jda.api.utils.data;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.util.DefaultIndenter;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.type.CollectionType;
+import net.dv8tion.jda.api.exceptions.DataArrayParsingException;
 import net.dv8tion.jda.api.exceptions.ParsingException;
 import net.dv8tion.jda.api.utils.data.etf.ExTermDecoder;
 import net.dv8tion.jda.api.utils.data.etf.ExTermEncoder;
 import net.dv8tion.jda.internal.utils.Checks;
 import net.dv8tion.jda.internal.utils.Helpers;
+import net.dv8tion.jda.internal.utils.SerializationUtil;
 import org.jetbrains.annotations.Contract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Represents a list of values used in communication with the Discord API.
@@ -50,27 +50,12 @@ import java.util.stream.Stream;
  *
  * <p>This class is not Thread-Safe
  */
-public class DataArray implements Iterable<Object>, SerializableArray
-{
+public class DataArray implements Iterable<Object>, SerializableArray {
     private static final Logger log = LoggerFactory.getLogger(DataObject.class);
-    private static final ObjectMapper mapper;
-    private static final SimpleModule module;
-    private static final CollectionType listType;
-
-    static
-    {
-        mapper = new ObjectMapper();
-        module = new SimpleModule();
-        module.addAbstractTypeMapping(Map.class, HashMap.class);
-        module.addAbstractTypeMapping(List.class, ArrayList.class);
-        mapper.registerModule(module);
-        listType = mapper.getTypeFactory().constructRawCollectionType(ArrayList.class);
-    }
 
     protected final List<Object> data;
 
-    protected DataArray(List<Object> data)
-    {
+    protected DataArray(List<Object> data) {
         this.data = data;
     }
 
@@ -82,8 +67,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @see    #add(Object)
      */
     @Nonnull
-    public static DataArray empty()
-    {
+    public static DataArray empty() {
         return new DataArray(new ArrayList<>());
     }
 
@@ -97,8 +81,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A new DataArray populated with the contents of the collection
      */
     @Nonnull
-    public static DataArray fromCollection(@Nonnull Collection<?> col)
-    {
+    public static DataArray fromCollection(@Nonnull Collection<?> col) {
         return empty().addAll(col);
     }
 
@@ -114,16 +97,8 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A new DataArray instance for the provided array
      */
     @Nonnull
-    public static DataArray fromJson(@Nonnull String json)
-    {
-        try
-        {
-            return new DataArray(mapper.readValue(json, listType));
-        }
-        catch (IOException e)
-        {
-            throw new ParsingException(e);
-        }
+    public static DataArray fromJson(@Nonnull String json) {
+        return new DataArray(SerializationUtil.fromJson(SerializationUtil.getListType(), json));
     }
 
     /**
@@ -138,16 +113,8 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A new DataArray instance for the provided array
      */
     @Nonnull
-    public static DataArray fromJson(@Nonnull InputStream json)
-    {
-        try
-        {
-            return new DataArray(mapper.readValue(json, listType));
-        }
-        catch (IOException e)
-        {
-            throw new ParsingException(e);
-        }
+    public static DataArray fromJson(@Nonnull InputStream json) {
+        return new DataArray(SerializationUtil.fromJson(SerializationUtil.getListType(), json));
     }
 
     /**
@@ -162,16 +129,8 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A new DataArray instance for the provided array
      */
     @Nonnull
-    public static DataArray fromJson(@Nonnull Reader json)
-    {
-        try
-        {
-            return new DataArray(mapper.readValue(json, listType));
-        }
-        catch (IOException e)
-        {
-            throw new ParsingException(e);
-        }
+    public static DataArray fromJson(@Nonnull Reader json) {
+        return new DataArray(SerializationUtil.fromJson(SerializationUtil.getListType(), json));
     }
 
     /**
@@ -187,20 +146,14 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *         If the provided ETF payload is incorrectly formatted or an I/O error occurred
      *
      * @return A DataArray instance for the provided payload
-     *
-     * @since  4.2.1
      */
     @Nonnull
-    public static DataArray fromETF(@Nonnull byte[] data)
-    {
+    public static DataArray fromETF(@Nonnull byte[] data) {
         Checks.notNull(data, "Data");
-        try
-        {
+        try {
             List<Object> list = ExTermDecoder.unpackList(ByteBuffer.wrap(data));
             return new DataArray(list);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             log.error("Failed to parse ETF data {}", Arrays.toString(data), ex);
             throw new ParsingException(ex);
         }
@@ -214,9 +167,8 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return True, if the value at the index is null
      */
-    public boolean isNull(int index)
-    {
-        return data.get(index) == null;
+    public boolean isNull(int index) {
+        return index >= length() || data.get(index) == null;
     }
 
     /**
@@ -231,8 +183,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @see    net.dv8tion.jda.api.utils.data.DataType#isType(Object) DataType.isType(Object)
      */
-    public boolean isType(int index, @Nonnull DataType type)
-    {
+    public boolean isType(int index, @Nonnull DataType type) {
         return type.isType(data.get(index));
     }
 
@@ -241,8 +192,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The length of the array
      */
-    public int length()
-    {
+    public int length() {
         return data.size();
     }
 
@@ -251,8 +201,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return True, if this array is empty
      */
-    public boolean isEmpty()
-    {
+    public boolean isEmpty() {
         return data.isEmpty();
     }
 
@@ -269,19 +218,16 @@ public class DataArray implements Iterable<Object>, SerializableArray
      */
     @Nonnull
     @SuppressWarnings("unchecked")
-    public DataObject getObject(int index)
-    {
+    public DataObject getObject(int index) {
         Map<String, Object> child = null;
-        try
-        {
+        try {
             child = (Map<String, Object>) get(Map.class, index);
-        }
-        catch (ClassCastException ex)
-        {
+        } catch (ClassCastException ex) {
             log.error("Unable to extract child data", ex);
         }
-        if (child == null)
+        if (child == null) {
             throw valueError(index, "DataObject");
+        }
         return new DataObject(child);
     }
 
@@ -298,19 +244,16 @@ public class DataArray implements Iterable<Object>, SerializableArray
      */
     @Nonnull
     @SuppressWarnings("unchecked")
-    public DataArray getArray(int index)
-    {
+    public DataArray getArray(int index) {
         List<Object> child = null;
-        try
-        {
+        try {
             child = (List<Object>) get(List.class, index);
-        }
-        catch (ClassCastException ex)
-        {
+        } catch (ClassCastException ex) {
             log.error("Unable to extract child data", ex);
         }
-        if (child == null)
+        if (child == null) {
             throw valueError(index, "DataArray");
+        }
         return new DataArray(child);
     }
 
@@ -326,11 +269,11 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return The resolved String
      */
     @Nonnull
-    public String getString(int index)
-    {
+    public String getString(int index) {
         String value = get(String.class, index, UnaryOperator.identity(), String::valueOf);
-        if (value == null)
+        if (value == null) {
             throw valueError(index, "String");
+        }
         return value;
     }
 
@@ -348,8 +291,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return The resolved String
      */
     @Contract("_, !null -> !null")
-    public String getString(int index, @Nullable String defaultValue)
-    {
+    public String getString(int index, @Nullable String defaultValue) {
         String value = get(String.class, index, UnaryOperator.identity(), String::valueOf);
         return value == null ? defaultValue : value;
     }
@@ -365,8 +307,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return True, if the value is present and set to true. Otherwise false.
      */
-    public boolean getBoolean(int index)
-    {
+    public boolean getBoolean(int index) {
         return getBoolean(index, false);
     }
 
@@ -383,8 +324,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return True, if the value is present and set to true. False, if it is set to false. Otherwise defaultValue.
      */
-    public boolean getBoolean(int index, boolean defaultValue)
-    {
+    public boolean getBoolean(int index, boolean defaultValue) {
         Boolean value = get(Boolean.class, index, Boolean::parseBoolean, null);
         return value == null ? defaultValue : value;
     }
@@ -400,11 +340,11 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved int value
      */
-    public int getInt(int index)
-    {
+    public int getInt(int index) {
         Integer value = get(Integer.class, index, Integer::parseInt, Number::intValue);
-        if (value == null)
+        if (value == null) {
             throw valueError(index, "int");
+        }
         return value;
     }
 
@@ -421,8 +361,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved int value
      */
-    public int getInt(int index, int defaultValue)
-    {
+    public int getInt(int index, int defaultValue) {
         Integer value = get(Integer.class, index, Integer::parseInt, Number::intValue);
         return value == null ? defaultValue : value;
     }
@@ -438,11 +377,11 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved unsigned int value
      */
-    public int getUnsignedInt(int index)
-    {
+    public int getUnsignedInt(int index) {
         Integer value = get(Integer.class, index, Integer::parseUnsignedInt, Number::intValue);
-        if (value == null)
+        if (value == null) {
             throw valueError(index, "unsigned int");
+        }
         return value;
     }
 
@@ -459,8 +398,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved unsigned int value
      */
-    public int getUnsignedInt(int index, int defaultValue)
-    {
+    public int getUnsignedInt(int index, int defaultValue) {
         Integer value = get(Integer.class, index, Integer::parseUnsignedInt, Number::intValue);
         return value == null ? defaultValue : value;
     }
@@ -476,11 +414,11 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved long value
      */
-    public long getLong(int index)
-    {
+    public long getLong(int index) {
         Long value = get(Long.class, index, Long::parseLong, Number::longValue);
-        if (value == null)
+        if (value == null) {
             throw valueError(index, "long");
+        }
         return value;
     }
 
@@ -497,8 +435,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved long value
      */
-    public long getLong(int index, long defaultValue)
-    {
+    public long getLong(int index, long defaultValue) {
         Long value = get(Long.class, index, Long::parseLong, Number::longValue);
         return value == null ? defaultValue : value;
     }
@@ -514,12 +451,59 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved unsigned long value
      */
-    public long getUnsignedLong(int index)
-    {
+    public long getUnsignedLong(int index) {
         Long value = get(Long.class, index, Long::parseUnsignedLong, Number::longValue);
-        if (value == null)
+        if (value == null) {
             throw valueError(index, "unsigned long");
+        }
         return value;
+    }
+
+    /**
+     * Resolves the value at the specified index to an {@link OffsetDateTime}.
+     * <br><b>Note:</b> This method should be used on ISO8601 timestamps
+     *
+     * @param  index
+     *         The index to resolve
+     *
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the value is missing, null, or not a valid ISO8601 timestamp
+     *
+     * @return Possibly-null {@link OffsetDateTime} object representing the timestamp
+     */
+    @Nonnull
+    public OffsetDateTime getOffsetDateTime(int index) {
+        OffsetDateTime value = getOffsetDateTime(index, null);
+        if (value == null) {
+            throw valueError(index, "OffsetDateTime");
+        }
+        return value;
+    }
+    /**
+     * Resolves the value at the specified index to an {@link OffsetDateTime}.
+     * <br><b>Note:</b> This method should only be used on ISO8601 timestamps
+     *
+     * @param  index
+     *         The index to resolve
+     * @param  defaultValue
+     *         Alternative value to use when no value or null value is associated with the key
+     *
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the value is not a valid ISO8601 timestamp
+     *
+     * @return Possibly-null {@link OffsetDateTime} object representing the timestamp
+     */
+    @Contract("_, !null -> !null")
+    public OffsetDateTime getOffsetDateTime(int index, @Nullable OffsetDateTime defaultValue) {
+        OffsetDateTime value;
+        try {
+            value = get(OffsetDateTime.class, index, OffsetDateTime::parse, null);
+        } catch (DateTimeParseException e) {
+            String reason =
+                    "Cannot parse value for index %d into an OffsetDateTime object. Try double checking that %s is a valid ISO8601 timestamp";
+            throw new ParsingException(String.format(reason, index, e.getParsedString()));
+        }
+        return value == null ? defaultValue : value;
     }
 
     /**
@@ -535,9 +519,45 @@ public class DataArray implements Iterable<Object>, SerializableArray
      *
      * @return The resolved unsigned long value
      */
-    public long getUnsignedLong(int index, long defaultValue)
-    {
+    public long getUnsignedLong(int index, long defaultValue) {
         Long value = get(Long.class, index, Long::parseUnsignedLong, Number::longValue);
+        return value == null ? defaultValue : value;
+    }
+
+    /**
+     * Resolves the value at the specified index to a double.
+     *
+     * @param  index
+     *         The index to resolve
+     *
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the value is of the wrong type
+     *
+     * @return The resolved double value
+     */
+    public double getDouble(int index) {
+        Double value = get(Double.class, index, Double::parseDouble, Number::doubleValue);
+        if (value == null) {
+            throw valueError(index, "double");
+        }
+        return value;
+    }
+
+    /**
+     * Resolves the value at the specified index to a double.
+     *
+     * @param  index
+     *         The index to resolve
+     * @param  defaultValue
+     *         Alternative value to use when the value associated with the index is null
+     *
+     * @throws net.dv8tion.jda.api.exceptions.ParsingException
+     *         If the value is of the wrong type
+     *
+     * @return The resolved double value
+     */
+    public double getDouble(int index, double defaultValue) {
+        Double value = get(Double.class, index, Double::parseDouble, Number::doubleValue);
         return value == null ? defaultValue : value;
     }
 
@@ -550,14 +570,14 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A DataArray with the value inserted at the end
      */
     @Nonnull
-    public DataArray add(@Nullable Object value)
-    {
-        if (value instanceof SerializableData)
+    public DataArray add(@Nullable Object value) {
+        if (value instanceof SerializableData) {
             data.add(((SerializableData) value).toData().data);
-        else if (value instanceof SerializableArray)
+        } else if (value instanceof SerializableArray) {
             data.add(((SerializableArray) value).toDataArray().data);
-        else
+        } else {
             data.add(value);
+        }
         return this;
     }
 
@@ -570,8 +590,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A DataArray with the values inserted at the end
      */
     @Nonnull
-    public DataArray addAll(@Nonnull Collection<?> values)
-    {
+    public DataArray addAll(@Nonnull Collection<?> values) {
         values.forEach(this::add);
         return this;
     }
@@ -585,8 +604,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A DataArray with the values inserted at the end
      */
     @Nonnull
-    public DataArray addAll(@Nonnull DataArray array)
-    {
+    public DataArray addAll(@Nonnull DataArray array) {
         return addAll(array.data);
     }
 
@@ -601,14 +619,14 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A DataArray with the value inserted at the specified index
      */
     @Nonnull
-    public DataArray insert(int index, @Nullable Object value)
-    {
-        if (value instanceof SerializableData)
+    public DataArray insert(int index, @Nullable Object value) {
+        if (value instanceof SerializableData) {
             data.add(index, ((SerializableData) value).toData().data);
-        else if (value instanceof SerializableArray)
+        } else if (value instanceof SerializableArray) {
             data.add(index, ((SerializableArray) value).toDataArray().data);
-        else
+        } else {
             data.add(index, value);
+        }
         return this;
     }
 
@@ -621,8 +639,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A DataArray with the value removed
      */
     @Nonnull
-    public DataArray remove(int index)
-    {
+    public DataArray remove(int index) {
         data.remove(index);
         return this;
     }
@@ -636,8 +653,7 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return A DataArray with the value removed
      */
     @Nonnull
-    public DataArray remove(@Nullable Object value)
-    {
+    public DataArray remove(@Nullable Object value) {
         data.remove(value);
         return this;
     }
@@ -648,59 +664,36 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return byte array containing the JSON representation of this object
      */
     @Nonnull
-    public byte[] toJson()
-    {
-        try
-        {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            mapper.writeValue(outputStream, data);
-            return outputStream.toByteArray();
-        }
-        catch (IOException e)
-        {
-            throw new UncheckedIOException(e);
-        }
+    public byte[] toJson() {
+        return SerializationUtil.toJson(data);
     }
 
     /**
      * Serializes this object as ETF LIST term.
      *
      * @return byte array containing the encoded ETF term
-     *
-     * @since  4.2.1
      */
     @Nonnull
-    public byte[] toETF()
-    {
+    public byte[] toETF() {
         ByteBuffer buffer = ExTermEncoder.pack(data);
         return Arrays.copyOfRange(buffer.array(), buffer.arrayOffset(), buffer.arrayOffset() + buffer.limit());
     }
 
     @Override
-    public String toString()
-    {
-        try
-        {
-            return mapper.writeValueAsString(data);
-        }
-        catch (JsonProcessingException e)
-        {
-            throw new ParsingException(e);
-        }
+    public String toString() {
+        return SerializationUtil.toJsonString(data, false);
     }
 
     @Nonnull
-    public String toPrettyString()
-    {
-        DefaultPrettyPrinter.Indenter indent = new DefaultIndenter("    ", DefaultIndenter.SYS_LF);
-        DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
-        printer.withObjectIndenter(indent).withArrayIndenter(indent);
-        try
-        {
-            return mapper.writer(printer).writeValueAsString(data);
-        }
-        catch (JsonProcessingException e)
-        {
+    public String toPrettyString() {
+        return SerializationUtil.toJsonString(data, true);
+    }
+
+    @Nonnull
+    public String toShallowString() {
+        try {
+            return SerializationUtil.toShallowJsonString(this.data);
+        } catch (JsonProcessingException e) {
             throw new ParsingException(e);
         }
     }
@@ -711,60 +704,82 @@ public class DataArray implements Iterable<Object>, SerializableArray
      * @return The resulting list
      */
     @Nonnull
-    public List<Object> toList()
-    {
+    public List<Object> toList() {
         return data;
     }
 
-    private ParsingException valueError(int index, String expectedType)
-    {
-        return new ParsingException("Unable to resolve value at " + index + " to type " + expectedType + ": " + data.get(index));
+    private ParsingException valueError(int index, String expectedType) {
+        return new DataArrayParsingException(
+                this, "Unable to resolve value at " + index + " to type " + expectedType + ": " + data.get(index));
     }
 
     @Nullable
-    private <T> T get(@Nonnull Class<T> type, int index)
-    {
+    private <T> T get(@Nonnull Class<T> type, int index) {
         return get(type, index, null, null);
     }
 
     @Nullable
-    private <T> T get(@Nonnull Class<T> type, int index, @Nullable Function<String, T> stringMapper, @Nullable Function<Number, T> numberMapper)
-    {
-        Object value = data.get(index);
-        if (value == null)
+    private <T> T get(
+            @Nonnull Class<T> type,
+            int index,
+            @Nullable Function<String, T> stringMapper,
+            @Nullable Function<Number, T> numberMapper) {
+        if (index < 0) {
+            throw new IndexOutOfBoundsException("Index out of range: " + index);
+        }
+        Object value = index < data.size() ? data.get(index) : null;
+        if (value == null) {
             return null;
-        if (type.isInstance(value))
+        }
+        if (type.isInstance(value)) {
             return type.cast(value);
-        if (type == String.class)
+        }
+        if (type == String.class) {
             return type.cast(value.toString());
+        }
         // attempt type coercion
-        if (stringMapper != null && value instanceof String)
+        if (stringMapper != null && value instanceof String) {
             return stringMapper.apply((String) value);
-        else if (numberMapper != null && value instanceof Number)
+        } else if (numberMapper != null && value instanceof Number) {
             return numberMapper.apply((Number) value);
+        }
 
-        throw new ParsingException(Helpers.format("Cannot parse value for index %d into type %s: %s instance of %s",
-                                                      index, type.getSimpleName(), value, value.getClass().getSimpleName()));
+        throw new ParsingException(Helpers.format(
+                "Cannot parse value for index %d into type %s: %s instance of %s",
+                index, type.getSimpleName(), value, value.getClass().getSimpleName()));
     }
 
     @Nonnull
     @Override
-    public Iterator<Object> iterator()
-    {
+    public Iterator<Object> iterator() {
         return data.iterator();
     }
 
     @Nonnull
-    public <T> Stream<T> stream(BiFunction<? super DataArray, Integer, ? extends T> mapper)
-    {
-        return IntStream.range(0, length())
-                .mapToObj(index -> mapper.apply(this, index));
+    public <T> Stream<T> stream(@Nonnull BiFunction<? super DataArray, Integer, ? extends T> mapper) {
+        return IntStream.range(0, length()).mapToObj(index -> mapper.apply(this, index));
     }
 
     @Nonnull
     @Override
-    public DataArray toDataArray()
-    {
+    public DataArray toDataArray() {
         return this;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DataArray)) {
+            return false;
+        }
+        DataArray objects = (DataArray) o;
+        return Objects.equals(data, objects.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(data);
     }
 }

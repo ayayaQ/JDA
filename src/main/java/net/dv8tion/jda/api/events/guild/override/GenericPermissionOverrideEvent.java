@@ -17,25 +17,34 @@
 package net.dv8tion.jda.api.events.guild.override;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.IPermissionHolder;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.PermissionOverride;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.unions.IPermissionContainerUnion;
 import net.dv8tion.jda.api.events.guild.GenericGuildEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Indicates that a {@link PermissionOverride} for a {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} was created, deleted, or updated.
+ * Indicates that a {@link PermissionOverride} for a {@link GuildChannel GuildChannel} was created, deleted, or updated.
  * <br>Every guild channel override event is a subclass of this event and can be casted
  *
  * <p>Can be used to detect that any guild channel override event was fired
  */
-public class GenericPermissionOverrideEvent extends GenericGuildEvent
-{
-    protected final GuildChannel channel;
+public class GenericPermissionOverrideEvent extends GenericGuildEvent {
+    protected final IPermissionContainer channel;
     protected final PermissionOverride override;
 
-    public GenericPermissionOverrideEvent(@Nonnull JDA api, long responseNumber, @Nonnull GuildChannel channel, @Nonnull PermissionOverride override)
-    {
+    public GenericPermissionOverrideEvent(
+            @Nonnull JDA api,
+            long responseNumber,
+            @Nonnull IPermissionContainer channel,
+            @Nonnull PermissionOverride override) {
         super(api, responseNumber, channel.getGuild());
         this.channel = channel;
         this.override = override;
@@ -47,97 +56,18 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      * @return The {@link ChannelType}
      */
     @Nonnull
-    public ChannelType getChannelType()
-    {
+    public ChannelType getChannelType() {
         return channel.getType();
     }
 
     /**
-     * The {@link GuildChannel} this override belongs to.
+     * The {@link IPermissionContainer guild channel} this override belongs to.
      *
-     * @return The {@link GuildChannel}
+     * @return The {@link IPermissionContainer channel}
      */
     @Nonnull
-    public GuildChannel getChannel()
-    {
-        return channel;
-    }
-
-    /**
-     * The {@link TextChannel} this override belongs to.
-     *
-     * @throws IllegalStateException
-     *         If the override does not belong to a TextChannel
-     *
-     * @return {@link TextChannel}
-     *
-     * @see    #getChannel()
-     * @see    #getChannelType()
-     */
-    @Nonnull
-    public TextChannel getTextChannel()
-    {
-        if (channel instanceof TextChannel)
-            return (TextChannel) channel;
-        throw new IllegalStateException("This override is for a channel of type " + getChannelType());
-    }
-
-    /**
-     * The {@link VoiceChannel} this override belongs to.
-     *
-     * @throws IllegalStateException
-     *         If the override does not belong to a VoiceChannel
-     *
-     * @return {@link VoiceChannel}
-     *
-     * @see    #getChannel()
-     * @see    #getChannelType()
-     */
-    @Nonnull
-    public VoiceChannel getVoiceChannel()
-    {
-        if (channel instanceof VoiceChannel)
-            return (VoiceChannel) channel;
-        throw new IllegalStateException("This override is for a channel of type " + getChannelType());
-    }
-
-    /**
-     * The {@link StoreChannel} this override belongs to.
-     *
-     * @throws IllegalStateException
-     *         If the override does not belong to a StoreChannel
-     *
-     * @return {@link StoreChannel}
-     *
-     * @see    #getChannel()
-     * @see    #getChannelType()
-     */
-    @Nonnull
-    public StoreChannel getStoreChannel()
-    {
-        if (channel instanceof StoreChannel)
-            return (StoreChannel) channel;
-        throw new IllegalStateException("This override is for a channel of type " + getChannelType());
-    }
-
-    /**
-     * The {@link Category} this override belongs to.
-     * <br>Note: This is not the same as {@code getChannel().getParent()}!
-     *
-     * @throws IllegalStateException
-     *         If the override does not belong to a Category
-     *
-     * @return {@link Category}
-     *
-     * @see    #getChannel()
-     * @see    #getChannelType()
-     */
-    @Nonnull
-    public Category getCategory()
-    {
-        if (channel instanceof Category)
-            return (Category) channel;
-        throw new IllegalStateException("This override is for a channel of type " + getChannelType());
+    public IPermissionContainerUnion getChannel() {
+        return (IPermissionContainerUnion) channel;
     }
 
     /**
@@ -146,8 +76,7 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      * @return The override
      */
     @Nonnull
-    public PermissionOverride getPermissionOverride()
-    {
+    public PermissionOverride getPermissionOverride() {
         return override;
     }
 
@@ -157,8 +86,7 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      *
      * @return True, if this override is for a role
      */
-    public boolean isRoleOverride()
-    {
+    public boolean isRoleOverride() {
         return override.isRoleOverride();
     }
 
@@ -168,8 +96,7 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      *
      * @return True, if this override is for a member
      */
-    public boolean isMemberOverride()
-    {
+    public boolean isMemberOverride() {
         return override.isMemberOverride();
     }
 
@@ -180,8 +107,7 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      * @return Possibly-null permission holder
      */
     @Nullable
-    public IPermissionHolder getPermissionHolder()
-    {
+    public IPermissionHolder getPermissionHolder() {
         return isMemberOverride() ? override.getMember() : override.getRole();
     }
 
@@ -192,8 +118,7 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      * @return Possibly-null member
      */
     @Nullable
-    public Member getMember()
-    {
+    public Member getMember() {
         return override.getMember();
     }
 
@@ -203,8 +128,7 @@ public class GenericPermissionOverrideEvent extends GenericGuildEvent
      * @return Possibly-null role
      */
     @Nullable
-    public Role getRole()
-    {
+    public Role getRole() {
         return override.getRole();
     }
 }

@@ -17,48 +17,54 @@
 package net.dv8tion.jda.api.requests.restaction;
 
 import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.Region;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.IPermissionHolder;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
+import net.dv8tion.jda.api.entities.channel.attribute.ISlowmodeChannel;
+import net.dv8tion.jda.api.entities.channel.attribute.IThreadContainer;
+import net.dv8tion.jda.api.entities.channel.concrete.Category;
+import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.StageChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
+import net.dv8tion.jda.api.entities.channel.forums.BaseForumTag;
+import net.dv8tion.jda.api.entities.channel.forums.ForumTagData;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.utils.MiscUtil;
 import net.dv8tion.jda.internal.utils.Checks;
+
+import java.util.Collection;
+import java.util.List;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Collection;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
 
 /**
  * Extension of {@link net.dv8tion.jda.api.requests.RestAction RestAction} specifically
- * designed to create a {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}.
+ * designed to create a {@link GuildChannel GuildChannel}.
  * This extension allows setting properties before executing the action.
- *
- * @since  3.0
- *
- * @see    net.dv8tion.jda.api.entities.Guild
- * @see    net.dv8tion.jda.api.entities.Guild#createTextChannel(String)
- * @see    net.dv8tion.jda.api.entities.Guild#createVoiceChannel(String)
- * @see    net.dv8tion.jda.api.entities.Guild#createCategory(String)
- * @see    GuildChannel#createCopy()
- * @see    GuildChannel#createCopy(Guild)
  *
  * @param <T>
  *        The type of channel to create
+ *
+ * @see    net.dv8tion.jda.api.entities.Guild
+ * @see    net.dv8tion.jda.api.entities.Guild#createTextChannel(String)
+ * @see    net.dv8tion.jda.api.entities.Guild#createNewsChannel(String)
+ * @see    net.dv8tion.jda.api.entities.Guild#createVoiceChannel(String)
+ * @see    net.dv8tion.jda.api.entities.Guild#createStageChannel(String)
+ * @see    net.dv8tion.jda.api.entities.Guild#createCategory(String)
+ * @see    net.dv8tion.jda.api.entities.channel.attribute.ICopyableChannel#createCopy()
+ * @see    net.dv8tion.jda.api.entities.channel.attribute.ICopyableChannel#createCopy(Guild)
  */
-public interface ChannelAction<T extends GuildChannel> extends AuditableRestAction<T>
-{
-    @Nonnull
-    @Override
-    ChannelAction<T> setCheck(@Nullable BooleanSupplier checks);
-
-    @Nonnull
-    @Override
-    ChannelAction<T> timeout(long timeout, @Nonnull TimeUnit unit);
-
-    @Nonnull
-    @Override
-    ChannelAction<T> deadline(long timestamp);
-
+public interface ChannelAction<T extends GuildChannel> extends FluentAuditableRestAction<T, ChannelAction<T>> {
     /**
      * The guild to create this {@link GuildChannel} in
      *
@@ -79,10 +85,10 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * Sets the name for the new GuildChannel
      *
      * @param  name
-     *         The not-null name for the new GuildChannel (1-100 chars long)
+     *         The not-null name for the new GuildChannel (1-{@value Channel#MAX_NAME_LENGTH} characters long)
      *
      * @throws java.lang.IllegalArgumentException
-     *         If the provided name is null or not between 1-100 chars long
+     *         If the provided name is null or not between 1-{@value Channel#MAX_NAME_LENGTH} characters long
      *
      * @return The current ChannelAction, for chaining convenience
      */
@@ -91,9 +97,9 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
     ChannelAction<T> setName(@Nonnull String name);
 
     /**
-     * Sets the {@link net.dv8tion.jda.api.entities.Category Category} for the new GuildChannel.
+     * Sets the {@link Category Category} for the new GuildChannel.
      *
-     * You can use {@link #syncPermissionOverrides()} to sync the channel with the category.
+     * <p>You can use {@link #syncPermissionOverrides()} to sync the channel with the category.
      *
      * @param  category
      *         The parent for the new GuildChannel
@@ -136,15 +142,17 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
     ChannelAction<T> setPosition(@Nullable Integer position);
 
     /**
-     * Sets the topic for the new TextChannel
+     * Sets the topic for the channel
      *
      * @param  topic
-     *         The topic for the new GuildChannel (max 1024 chars)
+     *         The topic for the new GuildChannel
      *
      * @throws UnsupportedOperationException
      *         If this ChannelAction is not for a TextChannel
      * @throws IllegalArgumentException
-     *         If the provided topic is longer than 1024 chars
+     *         If the provided topic is greater than {@value StandardGuildMessageChannel#MAX_TOPIC_LENGTH} in length.
+     *         For {@link IPostContainer IPostContainers},
+     *         this limit is {@value IPostContainer#MAX_POST_CONTAINER_TOPIC_LENGTH} instead.
      *
      * @return The current ChannelAction, for chaining convenience
      */
@@ -153,7 +161,7 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
     ChannelAction<T> setTopic(@Nullable String topic);
 
     /**
-     * Sets the NSFW flag for the new TextChannel
+     * Sets the NSFW flag for the channel
      *
      * @param  nsfw
      *         The NSFW flag for the new GuildChannel
@@ -169,20 +177,18 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
 
     /**
      * Sets the slowmode value, which limits the amount of time that individual users must wait
-     * between sending messages in the new TextChannel. This is measured in seconds.
+     * between sending messages in the new channel. This is measured in seconds.
      *
      * <p>Note: Bots are unaffected by this.
-     * <br>Having {@link net.dv8tion.jda.api.Permission#MESSAGE_MANAGE MESSAGE_MANAGE} or
-     * {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL MANAGE_CHANNEL} permission also
-     * grants immunity to slowmode.
+     * <br>Having the {@link Permission#BYPASS_SLOWMODE BYPASS_SLOWMODE} permission also grants immunity to slowmode.
      *
      * @param  slowmode
      *         The number of seconds required to wait between sending messages in the channel.
      *
      * @throws UnsupportedOperationException
-     *         If this ChannelAction is not for a TextChannel
+     *         If this ChannelAction is not for a {@link ISlowmodeChannel}
      * @throws IllegalArgumentException
-     *         If the {@code slowmode} is greater than {@link net.dv8tion.jda.api.entities.TextChannel#MAX_SLOWMODE TextChannel.MAX_SLOWMODE}, or less than 0
+     *         If the {@code slowmode} is greater than {@link ISlowmodeChannel#MAX_SLOWMODE ISlowmodeChannel.MAX_SLOWMODE}, or less than 0
      *
      * @return The current ChannelAction, for chaining convenience
      */
@@ -191,26 +197,95 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
     ChannelAction<T> setSlowmode(int slowmode);
 
     /**
-     * Sets the news flag for the new TextChannel.
-     * Announcement-/News-Channels can be used to crosspost messages to other guilds.
+     * Sets the slowmode value, which limits the amount of time that individual users must wait
+     * between sending messages in the new channel. This is measured in seconds.
+     * <br>This is applied to newly created threads by default.
      *
-     * @param  news
-     *         The news flag for the new GuildChannel
+     * <p>Note: Bots are unaffected by this.
+     * <br>Having the {@link Permission#BYPASS_SLOWMODE BYPASS_SLOWMODE} permission also grants immunity to slowmode.
+     *
+     * @param  slowmode
+     *         The number of seconds required to wait between sending messages in the channel.
      *
      * @throws UnsupportedOperationException
-     *         If this ChannelAction is not for a TextChannel
-     * @throws java.lang.IllegalStateException
-     *         If {@code news} is {@code true} and the guild doesn't have the NEWS feature
+     *         If this ChannelAction is not for a {@link IThreadContainer}
+     * @throws IllegalArgumentException
+     *         If the {@code slowmode} is greater than {@link ISlowmodeChannel#MAX_SLOWMODE ISlowmodeChannel.MAX_SLOWMODE}, or less than 0
      *
      * @return The current ChannelAction, for chaining convenience
-     *
-     * @see    net.dv8tion.jda.api.entities.TextChannel#isNews()
-     *
-     * @since  4.2.1
      */
     @Nonnull
     @CheckReturnValue
-    ChannelAction<T> setNews(boolean news);
+    ChannelAction<T> setDefaultThreadSlowmode(int slowmode);
+
+    /**
+     * Sets the <b><u>default reaction emoji</u></b> of the channel.
+     * <br>This does not support custom emoji from other guilds.
+     *
+     * @param  emoji
+     *         The new default reaction emoji, or null to unset.
+     *
+     * @return The current ChannelAction, for chaining convenience
+     *
+     * @see    IPostContainer#getDefaultReaction()
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelAction<T> setDefaultReaction(@Nullable Emoji emoji);
+
+    /**
+     * Sets the <b><u>default layout</u></b> of the new {@link ForumChannel}.
+     *
+     * @param  layout
+     *         The new default layout.
+     *
+     * @throws IllegalArgumentException
+     *         If null or {@link net.dv8tion.jda.api.entities.channel.concrete.ForumChannel.Layout#UNKNOWN UNKNOWN} is provided
+     *
+     * @return The current ChannelAction, for chaining convenience
+     *
+     * @see    ForumChannel#getDefaultLayout()
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelAction<T> setDefaultLayout(@Nonnull ForumChannel.Layout layout);
+
+    /**
+     * Sets the <b><u>default sort order</u></b> of the channel.
+     *
+     * @param  sortOrder
+     *         The new default sort order.
+     *
+     * @throws IllegalArgumentException
+     *         If null or {@link net.dv8tion.jda.api.entities.channel.attribute.IPostContainer.SortOrder#UNKNOWN UNKNOWN} is provided
+     *
+     * @return The current ChannelAction, for chaining convenience
+     *
+     * @see    IPostContainer#getDefaultSortOrder()
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelAction<T> setDefaultSortOrder(@Nonnull IPostContainer.SortOrder sortOrder);
+
+    /**
+     * Sets the <b><u>available tags</u></b> of the channel.
+     * <br>Tags will be ordered based on the provided list order.
+     *
+     * <p>You can use {@link ForumTagData} to create new tags.
+     *
+     * @param  tags
+     *         The new available tags in the desired order.
+     *
+     * @throws IllegalArgumentException
+     *         If the provided list is null or contains null elements
+     *
+     * @return The current ChannelAction, for chaining convenience
+     *
+     * @see    IPostContainer#getAvailableTags()
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelAction<T> setAvailableTags(@Nonnull List<? extends BaseForumTag> tags);
 
     /**
      * Adds a new Role or Member {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverride}
@@ -219,12 +294,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * <p>If setting permission overwrites, only permissions your bot has in the guild can be allowed/denied.
      *
      * <p>Example:
-     * <pre>{@code
+     * {@snippet lang="java":
      * Role role = guild.getPublicRole();
-     * EnumSet<Permission> allow = EnumSet.of(Permission.MESSAGE_READ);
-     * EnumSet<Permission> deny = EnumSet.of(Permission.MESSAGE_WRITE);
+     * EnumSet<Permission> allow = EnumSet.of(Permission.VIEW_CHANNEL);
+     * EnumSet<Permission> deny = EnumSet.of(Permission.MESSAGE_SEND);
      * channelAction.addPermissionOverride(role, allow, deny);
-     * }</pre>
+     * }
      *
      * @param  target
      *         The not-null {@link net.dv8tion.jda.api.entities.Role Role} or {@link net.dv8tion.jda.api.entities.Member Member} for the override
@@ -245,10 +320,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      */
     @Nonnull
     @CheckReturnValue
-    default ChannelAction<T> addPermissionOverride(@Nonnull IPermissionHolder target, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny)
-    {
-        final long allowRaw = allow != null ? Permission.getRaw(allow) : 0;
-        final long denyRaw = deny != null ? Permission.getRaw(deny) : 0;
+    default ChannelAction<T> addPermissionOverride(
+            @Nonnull IPermissionHolder target,
+            @Nullable Collection<Permission> allow,
+            @Nullable Collection<Permission> deny) {
+        long allowRaw = allow != null ? Permission.getRaw(allow) : 0;
+        long denyRaw = deny != null ? Permission.getRaw(deny) : 0;
 
         return addPermissionOverride(target, allowRaw, denyRaw);
     }
@@ -260,12 +337,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * <p>If setting permission overwrites, only permissions your bot has in the guild can be allowed/denied.
      *
      * <p>Example:
-     * <pre>{@code
+     * {@snippet lang="java":
      * Role role = guild.getPublicRole();
-     * long allow = Permission.MESSAGE_READ.getRawValue();
-     * long deny = Permission.MESSAGE_WRITE.getRawValue() | Permission.MESSAGE_ADD_REACTION.getRawValue();
+     * long allow = Permission.VIEW_CHANNEL.getRawValue();
+     * long deny = Permission.MESSAGE_SEND.getRawValue() | Permission.MESSAGE_ADD_REACTION.getRawValue();
      * channelAction.addPermissionOverride(role, allow, deny);
-     * }</pre>
+     * }
      *
      * @param  target
      *         The not-null {@link net.dv8tion.jda.api.entities.Role Role} or {@link net.dv8tion.jda.api.entities.Member Member} for the override
@@ -294,14 +371,15 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      */
     @Nonnull
     @CheckReturnValue
-    default ChannelAction<T> addPermissionOverride(@Nonnull IPermissionHolder target, long allow, long deny)
-    {
+    default ChannelAction<T> addPermissionOverride(@Nonnull IPermissionHolder target, long allow, long deny) {
         Checks.notNull(target, "Override Role/Member");
-        if (target instanceof Role)
+        if (target instanceof Role) {
             return addRolePermissionOverride(target.getIdLong(), allow, deny);
-        else if (target instanceof Member)
+        } else if (target instanceof Member) {
             return addMemberPermissionOverride(target.getIdLong(), allow, deny);
-        throw new IllegalArgumentException("Cannot add override for " + target.getClass().getSimpleName());
+        }
+        throw new IllegalArgumentException(
+                "Cannot add override for " + target.getClass().getSimpleName());
     }
 
     /**
@@ -311,12 +389,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * <p>If setting permission overwrites, only permissions your bot has in the guild can be allowed/denied.
      *
      * <p>Example:
-     * <pre>{@code
+     * {@snippet lang="java":
      * long userId = user.getIdLong();
-     * EnumSet<Permission> allow = EnumSet.of(Permission.MESSAGE_READ);
-     * EnumSet<Permission> deny = EnumSet.of(Permission.MESSAGE_WRITE);
+     * EnumSet<Permission> allow = EnumSet.of(Permission.VIEW_CHANNEL);
+     * EnumSet<Permission> deny = EnumSet.of(Permission.MESSAGE_SEND);
      * channelAction.addMemberPermissionOverride(userId, allow, deny);
-     * }</pre>
+     * }
      *
      * @param  memberId
      *         The id for the member
@@ -335,10 +413,10 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      */
     @Nonnull
     @CheckReturnValue
-    default ChannelAction<T> addMemberPermissionOverride(long memberId, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny)
-    {
-        final long allowRaw = allow != null ? Permission.getRaw(allow) : 0;
-        final long denyRaw = deny != null ? Permission.getRaw(deny) : 0;
+    default ChannelAction<T> addMemberPermissionOverride(
+            long memberId, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny) {
+        long allowRaw = allow != null ? Permission.getRaw(allow) : 0;
+        long denyRaw = deny != null ? Permission.getRaw(deny) : 0;
 
         return addMemberPermissionOverride(memberId, allowRaw, denyRaw);
     }
@@ -350,12 +428,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * <p>If setting permission overwrites, only permissions your bot has in the guild can be allowed/denied.
      *
      * <p>Example:
-     * <pre>{@code
+     * {@snippet lang="java":
      * long roleId = role.getIdLong();
-     * EnumSet<Permission> allow = EnumSet.of(Permission.MESSAGE_READ);
-     * EnumSet<Permission> deny = EnumSet.of(Permission.MESSAGE_WRITE);
+     * EnumSet<Permission> allow = EnumSet.of(Permission.VIEW_CHANNEL);
+     * EnumSet<Permission> deny = EnumSet.of(Permission.MESSAGE_SEND);
      * channelAction.addRolePermissionOverride(roleId, allow, deny);
-     * }</pre>
+     * }
      *
      * @param  roleId
      *         The id for the role
@@ -374,10 +452,10 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      */
     @Nonnull
     @CheckReturnValue
-    default ChannelAction<T> addRolePermissionOverride(long roleId, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny)
-    {
-        final long allowRaw = allow != null ? Permission.getRaw(allow) : 0;
-        final long denyRaw = deny != null ? Permission.getRaw(deny) : 0;
+    default ChannelAction<T> addRolePermissionOverride(
+            long roleId, @Nullable Collection<Permission> allow, @Nullable Collection<Permission> deny) {
+        long allowRaw = allow != null ? Permission.getRaw(allow) : 0;
+        long denyRaw = deny != null ? Permission.getRaw(deny) : 0;
 
         return addRolePermissionOverride(roleId, allowRaw, denyRaw);
     }
@@ -388,12 +466,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * <p>If setting permission overwrites, only permissions your bot has in the guild can be allowed/denied.
      *
      * <p>Example:
-     * <pre>{@code
+     * {@snippet lang="java":
      * long userId = user.getIdLong();
-     * long allow = Permission.MESSAGE_READ.getRawValue();
-     * long deny = Permission.MESSAGE_WRITE.getRawValue() | Permission.MESSAGE_ADD_REACTION.getRawValue();
+     * long allow = Permission.VIEW_CHANNEL.getRawValue();
+     * long deny = Permission.MESSAGE_SEND.getRawValue() | Permission.MESSAGE_ADD_REACTION.getRawValue();
      * channelAction.addMemberPermissionOverride(userId, allow, deny);
-     * }</pre>
+     * }
      *
      * @param  memberId
      *         The id for the member
@@ -426,12 +504,12 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      * <p>If setting permission overwrites, only permissions your bot has in the guild can be allowed/denied.
      *
      * <p>Example:
-     * <pre>{@code
+     * {@snippet lang="java":
      * long roleId = role.getIdLong();
-     * long allow = Permission.MESSAGE_READ.getRawValue();
-     * long deny = Permission.MESSAGE_WRITE.getRawValue() | Permission.MESSAGE_ADD_REACTION.getRawValue();
+     * long allow = Permission.VIEW_CHANNEL.getRawValue();
+     * long deny = Permission.MESSAGE_SEND.getRawValue() | Permission.MESSAGE_ADD_REACTION.getRawValue();
      * channelAction.addMemberPermissionOverride(roleId, allow, deny);
-     * }</pre>
+     * }
      *
      * @param  roleId
      *         The id for the role
@@ -485,8 +563,7 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      */
     @Nonnull
     @CheckReturnValue
-    default ChannelAction<T> removePermissionOverride(@Nonnull String id)
-    {
+    default ChannelAction<T> removePermissionOverride(@Nonnull String id) {
         return removePermissionOverride(MiscUtil.parseSnowflake(id));
     }
 
@@ -504,8 +581,7 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
      */
     @Nonnull
     @CheckReturnValue
-    default ChannelAction<T> removePermissionOverride(@Nonnull IPermissionHolder holder)
-    {
+    default ChannelAction<T> removePermissionOverride(@Nonnull IPermissionHolder holder) {
         Checks.notNull(holder, "PermissionHolder");
         return removePermissionOverride(holder.getIdLong());
     }
@@ -553,19 +629,39 @@ public interface ChannelAction<T extends GuildChannel> extends AuditableRestActi
     ChannelAction<T> setBitrate(@Nullable Integer bitrate);
 
     /**
-     * Sets the userlimit for the new VoiceChannel
+     * Sets the userlimit for the new {@link AudioChannel}.
+     * <br>The limit maximum varies by type.
+     * <ul>
+     *     <li>{@link ChannelType#VOICE} - {@value VoiceChannel#MAX_USERLIMIT}</li>
+     *     <li>{@link ChannelType#STAGE} - {@value StageChannel#MAX_USERLIMIT}</li>
+     * </ul>
      *
      * @param  userlimit
-     *         The userlimit for the new VoiceChannel or {@code null}/{@code 0} to use no limit,
+     *         The userlimit for the new AudioChannel or {@code null}/{@code 0} to use no limit
      *
      * @throws UnsupportedOperationException
-     *         If this ChannelAction is not for a VoiceChannel
+     *         If this ChannelAction is not for a AudioChannel
      * @throws IllegalArgumentException
-     *         If the provided userlimit is negative or above {@code 99}
+     *         If the provided userlimit is negative or above the permitted limit
      *
      * @return The current ChannelAction, for chaining convenience
      */
     @Nonnull
     @CheckReturnValue
     ChannelAction<T> setUserlimit(@Nullable Integer userlimit);
+
+    /**
+     * Sets the voice region for the new AudioChannel
+     *
+     * @param  region
+     *         The region for the new AudioChannel, or {@code null} to set to {@link Region#AUTOMATIC}
+     *
+     * @throws UnsupportedOperationException
+     *         If this ChannelAction is not for an AudioChannel
+     *
+     * @return The current ChannelAction, for chaining convenience
+     */
+    @Nonnull
+    @CheckReturnValue
+    ChannelAction<T> setRegion(@Nullable Region region);
 }

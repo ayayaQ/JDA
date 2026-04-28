@@ -17,32 +17,33 @@
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.entities.channel.unions.IWebhookContainerUnion;
 import net.dv8tion.jda.api.managers.WebhookManager;
 import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.internal.requests.RestActionImpl;
-import net.dv8tion.jda.internal.requests.Route;
+
+import java.util.regex.Pattern;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.regex.Pattern;
 
 /**
  * An object representing Webhooks in Discord
- *
- * @since  3.0
  *
  * @see    TextChannel#retrieveWebhooks()
  * @see    Guild#retrieveWebhooks()
  * @see    JDA#retrieveWebhookById(String)
  */
-public interface Webhook extends ISnowflake
-{
+public interface Webhook extends ISnowflake, WebhookClient<Message> {
     /**
      * Pattern for a Webhook URL.
      *
-     * <h2>Groups</h2>
+     * <p><b>Groups</b><br>
      * <table>
      *   <caption style="display: none">Javadoc is stupid, this is not a required tag</caption>
      *   <tr>
@@ -70,7 +71,9 @@ public interface Webhook extends ISnowflake
      * You can use the names with {@link java.util.regex.Matcher#group(String) Matcher.group(String)}
      * and the index with {@link java.util.regex.Matcher#group(int) Matcher.group(int)}.
      */
-    Pattern WEBHOOK_URL = Pattern.compile("https?://(?:[^\\s.]+\\.)?discord(?:app)?\\.com/api(?:/v\\d+)?/webhooks/(?<id>\\d+)/(?<token>[^\\s/]+)", Pattern.CASE_INSENSITIVE);
+    Pattern WEBHOOK_URL = Pattern.compile(
+            "https?://(?:[^\\s.]+\\.)?discord(?:app)?\\.com/api(?:/v\\d+)?/webhooks/(?<id>\\d+)/(?<token>[^\\s/]+)",
+            Pattern.CASE_INSENSITIVE);
 
     /**
      * The JDA instance of this Webhook.
@@ -111,16 +114,20 @@ public interface Webhook extends ISnowflake
     Guild getGuild();
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} instance
-     * this Webhook is attached to.
+     * The {@link net.dv8tion.jda.api.entities.channel.attribute.IWebhookContainer channel} instance this Webhook is attached to.
+     * Webhooks are created on specific channels so that they can interact with that channel.
+     * With regard to {@link ThreadChannel threads}, Webhooks are attached to their {@link net.dv8tion.jda.api.entities.channel.attribute.IThreadContainer parent channel}
+     * and then the Webhooks can post to the {@link net.dv8tion.jda.api.entities.channel.attribute.IThreadContainer parent} <i>and</i> the {@link ThreadChannel thread} too.
      *
      * @throws IllegalStateException
      *         If this webhooks {@link #isPartial() is partial}
      *
-     * @return The current TextChannel of this Webhook
+     * @return The current {@link net.dv8tion.jda.api.entities.channel.attribute.IWebhookContainer channel} that this webhook is attached to.
      */
     @Nonnull
-    TextChannel getChannel();
+    // TODO-v5: Should we introduce StandardIWebhookContainer? (IWebhookContainer +
+    // StandardGuildChannel)
+    IWebhookContainerUnion getChannel();
 
     /**
      * The owner of this Webhook. This will be null for some Webhooks, such as those retrieved from Audit Logs.
@@ -176,7 +183,7 @@ public interface Webhook extends ISnowflake
      * The execute token for this Webhook.
      * <br>This can be used to modify/delete/execute
      * this Webhook.
-     * 
+     *
      * <p><b>Note: Some Webhooks, such as those retrieved from Audit Logs, do not contain a token</b>
      *
      * @return The execute token for this Webhook
@@ -239,7 +246,7 @@ public interface Webhook extends ISnowflake
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the Webhook does not have a token, such as the Webhooks retrieved from Audit Logs and the currently
      *         logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_WEBHOOKS} in this channel.
-     * 
+     *
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
      *         <br>The rest action to delete this Webhook.
      */
@@ -274,8 +281,6 @@ public interface Webhook extends ISnowflake
      *
      * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}
      *         <br>The rest action to delete this Webhook.
-     *
-     * @since  4.0.0
      */
     @Nonnull
     @CheckReturnValue
@@ -285,15 +290,13 @@ public interface Webhook extends ISnowflake
      * The {@link WebhookManager WebhookManager} for this Webhook.
      * <br>You can modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
      *
-     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
-     * This getter is not thread-safe and would require guards by the user.
-     *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_WEBHOOKS Permission.MANAGE_WEBHOOKS}
      *
      * @return The {@link WebhookManager WebhookManager} for this Webhook
      */
     @Nonnull
+    @CheckReturnValue
     WebhookManager getManager();
 
     /**
@@ -301,21 +304,18 @@ public interface Webhook extends ISnowflake
      *
      * @see #resolve()
      */
-    class WebhookReference implements ISnowflake
-    {
+    class WebhookReference implements ISnowflake {
         private final JDA api;
         private final long webhookId, channelId;
 
-        public WebhookReference(JDA api, long webhookId, long channelId)
-        {
+        public WebhookReference(JDA api, long webhookId, long channelId) {
             this.api = api;
             this.webhookId = webhookId;
             this.channelId = channelId;
         }
 
         @Override
-        public long getIdLong()
-        {
+        public long getIdLong() {
             return webhookId;
         }
 
@@ -325,8 +325,7 @@ public interface Webhook extends ISnowflake
          * @return The ID for the channel this webhook belongs to
          */
         @Nonnull
-        public String getChannelId()
-        {
+        public String getChannelId() {
             return Long.toUnsignedString(channelId);
         }
 
@@ -335,8 +334,7 @@ public interface Webhook extends ISnowflake
          *
          * @return The ID for the channel this webhook belongs to
          */
-        public long getChannelIdLong()
-        {
+        public long getChannelIdLong() {
             return channelId;
         }
 
@@ -350,31 +348,28 @@ public interface Webhook extends ISnowflake
          */
         @Nonnull
         @CheckReturnValue
-        public RestAction<Webhook> resolve()
-        {
+        public RestAction<Webhook> resolve() {
             Route.CompiledRoute route = Route.Webhooks.GET_WEBHOOK.compile(getId());
-            return new RestActionImpl<>(api, route,
-                (response, request) -> request.getJDA().getEntityBuilder().createWebhook(response.getObject(), true));
+            return new RestActionImpl<>(api, route, (response, request) -> request.getJDA()
+                    .getEntityBuilder()
+                    .createWebhook(response.getObject(), true));
         }
     }
 
     /**
      * Partial Channel which references the source channel for a follower webhook.
      */
-    class ChannelReference implements ISnowflake
-    {
+    class ChannelReference implements ISnowflake {
         private final long id;
         private final String name;
 
-        public ChannelReference(long id, String name)
-        {
+        public ChannelReference(long id, String name) {
             this.id = id;
             this.name = name;
         }
 
         @Override
-        public long getIdLong()
-        {
+        public long getIdLong() {
             return id;
         }
 
@@ -384,8 +379,7 @@ public interface Webhook extends ISnowflake
          * @return The channel name
          */
         @Nonnull
-        public String getName()
-        {
+        public String getName() {
             return name;
         }
     }
@@ -393,20 +387,17 @@ public interface Webhook extends ISnowflake
     /**
      * Partial Guild which references the source guild for a follower webhook.
      */
-    class GuildReference implements ISnowflake
-    {
+    class GuildReference implements ISnowflake {
         private final long id;
         private final String name;
 
-        public GuildReference(long id, String name)
-        {
+        public GuildReference(long id, String name) {
             this.id = id;
             this.name = name;
         }
 
         @Override
-        public long getIdLong()
-        {
+        public long getIdLong() {
             return id;
         }
 
@@ -416,8 +407,7 @@ public interface Webhook extends ISnowflake
          * @return The guild name
          */
         @Nonnull
-        public String getName()
-        {
+        public String getName() {
             return name;
         }
     }

@@ -17,146 +17,121 @@
 package net.dv8tion.jda.internal.handle;
 
 import gnu.trove.map.TLongObjectMap;
-import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.Role;
-import net.dv8tion.jda.api.events.emote.EmoteAddedEvent;
-import net.dv8tion.jda.api.events.emote.EmoteRemovedEvent;
-import net.dv8tion.jda.api.events.emote.update.EmoteUpdateNameEvent;
-import net.dv8tion.jda.api.events.emote.update.EmoteUpdateRolesEvent;
+import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
+import net.dv8tion.jda.api.events.emoji.EmojiAddedEvent;
+import net.dv8tion.jda.api.events.emoji.EmojiRemovedEvent;
+import net.dv8tion.jda.api.events.emoji.update.EmojiUpdateNameEvent;
+import net.dv8tion.jda.api.events.emoji.update.EmojiUpdateRolesEvent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
-import net.dv8tion.jda.internal.entities.EmoteImpl;
 import net.dv8tion.jda.internal.entities.GuildImpl;
+import net.dv8tion.jda.internal.entities.emoji.RichCustomEmojiImpl;
 import net.dv8tion.jda.internal.utils.UnlockHook;
 import net.dv8tion.jda.internal.utils.cache.SnowflakeCacheViewImpl;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.*;
 
-public class GuildEmojisUpdateHandler extends SocketHandler
-{
-    public GuildEmojisUpdateHandler(JDAImpl api)
-    {
+public class GuildEmojisUpdateHandler extends SocketHandler {
+    public GuildEmojisUpdateHandler(JDAImpl api) {
         super(api);
     }
 
     @Override
-    protected Long handleInternally(DataObject content)
-    {
-        if (!getJDA().isCacheFlagSet(CacheFlag.EMOTE))
+    protected Long handleInternally(DataObject content) {
+        if (!getJDA().isCacheFlagSet(CacheFlag.EMOJI)) {
             return null;
-        final long guildId = content.getLong("guild_id");
-        if (getJDA().getGuildSetupController().isLocked(guildId))
+        }
+        long guildId = content.getLong("guild_id");
+        if (getJDA().getGuildSetupController().isLocked(guildId)) {
             return guildId;
+        }
 
         GuildImpl guild = (GuildImpl) getJDA().getGuildById(guildId);
-        if (guild == null)
-        {
+        if (guild == null) {
             getJDA().getEventCache().cache(EventCache.Type.GUILD, guildId, responseNumber, allContent, this::handle);
             return null;
         }
 
         DataArray array = content.getArray("emojis");
-        List<Emote> oldEmotes, newEmotes;
-        SnowflakeCacheViewImpl<Emote> emoteView = guild.getEmotesView();
-        try (UnlockHook hook = emoteView.writeLock())
-        {
-            TLongObjectMap<Emote> emoteMap = emoteView.getMap();
-            oldEmotes = new ArrayList<>(emoteMap.valueCollection()); //snapshot of emote cache
-            newEmotes = new ArrayList<>();
-            for (int i = 0; i < array.length(); i++)
-            {
+        List<RichCustomEmoji> oldEmojis, newEmojis;
+        SnowflakeCacheViewImpl<RichCustomEmoji> emojiView = guild.getEmojisView();
+        try (UnlockHook hook = emojiView.writeLock()) {
+            TLongObjectMap<RichCustomEmoji> emojiMap = emojiView.getMap();
+            oldEmojis = new ArrayList<>(emojiMap.valueCollection()); // snapshot of emoji cache
+            newEmojis = new ArrayList<>();
+            for (int i = 0; i < array.length(); i++) {
                 DataObject current = array.getObject(i);
-                final long emoteId = current.getLong("id");
-                EmoteImpl emote = (EmoteImpl) emoteMap.get(emoteId);
-                EmoteImpl oldEmote = null;
+                long emojiId = current.getLong("id");
+                RichCustomEmojiImpl emoji = (RichCustomEmojiImpl) emojiMap.get(emojiId);
+                RichCustomEmojiImpl oldEmoji = null;
 
-                if (emote == null)
-                {
-                    emote = new EmoteImpl(emoteId, guild);
-                    newEmotes.add(emote);
-                }
-                else
-                {
-                    // emote is in our cache which is why we don't want to remove it in cleanup later
-                    oldEmotes.remove(emote);
-                    oldEmote = emote.clone();
+                if (emoji == null) {
+                    emoji = new RichCustomEmojiImpl(emojiId, guild);
+                    newEmojis.add(emoji);
+                } else {
+                    // emoji is in our cache
+                    // which is why we don't want to remove it in cleanup later
+                    oldEmojis.remove(emoji);
+                    oldEmoji = emoji.copy();
                 }
 
-                emote.setName(current.getString("name"))
-                     .setAnimated(current.getBoolean("animated"))
-                     .setManaged(current.getBoolean("managed"));
-                //update roles
+                emoji.setName(current.getString("name"))
+                        .setAnimated(current.getBoolean("animated"))
+                        .setManaged(current.getBoolean("managed"));
+                // update roles
                 DataArray roles = current.getArray("roles");
-                Set<Role> newRoles = emote.getRoleSet();
-                Set<Role> oldRoles = new HashSet<>(newRoles); //snapshot of cached roles
-                for (int j = 0; j < roles.length(); j++)
-                {
+                Set<Role> newRoles = emoji.getRoleSet();
+                Set<Role> oldRoles = new HashSet<>(newRoles); // snapshot of cached roles
+                for (int j = 0; j < roles.length(); j++) {
                     Role role = guild.getRoleById(roles.getString(j));
-                    if (role != null)
-                    {
+                    if (role != null) {
                         newRoles.add(role);
                         oldRoles.remove(role);
                     }
                 }
 
-                //cleanup old cached roles that were not found in the JSONArray
-                for (Role r : oldRoles)
-                {
-                    // newRoles directly writes to the set contained in the emote
+                // cleanup old cached roles that were not found in the JSONArray
+                for (Role r : oldRoles) {
+                    // newRoles directly writes to the set contained in the emoji
                     newRoles.remove(r);
                 }
 
-                // finally, update the emote
-                emoteMap.put(emote.getIdLong(), emote);
+                // finally, update the emoji
+                emojiMap.put(emoji.getIdLong(), emoji);
                 // check for updated fields and fire events
-                handleReplace(oldEmote, emote);
+                handleReplace(oldEmoji, emoji);
             }
-            for (Emote e : oldEmotes)
-                emoteMap.remove(e.getIdLong());
+            for (RichCustomEmoji e : oldEmojis) {
+                emojiMap.remove(e.getIdLong());
+            }
         }
-        //cleanup old emotes that don't exist anymore
-        for (Emote e : oldEmotes)
-        {
-            getJDA().handleEvent(
-                new EmoteRemovedEvent(
-                    getJDA(), responseNumber,
-                    e));
+        // cleanup old emojis that don't exist anymore
+        for (RichCustomEmoji e : oldEmojis) {
+            getJDA().handleEvent(new EmojiRemovedEvent(getJDA(), responseNumber, e));
         }
 
-        for (Emote e : newEmotes)
-        {
-            getJDA().handleEvent(
-                new EmoteAddedEvent(
-                    getJDA(), responseNumber,
-                    e));
+        for (RichCustomEmoji e : newEmojis) {
+            getJDA().handleEvent(new EmojiAddedEvent(getJDA(), responseNumber, e));
         }
 
         return null;
     }
 
-    private void handleReplace(Emote oldEmote, Emote newEmote)
-    {
-        if (oldEmote == null || newEmote == null) return;
-
-        if (!Objects.equals(oldEmote.getName(), newEmote.getName()))
-        {
-            getJDA().handleEvent(
-                new EmoteUpdateNameEvent(
-                    getJDA(), responseNumber,
-                    newEmote, oldEmote.getName()));
+    private void handleReplace(RichCustomEmoji oldEmoji, RichCustomEmoji newEmoji) {
+        if (oldEmoji == null || newEmoji == null) {
+            return;
         }
 
-        if (!CollectionUtils.isEqualCollection(oldEmote.getRoles(), newEmote.getRoles()))
-        {
-            getJDA().handleEvent(
-                new EmoteUpdateRolesEvent(
-                    getJDA(), responseNumber,
-                    newEmote, oldEmote.getRoles()));
+        if (!Objects.equals(oldEmoji.getName(), newEmoji.getName())) {
+            getJDA().handleEvent(new EmojiUpdateNameEvent(getJDA(), responseNumber, newEmoji, oldEmoji.getName()));
         }
 
+        if (!CollectionUtils.isEqualCollection(oldEmoji.getRoles(), newEmoji.getRoles())) {
+            getJDA().handleEvent(new EmojiUpdateRolesEvent(getJDA(), responseNumber, newEmoji, oldEmoji.getRoles()));
+        }
     }
-
 }

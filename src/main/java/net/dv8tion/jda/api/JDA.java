@@ -16,59 +16,73 @@
 
 package net.dv8tion.jda.api;
 
+import net.dv8tion.jda.annotations.Incubating;
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.entities.channel.attribute.IGuildChannelContainer;
+import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.entities.emoji.ApplicationEmoji;
+import net.dv8tion.jda.api.entities.emoji.CustomEmoji;
+import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
+import net.dv8tion.jda.api.entities.sticker.*;
+import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.hooks.IEventManager;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.managers.ApplicationManager;
 import net.dv8tion.jda.api.managers.AudioManager;
 import net.dv8tion.jda.api.managers.DirectAudioController;
 import net.dv8tion.jda.api.managers.Presence;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.requests.restaction.*;
+import net.dv8tion.jda.api.requests.restaction.pagination.EntitlementPaginationAction;
 import net.dv8tion.jda.api.sharding.ShardManager;
 import net.dv8tion.jda.api.utils.MiscUtil;
+import net.dv8tion.jda.api.utils.Once;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import net.dv8tion.jda.api.utils.cache.CacheView;
 import net.dv8tion.jda.api.utils.cache.SnowflakeCacheView;
+import net.dv8tion.jda.internal.interactions.CommandDataImpl;
 import net.dv8tion.jda.internal.requests.CompletedRestAction;
 import net.dv8tion.jda.internal.requests.RestActionImpl;
-import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.utils.Checks;
+import net.dv8tion.jda.internal.utils.EntityString;
 import net.dv8tion.jda.internal.utils.Helpers;
 import okhttp3.OkHttpClient;
+import org.jetbrains.annotations.Unmodifiable;
 
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.awt.*;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
-import java.util.stream.Collectors;
+
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * The core of JDA. Acts as a registry system of JDA. All parts of the the API can be accessed starting from this class.
+ * The core of JDA. Acts as a registry system of JDA. All parts of the API can be accessed starting from this class.
  *
  * @see JDABuilder
  */
-public interface JDA
-{
+public interface JDA extends IGuildChannelContainer<Channel> {
     /**
      * Represents the connection status of JDA and its Main WebSocket.
      */
-    enum Status
-    {
+    enum Status {
         /**JDA is currently setting up supporting systems like the AudioSystem.*/
         INITIALIZING(true),
         /**JDA has finished setting up supporting systems and is ready to log in.*/
@@ -107,18 +121,15 @@ public interface JDA
 
         private final boolean isInit;
 
-        Status(boolean isInit)
-        {
+        Status(boolean isInit) {
             this.isInit = isInit;
         }
 
-        Status()
-        {
+        Status() {
             this.isInit = false;
         }
 
-        public boolean isInit()
-        {
+        public boolean isInit() {
             return isInit;
         }
     }
@@ -126,16 +137,14 @@ public interface JDA
     /**
      * Represents the information used to create this shard.
      */
-    class ShardInfo
-    {
+    class ShardInfo {
         /** Default sharding config with one shard */
         public static final ShardInfo SINGLE = new ShardInfo(0, 1);
 
         int shardId;
         int shardTotal;
 
-        public ShardInfo(int shardId, int shardTotal)
-        {
+        public ShardInfo(int shardId, int shardTotal) {
             this.shardId = shardId;
             this.shardTotal = shardTotal;
         }
@@ -146,8 +155,7 @@ public interface JDA
          *
          * @return The id of the currently logged in shard.
          */
-        public int getShardId()
-        {
+        public int getShardId() {
             return shardId;
         }
 
@@ -162,8 +170,7 @@ public interface JDA
          *
          * @return The total of shards based on the total provided by the developer during JDA initialization.
          */
-        public int getShardTotal()
-        {
+        public int getShardTotal() {
             return shardTotal;
         }
 
@@ -174,25 +181,33 @@ public interface JDA
          *
          * @return A String representing the information used to build this shard.
          */
-        public String getShardString()
-        {
+        @Nonnull
+        public String getShardString() {
             return "[" + shardId + " / " + shardTotal + "]";
         }
 
+        @Nonnull
         @Override
-        public String toString()
-        {
-            return "Shard " + getShardString();
+        public String toString() {
+            return new EntityString(this)
+                    .addMetadata("currentShard", getShardString())
+                    .addMetadata("totalShards", getShardTotal())
+                    .toString();
         }
 
         @Override
-        public boolean equals(Object o)
-        {
-            if (!(o instanceof ShardInfo))
+        public boolean equals(Object o) {
+            if (!(o instanceof ShardInfo)) {
                 return false;
+            }
 
             ShardInfo oInfo = (ShardInfo) o;
             return shardId == oInfo.getShardId() && shardTotal == oInfo.getShardTotal();
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(shardId, shardTotal);
         }
     }
 
@@ -206,7 +221,7 @@ public interface JDA
 
     /**
      * The {@link GatewayIntent GatewayIntents} for this JDA session.
-     * 
+     *
      * @return {@link EnumSet} of active gateway intents
      */
     @Nonnull
@@ -253,27 +268,25 @@ public interface JDA
      * The time in milliseconds that discord took to respond to a REST request.
      * <br>This will request the current user from the API and calculate the time the response took.
      *
-     * <h2>Example</h2>
-     * <pre><code>
-     * jda.getRestPing().queue( (time) {@literal ->}
+     * <p><b>Example</b><br>
+     * {@snippet lang="java":
+     * jda.getRestPing().queue((time) ->
      *     channel.sendMessageFormat("Ping: %d ms", time).queue()
      * );
-     * </code></pre>
+     * }
      *
      * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: long
-     *
-     * @since 4.0.0
      *
      * @see    #getGatewayPing()
      */
     @Nonnull
-    default RestAction<Long> getRestPing()
-    {
+    @CheckReturnValue
+    default RestAction<Long> getRestPing() {
         AtomicLong time = new AtomicLong();
         Route.CompiledRoute route = Route.Self.GET_SELF.compile();
-        RestActionImpl<Long> action = new RestActionImpl<>(this, route, (response, request) -> System.currentTimeMillis() - time.get());
-        action.setCheck(() ->
-        {
+        RestActionImpl<Long> action =
+                new RestActionImpl<>(this, route, (response, request) -> System.currentTimeMillis() - time.get());
+        action.setCheck(() -> {
             time.set(System.currentTimeMillis());
             return true;
         });
@@ -283,7 +296,7 @@ public interface JDA
     /**
      * This method will block until JDA has reached the specified connection status.
      *
-     * <h2>Login Cycle</h2>
+     * <p><b>Login Cycle</b><br>
      * <ol>
      *  <li>{@link net.dv8tion.jda.api.JDA.Status#INITIALIZING INITIALIZING}</li>
      *  <li>{@link net.dv8tion.jda.api.JDA.Status#INITIALIZED INITIALIZED}</li>
@@ -309,9 +322,9 @@ public interface JDA
      * @return The current JDA instance, for chaining convenience
      */
     @Nonnull
-    default JDA awaitStatus(@Nonnull JDA.Status status) throws InterruptedException
-    {
-        //This is done to retain backwards compatible ABI as it would otherwise change the signature of the method
+    default JDA awaitStatus(@Nonnull JDA.Status status) throws InterruptedException {
+        // This is done to retain backwards compatible ABI as it would otherwise change the
+        // signature of the method
         // which would require recompilation for all users (including extension libraries)
         return awaitStatus(status, new JDA.Status[0]);
     }
@@ -319,7 +332,7 @@ public interface JDA
     /**
      * This method will block until JDA has reached the specified connection status.
      *
-     * <h2>Login Cycle</h2>
+     * <p><b>Login Cycle</b><br>
      * <ol>
      *  <li>{@link net.dv8tion.jda.api.JDA.Status#INITIALIZING INITIALIZING}</li>
      *  <li>{@link net.dv8tion.jda.api.JDA.Status#INITIALIZED INITIALIZED}</li>
@@ -361,9 +374,109 @@ public interface JDA
      * @return The current JDA instance, for chaining convenience
      */
     @Nonnull
-    default JDA awaitReady() throws InterruptedException
-    {
+    default JDA awaitReady() throws InterruptedException {
         return awaitStatus(Status.CONNECTED);
+    }
+
+    /**
+     * Blocks the current thread until {@link #getStatus()} returns {@link Status#SHUTDOWN}.
+     * <br>This can be useful in certain situations like disabling class loading.
+     *
+     * <p>Note that shutdown time depends on the length of the rate-limit queue.
+     * You can use {@link #shutdownNow()} to cancel all pending requests and immediately shutdown.
+     *
+     * <p><b>Example</b>
+     * {@snippet lang="java":
+     * jda.shutdown();
+     * // Allow at most 10 seconds for remaining requests to finish
+     * if (!jda.awaitShutdown(10, TimeUnit.SECONDS)) {
+     *     jda.shutdownNow(); // Cancel all remaining requests
+     *     jda.awaitShutdown(); // Wait until shutdown is complete (indefinitely)
+     * }
+     * }
+     *
+     * <p><b>This will not implicitly call {@code shutdown()}, you are responsible to ensure that the shutdown process has started.</b>
+     *
+     * @param  duration
+     *         The maximum time to wait, or 0 to wait indefinitely
+     * @param  unit
+     *         The time unit for the duration
+     *
+     * @throws IllegalArgumentException
+     *         If the provided unit is null
+     * @throws InterruptedException
+     *         If the current thread is interrupted while waiting
+     *
+     * @return False, if the timeout has elapsed before the shutdown has completed, true otherwise.
+     */
+    @CheckReturnValue
+    boolean awaitShutdown(long duration, @Nonnull TimeUnit unit) throws InterruptedException;
+
+    /**
+     * Blocks the current thread until {@link #getStatus()} returns {@link Status#SHUTDOWN}.
+     * <br>This can be useful in certain situations like disabling class loading.
+     *
+     * <p>Note that shutdown time depends on the length of the rate-limit queue.
+     * You can use {@link #shutdownNow()} to cancel all pending requests and immediately shutdown.
+     *
+     * <p><b>Example</b>
+     * {@snippet lang="java":
+     * jda.shutdown();
+     * // Allow at most 10 seconds for remaining requests to finish
+     * if (!jda.awaitShutdown(Duration.ofSeconds(10))) {
+     *     jda.shutdownNow(); // Cancel all remaining requests
+     *     jda.awaitShutdown(); // Wait until shutdown is complete (indefinitely)
+     * }
+     * }
+     *
+     * <p><b>This will not implicitly call {@code shutdown()}, you are responsible to ensure that the shutdown process has started.</b>
+     *
+     * @param  timeout
+     *         The maximum time to wait, or {@link Duration#ZERO} to wait indefinitely
+     *
+     * @throws IllegalArgumentException
+     *         If the provided timeout is null
+     * @throws InterruptedException
+     *         If the current thread is interrupted while waiting
+     *
+     * @return False, if the timeout has elapsed before the shutdown has completed, true otherwise.
+     */
+    @CheckReturnValue
+    default boolean awaitShutdown(@Nonnull Duration timeout) throws InterruptedException {
+        Checks.notNull(timeout, "Timeout");
+        return awaitShutdown(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Blocks the current thread until {@link #getStatus()} returns {@link Status#SHUTDOWN}.
+     * <br>This can be useful in certain situations like disabling class loading.
+     *
+     * <p>This will wait indefinitely by default. Use {@link #awaitShutdown(Duration)} to set a timeout.
+     *
+     * <p>Note that shutdown time depends on the length of the rate-limit queue.
+     * You can use {@link #shutdownNow()} to cancel all pending requests and immediately shutdown.
+     *
+     * <p><b>Example</b>
+     * {@snippet lang="java":
+     * jda.shutdown();
+     * // Allow at most 10 seconds for remaining requests to finish
+     * if (!jda.awaitShutdown(Duration.ofSeconds(10))) {
+     *     jda.shutdownNow(); // Cancel all remaining requests
+     *     jda.awaitShutdown(); // Wait until shutdown is complete (indefinitely)
+     * }
+     * }
+     *
+     * <p><b>This will not implicitly call {@code shutdown()}, you are responsible to ensure that the shutdown process has started.</b>
+     *
+     * @throws IllegalArgumentException
+     *         If the provided timeout is null
+     * @throws InterruptedException
+     *         If the current thread is interrupted while waiting
+     *
+     * @return Always true
+     */
+    default boolean awaitShutdown() throws InterruptedException {
+        return awaitShutdown(0, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -386,8 +499,6 @@ public interface JDA
      * executions. This is also used in other parts of JDA related to http requests.
      *
      * @return The {@link ScheduledExecutorService} used for http request handling
-     *
-     * @since 4.0.0
      */
     @Nonnull
     ScheduledExecutorService getRateLimitPool();
@@ -397,8 +508,6 @@ public interface JDA
      * <br>This involves initial setup of guilds as well as keeping the connection alive.
      *
      * @return The {@link ScheduledExecutorService} used for WebSocket transmissions
-     *
-     * @since 4.0.0
      */
     @Nonnull
     ScheduledExecutorService getGatewayPool();
@@ -410,8 +519,6 @@ public interface JDA
      * <br>By default this uses the {@link ForkJoinPool#commonPool() CommonPool} of the runtime.
      *
      * @return The {@link ExecutorService} used for callbacks
-     *
-     * @since 4.0.0
      */
     @Nonnull
     ExecutorService getCallbackPool();
@@ -420,8 +527,6 @@ public interface JDA
      * The {@link OkHttpClient} used for handling http requests from {@link RestAction RestActions}.
      *
      * @return The http client
-     *
-     * @since 4.0.0
      */
     @Nonnull
     OkHttpClient getHttpClient();
@@ -437,8 +542,6 @@ public interface JDA
      *         If {@link GatewayIntent#GUILD_VOICE_STATES} is disabled
      *
      * @return The {@link DirectAudioController} for this JDA instance
-     *
-     * @since 4.0.0
      */
     @Nonnull
     DirectAudioController getDirectAudioController();
@@ -459,7 +562,7 @@ public interface JDA
      * This uses the {@link net.dv8tion.jda.api.hooks.InterfacedEventManager InterfacedEventListener} by default.
      * To switch to the {@link net.dv8tion.jda.api.hooks.AnnotatedEventManager AnnotatedEventManager}, use {@link #setEventManager(IEventManager)}.
      *
-     * Note: when using the {@link net.dv8tion.jda.api.hooks.InterfacedEventManager InterfacedEventListener} (default),
+     * <p>Note: when using the {@link net.dv8tion.jda.api.hooks.InterfacedEventManager InterfacedEventListener} (default),
      * given listener <b>must</b> be instance of {@link net.dv8tion.jda.api.hooks.EventListener EventListener}!
      *
      * @param  listeners
@@ -490,14 +593,71 @@ public interface JDA
     List<Object> getRegisteredListeners();
 
     /**
+     * Returns a reusable builder for a one-time event listener.
+     *
+     * <p>Note that this method only works if the {@link JDABuilder#setEventManager(IEventManager) event manager}
+     * is either the {@link net.dv8tion.jda.api.hooks.InterfacedEventManager InterfacedEventManager}
+     * or {@link net.dv8tion.jda.api.hooks.AnnotatedEventManager AnnotatedEventManager}.
+     * <br>Other implementations can support it as long as they call
+     * {@link net.dv8tion.jda.api.hooks.EventListener#onEvent(GenericEvent) EventListener.onEvent(GenericEvent)}.
+     *
+     * <p><b>Example:</b>
+     *
+     * <p>Listening to a message from a channel and a user, after using a slash command:
+     * {@snippet lang="java":
+     * final Duration timeout = Duration.ofSeconds(5);
+     * event.reply("Reply in " + TimeFormat.RELATIVE.after(timeout) + " if you can!")
+     *         .setEphemeral(true)
+     *         .queue();
+     *
+     * event.getJDA().listenOnce(MessageReceivedEvent.class)
+     *         .filter(messageEvent -> messageEvent.getChannel().getIdLong() == event.getChannel().getIdLong())
+     *         .filter(messageEvent -> messageEvent.getAuthor().getIdLong() == event.getUser().getIdLong())
+     *         .timeout(timeout, () -> {
+     *             event.getHook().editOriginal("Timeout!").queue();
+     *         })
+     *         .subscribe(messageEvent -> {
+     *             event.getHook().editOriginal("You sent: " + messageEvent.getMessage().getContentRaw()).queue();
+     *         });
+     * }
+     *
+     * @param  eventType
+     *         Type of the event to listen to
+     *
+     * @throws IllegalArgumentException
+     *         If the provided event type is {@code null}
+     *
+     * @return The one-time event listener builder
+     */
+    @Nonnull
+    @CheckReturnValue
+    <E extends GenericEvent> Once.Builder<E> listenOnce(@Nonnull Class<E> eventType);
+
+    /**
      * Retrieves the list of global commands.
      * <br>This list does not include guild commands! Use {@link Guild#retrieveCommands()} for guild commands.
+     * <br>This list does not include localization data. Use {@link #retrieveCommands(boolean)} to get localization data
      *
      * @return {@link RestAction} - Type: {@link List} of {@link Command}
      */
     @Nonnull
     @CheckReturnValue
-    RestAction<List<Command>> retrieveCommands();
+    default RestAction<List<Command>> retrieveCommands() {
+        return retrieveCommands(false);
+    }
+
+    /**
+     * Retrieves the list of global commands.
+     * <br>This list does not include guild commands! Use {@link Guild#retrieveCommands()} for guild commands.
+     *
+     * @param  withLocalizations
+     *         {@code true} if the localization data (such as name and description) should be included
+     *
+     * @return {@link RestAction} - Type: {@link List} of {@link Command}
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<List<Command>> retrieveCommands(boolean withLocalizations);
 
     /**
      * Retrieves the existing {@link Command} instance by id.
@@ -530,21 +690,19 @@ public interface JDA
      */
     @Nonnull
     @CheckReturnValue
-    default RestAction<Command> retrieveCommandById(long id)
-    {
+    default RestAction<Command> retrieveCommandById(long id) {
         return retrieveCommandById(Long.toUnsignedString(id));
     }
 
     /**
      * Creates or updates a global command.
      * <br>If a command with the same name exists, it will be replaced.
+     * This operation is idempotent.
+     * Commands will persist between restarts of your bot, you only have to create a command once.
      *
      * <p>To specify a complete list of all commands you can use {@link #updateCommands()} instead.
      *
      * <p>You need the OAuth2 scope {@code "applications.commands"} in order to add commands to a guild.
-     *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
      *
      * @param  command
      *         The {@link CommandData} for the command
@@ -552,24 +710,27 @@ public interface JDA
      * @throws IllegalArgumentException
      *         If null is provided
      *
-     * @return {@link CommandCreateAction}
+     * @return {@link RestAction} - Type: {@link Command}
+     *         <br>The RestAction used to create or update the command
      *
-     * @see net.dv8tion.jda.api.entities.Guild#upsertCommand(CommandData)
+     * @see    Commands#slash(String, String) Commands.slash(...)
+     * @see    Commands#message(String) Commands.message(...)
+     * @see    Commands#user(String) Commands.user(...)
+     * @see    Guild#upsertCommand(CommandData) Guild.upsertCommand(...)
      */
     @Nonnull
     @CheckReturnValue
-    CommandCreateAction upsertCommand(@Nonnull CommandData command);
+    RestAction<Command> upsertCommand(@Nonnull CommandData command);
 
     /**
-     * Creates or updates a global command.
+     * Creates or updates a global slash command.
      * <br>If a command with the same name exists, it will be replaced.
+     * This operation is idempotent.
+     * Commands will persist between restarts of your bot, you only have to create a command once.
      *
      * <p>To specify a complete list of all commands you can use {@link #updateCommands()} instead.
      *
      * <p>You need the OAuth2 scope {@code "applications.commands"} in order to add commands to a guild.
-     *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
      *
      * @param  name
      *         The lowercase alphanumeric (with dash) name, 1-32 characters
@@ -581,37 +742,44 @@ public interface JDA
      *
      * @return {@link CommandCreateAction}
      *
-     * @see net.dv8tion.jda.api.entities.Guild#upsertCommand(String, String)  
+     * @see Guild#upsertCommand(String, String)
      */
     @Nonnull
     @CheckReturnValue
-    default CommandCreateAction upsertCommand(@Nonnull String name, @Nonnull String description)
-    {
-        return upsertCommand(new CommandData(name, description));
+    default CommandCreateAction upsertCommand(@Nonnull String name, @Nonnull String description) {
+        return (CommandCreateAction) upsertCommand(new CommandDataImpl(name, description));
     }
 
     /**
      * Configures the complete list of global commands.
      * <br>This will replace the existing command list for this bot. You should only use this once on startup!
      *
+     * <p>This operation is idempotent.
+     * Commands will persist between restarts of your bot, you only have to create a command once.
+     *
      * <p>You need the OAuth2 scope {@code "applications.commands"} in order to add commands to a guild.
      *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
+     * <p><b>Examples</b>
      *
-     * <h2>Examples</h2>
-     * <pre>{@code
-     * // Set list to 2 commands
+     * <p>Set list to 2 commands:
+     * {@snippet lang="java":
      * jda.updateCommands()
-     *   .addCommands(new CommandData("ping", "Gives the current ping"))
-     *   .addCommands(new CommandData("ban", "Ban the target user")
+     *   .addCommands(Commands.slash("ping", "Gives the current ping"))
+     *   .addCommands(Commands.slash("ban", "Ban the target user")
+     *     .setContexts(InteractionContextType.GUILD)
+     *     .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.BAN_MEMBERS))
      *     .addOption(OptionType.USER, "user", "The user to ban", true))
      *   .queue();
-     * // Delete all commands
+     * }
+     *
+     * <p>Delete all commands:
+     * {@snippet lang="java":
      * jda.updateCommands().queue();
-     * }</pre>
+     * }
      *
      * @return {@link CommandListUpdateAction}
+     *
+     * @see    Guild#updateCommands()
      */
     @Nonnull
     @CheckReturnValue
@@ -623,20 +791,19 @@ public interface JDA
      * <p>If there is no command with the provided ID,
      * this RestAction fails with {@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_COMMAND ErrorResponse.UNKNOWN_COMMAND}
      *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
-     *
+     * @param  type
+     *         The command type
      * @param  id
      *         The id of the command to edit
      *
      * @throws IllegalArgumentException
-     *         If the provided id is not a valid snowflake
+     *         If the provided id is not a valid snowflake or the type is {@link Command.Type#UNKNOWN}
      *
      * @return {@link CommandEditAction} used to edit the command
      */
     @Nonnull
     @CheckReturnValue
-    CommandEditAction editCommandById(@Nonnull String id);
+    CommandEditAction editCommandById(@Nonnull Command.Type type, @Nonnull String id);
 
     /**
      * Edit an existing global command by id.
@@ -644,19 +811,20 @@ public interface JDA
      * <p>If there is no command with the provided ID,
      * this RestAction fails with {@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_COMMAND ErrorResponse.UNKNOWN_COMMAND}
      *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
-     *
+     * @param  type
+     *         The command type
      * @param  id
      *         The id of the command to edit
+     *
+     * @throws IllegalArgumentException
+     *         If the type is {@link Command.Type#UNKNOWN}
      *
      * @return {@link CommandEditAction} used to edit the command
      */
     @Nonnull
     @CheckReturnValue
-    default CommandEditAction editCommandById(long id)
-    {
-        return editCommandById(Long.toUnsignedString(id));
+    default CommandEditAction editCommandById(@Nonnull Command.Type type, long id) {
+        return editCommandById(type, Long.toUnsignedString(id));
     }
 
     /**
@@ -664,9 +832,6 @@ public interface JDA
      *
      * <p>If there is no command with the provided ID,
      * this RestAction fails with {@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_COMMAND ErrorResponse.UNKNOWN_COMMAND}
-     *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
      *
      * @param  commandId
      *         The id of the command that should be deleted
@@ -686,9 +851,6 @@ public interface JDA
      * <p>If there is no command with the provided ID,
      * this RestAction fails with {@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_COMMAND ErrorResponse.UNKNOWN_COMMAND}
      *
-     * <p><b>Global commands can take up to <u>1 hour</u> to propagate to the clients.</b>
-     * For testing, it is recommended to use a test guild with guild commands.
-     *
      * @param  commandId
      *         The id of the command that should be deleted
      *
@@ -696,68 +858,45 @@ public interface JDA
      */
     @Nonnull
     @CheckReturnValue
-    default RestAction<Void> deleteCommandById(long commandId)
-    {
+    default RestAction<Void> deleteCommandById(long commandId) {
         return deleteCommandById(Long.toUnsignedString(commandId));
     }
 
     /**
-     * Constructs a new {@link net.dv8tion.jda.api.entities.Guild Guild} with the specified name
-     * <br>Use the returned {@link GuildAction GuildAction} to provide
-     * further details and settings for the resulting Guild!
+     * Retrieves the currently configured {@link RoleConnectionMetadata} records for this application.
      *
-     * <p>This RestAction does not provide the resulting Guild!
-     * It will be in a following {@link net.dv8tion.jda.api.events.guild.GuildJoinEvent GuildJoinEvent}.
+     * @return {@link RestAction} - Type: {@link List} of {@link RoleConnectionMetadata}
      *
-     * @param  name
-     *         The name of the resulting guild
-     *
-     * @throws java.lang.IllegalStateException
-     *         If the currently logged in account is in 10 or more guilds
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided name is empty, {@code null} or not between 2-100 characters
-     *
-     * @return {@link GuildAction GuildAction}
-     *         <br>Allows for setting various details for the resulting Guild
+     * @see <a href="https://discord.com/developers/docs/tutorials/configuring-app-metadata-for-linked-roles" target="_blank">Configuring App Metadata for Linked Roles</a>
      */
     @Nonnull
     @CheckReturnValue
-    GuildAction createGuild(@Nonnull String name);
+    RestAction<List<RoleConnectionMetadata>> retrieveRoleConnectionMetadata();
 
     /**
-     * Constructs a new {@link net.dv8tion.jda.api.entities.Guild Guild} from the specified template code.
+     * Updates the currently configured {@link RoleConnectionMetadata} records for this application.
      *
-     * <p>This RestAction does not provide the resulting Guild!
-     * It will be in a following {@link net.dv8tion.jda.api.events.guild.GuildJoinEvent GuildJoinEvent}.
+     * <p>Returns the updated connection metadata records on success.
      *
-     * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} include:
-     * <ul>
-     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_GUILD_TEMPLATE Unknown Guild Template}
-     *     <br>The template doesn't exist.</li>
-     * </ul>
+     * @param  records
+     *         The new records to set
      *
-     * @param  code
-     *         The template code to use to create a guild
-     * @param  name
-     *         The name of the resulting guild
-     * @param  icon
-     *         The {@link net.dv8tion.jda.api.entities.Icon Icon} to use, or null to use no icon
+     * @throws IllegalArgumentException
+     *         If null is provided or more than {@value RoleConnectionMetadata#MAX_RECORDS} records are configured.
      *
-     * @throws java.lang.IllegalStateException
-     *         If the currently logged in account is in 10 or more guilds
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided name is empty, {@code null} or not between 2-100 characters
+     * @return {@link RestAction} - Type: {@link List} of {@link RoleConnectionMetadata}
      *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction}
+     * @see <a href="https://discord.com/developers/docs/tutorials/configuring-app-metadata-for-linked-roles" target="_blank">Configuring App Metadata for Linked Roles</a>
      */
     @Nonnull
     @CheckReturnValue
-    RestAction<Void> createGuildFromTemplate(@Nonnull String code, @Nonnull String name, @Nullable Icon icon);
+    RestAction<List<RoleConnectionMetadata>> updateRoleConnectionMetadata(
+            @Nonnull Collection<? extends RoleConnectionMetadata> records);
 
     /**
      * {@link net.dv8tion.jda.api.utils.cache.CacheView CacheView} of
      * all cached {@link net.dv8tion.jda.api.managers.AudioManager AudioManagers} created for this JDA instance.
-     * <br>AudioManagers are created when first retrieved via {@link net.dv8tion.jda.api.entities.Guild#getAudioManager() Guild.getAudioManager()}.
+     * <br>AudioManagers are created when first retrieved via {@link Guild#getAudioManager() Guild.getAudioManager()}.
      * <u>Using this will perform better than calling {@code Guild.getAudioManager()} iteratively as that would cause many useless audio managers to be created!</u>
      *
      * <p>AudioManagers are cross-session persistent!
@@ -773,8 +912,8 @@ public interface JDA
      * @return Immutable list of all created AudioManager instances
      */
     @Nonnull
-    default List<AudioManager> getAudioManagers()
-    {
+    @Unmodifiable
+    default List<AudioManager> getAudioManagers() {
         return getAudioManagerCache().asList();
     }
 
@@ -789,7 +928,7 @@ public interface JDA
 
     /**
      * An immutable list of all {@link net.dv8tion.jda.api.entities.User Users} that share a
-     * {@link net.dv8tion.jda.api.entities.Guild Guild} with the currently logged in account.
+     * {@link Guild Guild} with the currently logged in account.
      * <br>This list will never contain duplicates and represents all
      * {@link net.dv8tion.jda.api.entities.User Users} that JDA can currently see.
      *
@@ -806,8 +945,8 @@ public interface JDA
      * @return Immutable list of all {@link net.dv8tion.jda.api.entities.User Users} that are visible to JDA.
      */
     @Nonnull
-    default List<User> getUsers()
-    {
+    @Unmodifiable
+    default List<User> getUsers() {
         return getUserCache().asList();
     }
 
@@ -828,8 +967,7 @@ public interface JDA
      * @see    #retrieveUserById(String)
      */
     @Nullable
-    default User getUserById(@Nonnull String id)
-    {
+    default User getUserById(@Nonnull String id) {
         return getUserCache().getElementById(id);
     }
 
@@ -847,8 +985,7 @@ public interface JDA
      * @see    #retrieveUserById(long)
      */
     @Nullable
-    default User getUserById(long id)
-    {
+    default User getUserById(long id) {
         return getUserCache().getElementById(id);
     }
 
@@ -864,6 +1001,8 @@ public interface JDA
      *
      * <p><b>This will only check cached users!</b>
      *
+     * <p>To check users without discriminators, use {@code username#0000} instead.
+     *
      * @param  tag
      *         The Discord Tag in the format {@code Username#Discriminator}
      *
@@ -873,8 +1012,7 @@ public interface JDA
      * @return The {@link net.dv8tion.jda.api.entities.User} for the discord tag or null if no user has the provided tag
      */
     @Nullable
-    default User getUserByTag(@Nonnull String tag)
-    {
+    default User getUserByTag(@Nonnull String tag) {
         Checks.notNull(tag, "Tag");
         Matcher matcher = User.USER_TAG.matcher(tag);
         Checks.check(matcher.matches(), "Invalid tag format!");
@@ -906,19 +1044,18 @@ public interface JDA
      * @return The {@link net.dv8tion.jda.api.entities.User} for the discord tag or null if no user has the provided tag
      */
     @Nullable
-    default User getUserByTag(@Nonnull String username, @Nonnull String discriminator)
-    {
-        Checks.notNull(username, "Username");
-        Checks.notNull(discriminator, "Discriminator");
-        Checks.check(discriminator.length() == 4 && Helpers.isNumeric(discriminator), "Invalid format for discriminator!");
-        int codePointLength = Helpers.codePointLength(username);
-        Checks.check(codePointLength >= 2 && codePointLength <= 32, "Username must be between 2 and 32 codepoints in length!");
-        return getUserCache().applyStream(stream ->
-            stream.filter(it -> it.getDiscriminator().equals(discriminator))
-                  .filter(it -> it.getName().equals(username))
-                  .findFirst()
-                  .orElse(null)
-        );
+    default User getUserByTag(@Nonnull String username, @Nullable String discriminator) {
+        Checks.inRange(username, 2, 32, "Username");
+        Checks.check(
+                discriminator == null || discriminator.length() == 4 && Helpers.isNumeric(discriminator),
+                "Invalid format for discriminator! Provided: %s",
+                discriminator);
+        String actualDiscriminator = discriminator == null ? "0000" : discriminator;
+        return getUserCache()
+                .applyStream(stream -> stream.filter(it -> it.getDiscriminator().equals(actualDiscriminator))
+                        .filter(it -> it.getName().equals(username))
+                        .findFirst()
+                        .orElse(null));
     }
 
     /**
@@ -935,44 +1072,49 @@ public interface JDA
      *         Whether to ignore case or not when comparing the provided name to each {@link net.dv8tion.jda.api.entities.User#getName()}.
      *
      * @return Possibly-empty immutable list of {@link net.dv8tion.jda.api.entities.User Users} that all have the same name as the provided name.
+     *
+     * @incubating This will be replaced in the future when the rollout of globally unique usernames has been completed.
      */
     @Nonnull
-    default List<User> getUsersByName(@Nonnull String name, boolean ignoreCase)
-    {
+    @Incubating
+    @Unmodifiable
+    default List<User> getUsersByName(@Nonnull String name, boolean ignoreCase) {
         return getUserCache().getElementsByName(name, ignoreCase);
     }
 
     /**
-     * Gets all {@link net.dv8tion.jda.api.entities.Guild Guilds} that contain all given users as their members.
+     * Gets all {@link Guild Guilds} that contain all given users as their members.
      *
      * @param  users
-     *         The users which all the returned {@link net.dv8tion.jda.api.entities.Guild Guilds} must contain.
+     *         The users which all the returned {@link Guild Guilds} must contain.
      *
-     * @return Immutable list of all {@link net.dv8tion.jda.api.entities.Guild Guild} instances which have all {@link net.dv8tion.jda.api.entities.User Users} in them.
+     * @return Immutable list of all {@link Guild Guild} instances which have all {@link net.dv8tion.jda.api.entities.UserSnowflake Users} in them.
      *
-     * @see    Guild#isMember(net.dv8tion.jda.api.entities.User)
+     * @see    Guild#isMember(UserSnowflake)
      */
     @Nonnull
-    List<Guild> getMutualGuilds(@Nonnull User... users);
+    @Unmodifiable
+    List<Guild> getMutualGuilds(@Nonnull UserSnowflake... users);
 
     /**
-     * Gets all {@link net.dv8tion.jda.api.entities.Guild Guilds} that contain all given users as their members.
+     * Gets all {@link Guild Guilds} that contain all given users as their members.
      *
      * @param users
-     *        The users which all the returned {@link net.dv8tion.jda.api.entities.Guild Guilds} must contain.
+     *        The users which all the returned {@link Guild Guilds} must contain.
      *
-     * @return Immutable list of all {@link net.dv8tion.jda.api.entities.Guild Guild} instances which have all {@link net.dv8tion.jda.api.entities.User Users} in them.
+     * @return Immutable list of all {@link Guild Guild} instances which have all {@link net.dv8tion.jda.api.entities.UserSnowflake Users} in them.
      */
     @Nonnull
-    List<Guild> getMutualGuilds(@Nonnull Collection<User> users);
+    @Unmodifiable
+    List<Guild> getMutualGuilds(@Nonnull Collection<? extends UserSnowflake> users);
 
     /**
      * Attempts to retrieve a {@link net.dv8tion.jda.api.entities.User User} object based on the provided id.
-     * <br>This first calls {@link #getUserById(long)}, and if that returns {@code null} or the cache is inconsistent due to disabled intents then a request
-     * is made to the Discord servers.
      *
-     * <p>When the both {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} and {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intents
-     * are disabled this will always make a request even if the user is cached. You can use {@link #retrieveUserById(String, boolean)} to disable this behavior.
+     * <p>If {@link #getUserById(long)} is cached, this will directly return the user in a completed {@link RestAction} without making a request.
+     * When both {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} and {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intents
+     * are disabled this will always make a request even if the user is cached.
+     * You can use {@link CacheRestAction#useCache(boolean) action.useCache(false)} to force an update.
      *
      * <p>The returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} can encounter the following Discord errors:
      * <ul>
@@ -983,9 +1125,6 @@ public interface JDA
      *
      * @param  id
      *         The id of the requested {@link net.dv8tion.jda.api.entities.User User}.
-     *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         This endpoint is {@link AccountType#BOT} only.
      *
      * @throws java.lang.NumberFormatException
      *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
@@ -995,23 +1134,22 @@ public interface JDA
      *             <li>If the provided id String is empty.</li>
      *         </ul>
      *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.User User}
+     * @return {@link CacheRestAction} - Type: {@link User}
      *         <br>On request, gets the User with id matching provided id from Discord.
      */
     @Nonnull
     @CheckReturnValue
-    default RestAction<User> retrieveUserById(@Nonnull String id)
-    {
-        return retrieveUserById(id, true);
+    default CacheRestAction<User> retrieveUserById(@Nonnull String id) {
+        return retrieveUserById(MiscUtil.parseSnowflake(id));
     }
 
     /**
      * Attempts to retrieve a {@link net.dv8tion.jda.api.entities.User User} object based on the provided id.
-     * <br>This first calls {@link #getUserById(long)}, and if that returns {@code null} or the cache is inconsistent due to disabled intents then a request
-     * is made to the Discord servers.
      *
-     * <p>When the both {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} and {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intents
-     * are disabled this will always make a request even if the user is cached. You can use {@link #retrieveUserById(String, boolean)} to disable this behavior.
+     * <p>If {@link #getUserById(long)} is cached, this will directly return the user in a completed {@link RestAction} without making a request.
+     * When both {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} and {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intents
+     * are disabled this will always make a request even if the user is cached.
+     * You can use {@link CacheRestAction#useCache(boolean) action.useCache(false)} to force an update.
      *
      * <p>The returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} can encounter the following Discord errors:
      * <ul>
@@ -1021,91 +1159,18 @@ public interface JDA
      * </ul>
      *
      * @param  id
-     *         The id of the requested {@link net.dv8tion.jda.api.entities.User User}.
+     *         The id of the requested {@link User}.
      *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         This endpoint is {@link AccountType#BOT} only.
-     *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.User User}
+     * @return {@link CacheRestAction} - Type: {@link User}
      *         <br>On request, gets the User with id matching provided id from Discord.
      */
     @Nonnull
     @CheckReturnValue
-    default RestAction<User> retrieveUserById(long id)
-    {
-        return retrieveUserById(id, true);
-    }
-
-    /**
-     * Attempts to retrieve a {@link net.dv8tion.jda.api.entities.User User} object based on the provided id.
-     * <br>If both {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} and {@link GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} intents are disabled
-     * this method will update the cached user unless the {@code update} parameter is {@code false}.
-     * <br>If either of those intents is enabled, this will immediately provide the cached user if possible.
-     *
-     * <p>The returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} can encounter the following Discord errors:
-     * <ul>
-     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_USER ErrorResponse.UNKNOWN_USER}
-     *     <br>Occurs when the provided id does not refer to a {@link net.dv8tion.jda.api.entities.User User}
-     *     known by Discord. Typically occurs when developers provide an incomplete id (cut short).</li>
-     * </ul>
-     *
-     * @param  id
-     *         The id of the requested {@link net.dv8tion.jda.api.entities.User User}.
-     * @param  update
-     *         Whether JDA should perform a request even if the member is already cached to update properties such as the name
-     *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         This endpoint is {@link AccountType#BOT} only.
-     *
-     * @throws java.lang.NumberFormatException
-     *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
-     * @throws java.lang.IllegalArgumentException
-     *         <ul>
-     *             <li>If the provided id String is null.</li>
-     *             <li>If the provided id String is empty.</li>
-     *         </ul>
-     *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.User User}
-     *         <br>On request, gets the User with id matching provided id from Discord.
-     */
-    @Nonnull
-    @CheckReturnValue
-    default RestAction<User> retrieveUserById(@Nonnull String id, boolean update)
-    {
-        return retrieveUserById(MiscUtil.parseSnowflake(id), update);
-    }
-
-    /**
-     * Attempts to retrieve a {@link net.dv8tion.jda.api.entities.User User} object based on the provided id.
-     * <br>If both {@link GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} and {@link GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} intents are disabled
-     * this method will update the cached user unless the {@code update} parameter is {@code false}.
-     * <br>If either of those intents is enabled, this will immediately provide the cached user if possible.
-     *
-     * <p>The returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} can encounter the following Discord errors:
-     * <ul>
-     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_USER ErrorResponse.UNKNOWN_USER}
-     *     <br>Occurs when the provided id does not refer to a {@link net.dv8tion.jda.api.entities.User User}
-     *     known by Discord. Typically occurs when developers provide an incomplete id (cut short).</li>
-     * </ul>
-     *
-     * @param  id
-     *         The id of the requested {@link net.dv8tion.jda.api.entities.User User}.
-     * @param  update
-     *         Whether JDA should perform a request even if the member is already cached to update properties such as the name
-     *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         This endpoint is {@link AccountType#BOT} only.
-     *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.User User}
-     *         <br>On request, gets the User with id matching provided id from Discord.
-     */
-    @Nonnull
-    @CheckReturnValue
-    RestAction<User> retrieveUserById(long id, boolean update);
+    CacheRestAction<User> retrieveUserById(long id);
 
     /**
      * {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.Guild Guilds} visible to this JDA session.
+     * all cached {@link Guild Guilds} visible to this JDA session.
      *
      * @return {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
      */
@@ -1113,11 +1178,11 @@ public interface JDA
     SnowflakeCacheView<Guild> getGuildCache();
 
     /**
-     * An immutable List of all {@link net.dv8tion.jda.api.entities.Guild Guilds} that the logged account is connected to.
-     * <br>If this account is not connected to any {@link net.dv8tion.jda.api.entities.Guild Guilds}, this will return an empty list.
+     * An immutable List of all {@link Guild Guilds} that the logged account is connected to.
+     * <br>If this account is not connected to any {@link Guild Guilds}, this will return an empty list.
      *
      * <p>If the developer is sharding ({@link net.dv8tion.jda.api.JDABuilder#useSharding(int, int)}, then this list
-     * will only contain the {@link net.dv8tion.jda.api.entities.Guild Guilds} that the shard is actually connected to.
+     * will only contain the {@link Guild Guilds} that the shard is actually connected to.
      * Discord determines which guilds a shard is connect to using the following format:
      * <br>Guild connected if shardId == (guildId {@literal >>} 22) % totalShards;
      * <br>Source for formula: <a href="https://discord.com/developers/docs/topics/gateway#sharding">Discord Documentation</a>
@@ -1127,61 +1192,59 @@ public interface JDA
      * a local variable or use {@link #getGuildCache()} and use its more efficient
      * versions of handling these values.
      *
-     * @return Possibly-empty immutable list of all the {@link net.dv8tion.jda.api.entities.Guild Guilds} that this account is connected to.
+     * @return Possibly-empty immutable list of all the {@link Guild Guilds} that this account is connected to.
      */
     @Nonnull
-    default List<Guild> getGuilds()
-    {
+    @Unmodifiable
+    default List<Guild> getGuilds() {
         return getGuildCache().asList();
     }
 
     /**
-     * This returns the {@link net.dv8tion.jda.api.entities.Guild Guild} which has the same id as the one provided.
+     * This returns the {@link Guild Guild} which has the same id as the one provided.
      * <br>If there is no connected guild with an id that matches the provided one, then this returns {@code null}.
      *
      * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.Guild Guild}.
+     *         The id of the {@link Guild Guild}.
      *
      * @throws java.lang.NumberFormatException
      *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
      *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.Guild Guild} with matching id.
+     * @return Possibly-null {@link Guild Guild} with matching id.
      */
     @Nullable
-    default Guild getGuildById(@Nonnull String id)
-    {
+    default Guild getGuildById(@Nonnull String id) {
         return getGuildCache().getElementById(id);
     }
 
     /**
-     * This returns the {@link net.dv8tion.jda.api.entities.Guild Guild} which has the same id as the one provided.
+     * This returns the {@link Guild Guild} which has the same id as the one provided.
      * <br>If there is no connected guild with an id that matches the provided one, then this returns {@code null}.
      *
      * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.Guild Guild}.
+     *         The id of the {@link Guild Guild}.
      *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.Guild Guild} with matching id.
+     * @return Possibly-null {@link Guild Guild} with matching id.
      */
     @Nullable
-    default Guild getGuildById(long id)
-    {
+    default Guild getGuildById(long id) {
         return getGuildCache().getElementById(id);
     }
 
     /**
-     * An immutable list of all {@link net.dv8tion.jda.api.entities.Guild Guilds} that have the same name as the one provided.
-     * <br>If there are no {@link net.dv8tion.jda.api.entities.Guild Guilds} with the provided name, then this returns an empty list.
+     * An immutable list of all {@link Guild Guilds} that have the same name as the one provided.
+     * <br>If there are no {@link Guild Guilds} with the provided name, then this returns an empty list.
      *
      * @param  name
-     *         The name of the requested {@link net.dv8tion.jda.api.entities.Guild Guilds}.
+     *         The name of the requested {@link Guild Guilds}.
      * @param  ignoreCase
-     *         Whether to ignore case or not when comparing the provided name to each {@link net.dv8tion.jda.api.entities.Guild#getName()}.
+     *         Whether to ignore case or not when comparing the provided name to each {@link Guild#getName()}.
      *
-     * @return Possibly-empty immutable list of all the {@link net.dv8tion.jda.api.entities.Guild Guilds} that all have the same name as the provided name.
+     * @return Possibly-empty immutable list of all the {@link Guild Guilds} that all have the same name as the provided name.
      */
     @Nonnull
-    default List<Guild> getGuildsByName(@Nonnull String name, boolean ignoreCase)
-    {
+    @Unmodifiable
+    default List<Guild> getGuildsByName(@Nonnull String name, boolean ignoreCase) {
         return getGuildCache().getElementsByName(name, ignoreCase);
     }
 
@@ -1220,8 +1283,8 @@ public interface JDA
 
     /**
      * All {@link net.dv8tion.jda.api.entities.Role Roles} this JDA instance can see. <br>This will iterate over each
-     * {@link net.dv8tion.jda.api.entities.Guild Guild} retrieved from {@link #getGuilds()} and collect its {@link
-     * net.dv8tion.jda.api.entities.Guild#getRoles() Guild.getRoles()}.
+     * {@link Guild Guild} retrieved from {@link #getGuilds()} and collect its {@link
+     * Guild#getRoles() Guild.getRoles()}.
      *
      * <p>This copies the backing store into a list. This means every call
      * creates a new list with O(n) complexity. It is recommended to store this into
@@ -1231,14 +1294,14 @@ public interface JDA
      * @return Immutable List of all visible Roles
      */
     @Nonnull
-    default List<Role> getRoles()
-    {
+    @Unmodifiable
+    default List<Role> getRoles() {
         return getRoleCache().asList();
     }
 
     /**
      * Retrieves the {@link net.dv8tion.jda.api.entities.Role Role} associated to the provided id. <br>This iterates
-     * over all {@link net.dv8tion.jda.api.entities.Guild Guilds} and check whether a Role from that Guild is assigned
+     * over all {@link Guild Guilds} and check whether a Role from that Guild is assigned
      * to the specified ID and will return the first that can be found.
      *
      * @param  id
@@ -1250,14 +1313,13 @@ public interface JDA
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.Role Role} for the specified ID
      */
     @Nullable
-    default Role getRoleById(@Nonnull String id)
-    {
+    default Role getRoleById(@Nonnull String id) {
         return getRoleCache().getElementById(id);
     }
 
     /**
      * Retrieves the {@link net.dv8tion.jda.api.entities.Role Role} associated to the provided id. <br>This iterates
-     * over all {@link net.dv8tion.jda.api.entities.Guild Guilds} and check whether a Role from that Guild is assigned
+     * over all {@link Guild Guilds} and check whether a Role from that Guild is assigned
      * to the specified ID and will return the first that can be found.
      *
      * @param  id
@@ -1266,8 +1328,7 @@ public interface JDA
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.Role Role} for the specified ID
      */
     @Nullable
-    default Role getRoleById(long id)
-    {
+    default Role getRoleById(long id) {
         return getRoleCache().getElementById(id);
     }
 
@@ -1284,572 +1345,104 @@ public interface JDA
      * @return Immutable List of all Roles matching the parameters provided.
      */
     @Nonnull
-    default List<Role> getRolesByName(@Nonnull String name, boolean ignoreCase)
-    {
+    @Unmodifiable
+    default List<Role> getRolesByName(@Nonnull String name, boolean ignoreCase) {
         return getRoleCache().getElementsByName(name, ignoreCase);
     }
 
     /**
-     * Get {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} for the provided ID.
-     * <br>This checks if any of the channel types in this guild have the provided ID and returns the first match.
+     * {@link SnowflakeCacheView} of
+     * all cached {@link ScheduledEvent ScheduledEvents} visible to this JDA session.
      *
-     * <br>To get more specific channel types you can use one of the following:
-     * <ul>
-     *     <li>{@link #getTextChannelById(String)}</li>
-     *     <li>{@link #getVoiceChannelById(String)}</li>
-     *     <li>{@link #getStoreChannelById(String)}</li>
-     *     <li>{@link #getCategoryById(String)}</li>
-     * </ul>
+     * <p>This requires {@link CacheFlag#SCHEDULED_EVENTS} to be enabled.
+     *
+     * @return {@link SnowflakeCacheView}
+     */
+    @Nonnull
+    SnowflakeCacheView<ScheduledEvent> getScheduledEventCache();
+
+    /**
+     * An unmodifiable list of all {@link ScheduledEvent ScheduledEvents} of all connected
+     * {@link net.dv8tion.jda.api.entities.Guild Guilds}.
+     *
+     * <p>This copies the backing store into a list. This means every call
+     * creates a new list with O(n) complexity. It is recommended to store this into
+     * a local variable or use {@link #getScheduledEventCache()} and use its more efficient
+     * versions of handling these values.
+     *
+     * <p>This requires {@link CacheFlag#SCHEDULED_EVENTS} to be enabled.
+     *
+     * @return Possibly-empty immutable list of all known {@link ScheduledEvent ScheduledEvents}.
+     */
+    @Nonnull
+    @Unmodifiable
+    default List<ScheduledEvent> getScheduledEvents() {
+        return getScheduledEventCache().asList();
+    }
+
+    /**
+     * This returns the {@link ScheduledEvent} which has the same id as the one provided.
+     * <br>If there is no known {@link ScheduledEvent} with an id that matches the provided
+     * one, then this returns {@code null}.
+     *
+     * <p>This requires {@link CacheFlag#SCHEDULED_EVENTS} to be enabled.
      *
      * @param  id
-     *         The ID of the channel
+     *         The id of the {@link ScheduledEvent}.
      *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided ID is null
      * @throws java.lang.NumberFormatException
-     *         If the provided ID is not a snowflake
+     *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
      *
-     * @return The GuildChannel or null
+     * @return Possibly-null {@link ScheduledEvent} with a matching id.
      */
     @Nullable
-    default GuildChannel getGuildChannelById(@Nonnull String id)
-    {
-        return getGuildChannelById(MiscUtil.parseSnowflake(id));
+    default ScheduledEvent getScheduledEventById(@Nonnull String id) {
+        return getScheduledEventCache().getElementById(id);
     }
 
     /**
-     * Get {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} for the provided ID.
-     * <br>This checks if any of the channel types in this guild have the provided ID and returns the first match.
+     * This returns the {@link ScheduledEvent} which has the same id as the one provided.
+     * <br>If there is no known {@link ScheduledEvent} with an id that matches the provided
+     * one, then this returns {@code null}.
      *
-     * <br>To get more specific channel types you can use one of the following:
-     * <ul>
-     *     <li>{@link #getTextChannelById(long)}</li>
-     *     <li>{@link #getVoiceChannelById(long)}</li>
-     *     <li>{@link #getStoreChannelById(long)}</li>
-     *     <li>{@link #getCategoryById(long)}</li>
-     * </ul>
+     * <p>This requires {@link CacheFlag#SCHEDULED_EVENTS} to be enabled.
      *
      * @param  id
-     *         The ID of the channel
+     *         The id of the {@link ScheduledEvent}.
      *
-     * @return The GuildChannel or null
+     * @return Possibly-null {@link ScheduledEvent} with a matching id.
      */
     @Nullable
-    default GuildChannel getGuildChannelById(long id)
-    {
-        GuildChannel channel = getTextChannelById(id);
-        if (channel == null)
-            channel = getVoiceChannelById(id);
-        if (channel == null)
-            channel = getStoreChannelById(id);
-        if (channel == null)
-            channel = getCategoryById(id);
-        return channel;
+    default ScheduledEvent getScheduledEventById(long id) {
+        return getScheduledEventCache().getElementById(id);
     }
 
     /**
-     * Get {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} for the provided ID.
+     * An unmodifiable list of all {@link ScheduledEvent ScheduledEvents} that have the same name as the one provided.
+     * <br>If there are no {@link ScheduledEvent ScheduledEvents} with the provided name, then this returns an empty list.
      *
-     * <br>This is meant for systems that use a dynamic {@link net.dv8tion.jda.api.entities.ChannelType} and can
-     * profit from a simple function to get the channel instance.
-     * To get more specific channel types you can use one of the following:
-     * <ul>
-     *     <li>{@link #getTextChannelById(String)}</li>
-     *     <li>{@link #getVoiceChannelById(String)}</li>
-     *     <li>{@link #getStoreChannelById(String)}</li>
-     *     <li>{@link #getCategoryById(String)}</li>
-     * </ul>
-     *
-     * @param  type
-     *         The {@link net.dv8tion.jda.api.entities.ChannelType}
-     * @param  id
-     *         The ID of the channel
-     *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided ID is null
-     * @throws java.lang.NumberFormatException
-     *         If the provided ID is not a snowflake
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided {@link net.dv8tion.jda.api.entities.ChannelType} is null
-     *
-     * @return The GuildChannel or null
-     */
-    @Nullable
-    default GuildChannel getGuildChannelById(@Nonnull ChannelType type, @Nonnull String id)
-    {
-        return getGuildChannelById(type, MiscUtil.parseSnowflake(id));
-    }
-
-    /**
-     * Get {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} for the provided ID.
-     *
-     * <br>This is meant for systems that use a dynamic {@link net.dv8tion.jda.api.entities.ChannelType} and can
-     * profit from a simple function to get the channel instance.
-     * To get more specific channel types you can use one of the following:
-     * <ul>
-     *     <li>{@link #getTextChannelById(long)}</li>
-     *     <li>{@link #getVoiceChannelById(long)}</li>
-     *     <li>{@link #getStoreChannelById(long)}</li>
-     *     <li>{@link #getCategoryById(long)}</li>
-     * </ul>
-     *
-     * @param  type
-     *         The {@link net.dv8tion.jda.api.entities.ChannelType}
-     * @param  id
-     *         The ID of the channel
-     *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided {@link net.dv8tion.jda.api.entities.ChannelType} is null
-     *
-     * @return The GuildChannel or null
-     */
-    @Nullable
-    default GuildChannel getGuildChannelById(@Nonnull ChannelType type, long id)
-    {
-        Checks.notNull(type, "ChannelType");
-        switch (type)
-        {
-        case TEXT:
-            return getTextChannelById(id);
-        case VOICE:
-            return getVoiceChannelById(id);
-        case STAGE:
-            return getStageChannelById(id);
-        case STORE:
-            return getStoreChannelById(id);
-        case CATEGORY:
-            return getCategoryById(id);
-        }
-        return null;
-    }
-
-    /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.StageChannel StageChannels} that have the same name as the one provided.
-     * <br>If there are no {@link net.dv8tion.jda.api.entities.StageChannel StageChannels} with the provided name, then this returns an empty list.
+     * <p>This requires {@link CacheFlag#SCHEDULED_EVENTS} to be enabled.
      *
      * @param  name
-     *         The name of the requested {@link net.dv8tion.jda.api.entities.StageChannel StageChannels}.
+     *         The name of the requested {@link ScheduledEvent}.
      * @param  ignoreCase
-     *         Whether to ignore case or not when comparing the provided name to each {@link net.dv8tion.jda.api.entities.StageChannel#getName()}.
+     *         Whether to ignore case or not when comparing the provided name to each {@link ScheduledEvent#getName()}.
      *
-     * @return Possibly-empty list of all the {@link net.dv8tion.jda.api.entities.StageChannel StageChannels} that all have the
+     * @throws IllegalArgumentException
+     *         If the provided name is null.
+     *
+     * @return Possibly-empty immutable list of all the {@link ScheduledEvent ScheduledEvents} that all have the
      *         same name as the provided name.
      */
     @Nonnull
-    default List<StageChannel> getStageChannelsByName(@Nonnull String name, boolean ignoreCase)
-    {
-        return getVoiceChannelsByName(name, ignoreCase)
-                .stream()
-                .filter(StageChannel.class::isInstance)
-                .map(StageChannel.class::cast)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * This returns the {@link net.dv8tion.jda.api.entities.StageChannel StageChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.StageChannel StageChannel} with an id that matches the provided
-     * one, then this returns {@code null}.
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.StageChannel StageChannel}.
-     * @throws java.lang.NumberFormatException
-     *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.StageChannel StageChannel} with matching id.
-     */
-    @Nullable
-    default StageChannel getStageChannelById(@Nonnull String id)
-    {
-        return getStageChannelById(MiscUtil.parseSnowflake(id));
-    }
-
-    /**
-     * This returns the {@link net.dv8tion.jda.api.entities.StageChannel StageChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.StageChannel StageChannel} with an id that matches the provided
-     * one, then this returns {@code null}.
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.StageChannel StageChannel}.
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.StageChannel StageChannel} with matching id.
-     */
-    @Nullable
-    default StageChannel getStageChannelById(long id)
-    {
-        VoiceChannel channel = getVoiceChannelById(id);
-        return channel instanceof StageChannel ? (StageChannel) channel : null;
-    }
-
-    /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.StageChannel StageChannels} of all connected
-     * {@link net.dv8tion.jda.api.entities.Guild Guilds}.
-     *
-     * <p>This copies the backing store into a list. This means every call
-     * creates a new list with O(n) complexity.
-     *
-     * @return Possible-empty list of all known {@link net.dv8tion.jda.api.entities.StageChannel StageChannels}.
-     */
-    @Nonnull
-    default List<StageChannel> getStageChannels()
-    {
-        return getVoiceChannels().stream()
-                .filter(StageChannel.class::isInstance)
-                .map(StageChannel.class::cast)
-                .collect(Collectors.toList());
+    @Unmodifiable
+    default List<ScheduledEvent> getScheduledEventsByName(@Nonnull String name, boolean ignoreCase) {
+        return getScheduledEventCache().getElementsByName(name, ignoreCase);
     }
 
     /**
      * {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.Category Categories} visible to this JDA session.
-     *
-     * @return {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
-     */
-    @Nonnull
-    SnowflakeCacheView<Category> getCategoryCache();
-
-    /**
-     * Gets the {@link net.dv8tion.jda.api.entities.Category Category} that matches the provided id.
-     * <br>If there is no matching {@link net.dv8tion.jda.api.entities.Category Category} this returns {@code null}.
-     *
-     * @param  id
-     *         The snowflake ID of the wanted Category
-     *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided ID is not a valid {@code long}
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.Category Category} for the provided ID.
-     */
-    @Nullable
-    default Category getCategoryById(@Nonnull String id)
-    {
-        return getCategoryCache().getElementById(id);
-    }
-
-    /**
-     * Gets the {@link net.dv8tion.jda.api.entities.Category Category} that matches the provided id. <br>If there is no
-     * matching {@link net.dv8tion.jda.api.entities.Category Category} this returns {@code null}.
-     *
-     * @param  id
-     *         The snowflake ID of the wanted Category
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.Category Category} for the provided ID.
-     */
-    @Nullable
-    default Category getCategoryById(long id)
-    {
-        return getCategoryCache().getElementById(id);
-    }
-
-    /**
-     * Gets all {@link net.dv8tion.jda.api.entities.Category Categories} visible to the currently logged in account.
-     *
-     * <p>This copies the backing store into a list. This means every call
-     * creates a new list with O(n) complexity. It is recommended to store this into
-     * a local variable or use {@link #getCategoryCache()} and use its more efficient
-     * versions of handling these values.
-     *
-     * @return An immutable list of all visible {@link net.dv8tion.jda.api.entities.Category Categories}.
-     */
-    @Nonnull
-    default List<Category> getCategories()
-    {
-        return getCategoryCache().asList();
-    }
-
-    /**
-     * Gets a list of all {@link net.dv8tion.jda.api.entities.Category Categories} that have the same name as the one
-     * provided. <br>If there are no matching categories this will return an empty list.
-     *
-     * @param  name
-     *         The name to check
-     * @param  ignoreCase
-     *         Whether to ignore case on name checking
-     *
-     * @throws java.lang.IllegalArgumentException
-     *         If the provided name is {@code null}
-     *
-     * @return Immutable list of all categories matching the provided name
-     */
-    @Nonnull
-    default List<Category> getCategoriesByName(@Nonnull String name, boolean ignoreCase)
-    {
-        return getCategoryCache().getElementsByName(name, ignoreCase);
-    }
-
-    /**
-     * {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannels} visible to this JDA session.
-     * <br>TextChannels are sorted according to their position.
-     *
-     * @return {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
-     */
-    @Nonnull
-    SnowflakeCacheView<StoreChannel> getStoreChannelCache();
-
-    /**
-     * Gets a {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel} that has the same id as the
-     * one provided.
-     * <br>If there is no {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel} with an id that matches the provided
-     * one, then this returns {@code null}.
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel}.
-     *
-     * @throws java.lang.NumberFormatException
-     *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel} with matching id.
-     */
-    @Nullable
-    default StoreChannel getStoreChannelById(@Nonnull String id)
-    {
-        return getStoreChannelCache().getElementById(id);
-    }
-
-    /**
-     * Gets a {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel} that has the same id as the
-     * one provided.
-     * <br>If there is no {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel} with an id that matches the provided
-     * one, then this returns {@code null}.
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel}.
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel} with matching id.
-     */
-    @Nullable
-    default StoreChannel getStoreChannelById(long id)
-    {
-        return getStoreChannelCache().getElementById(id);
-    }
-
-    /**
-     * Gets all {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannels} of all connected
-     * {@link net.dv8tion.jda.api.entities.Guild Guilds}.
-     *
-     * <p>This copies the backing store into a list. This means every call
-     * creates a new list with O(n) complexity. It is recommended to store this into
-     * a local variable or use {@link #getStoreChannelCache()} and use its more efficient
-     * versions of handling these values.
-     *
-     * @return Possibly-empty immutable List of all known {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannel}.
-     */
-    @Nonnull
-    default List<StoreChannel> getStoreChannels()
-    {
-        return getStoreChannelCache().asList();
-    }
-
-    /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannels} that have the same name as the one provided.
-     * <br>If there are no {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannels} with the provided name, then this returns an empty list.
-     *
-     * @param  name
-     *         The name used to filter the returned {@link net.dv8tion.jda.api.entities.StoreChannel StoreChannels}.
-     * @param  ignoreCase
-     *         Determines if the comparison ignores case when comparing. True - case insensitive.
-     *
-     * @return Possibly-empty immutable list of all StoreChannels with names that match the provided name.
-     */
-    @Nonnull
-    default List<StoreChannel> getStoreChannelsByName(@Nonnull String name, boolean ignoreCase)
-    {
-        return getStoreChannelCache().getElementsByName(name, ignoreCase);
-    }
-
-    /**
-     * {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.TextChannel TextChannels} visible to this JDA session.
-     *
-     * @return {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
-     */
-    @Nonnull
-    SnowflakeCacheView<TextChannel> getTextChannelCache();
-
-    /**
-     * An unmodifiable List of all {@link net.dv8tion.jda.api.entities.TextChannel TextChannels} of all connected
-     * {@link net.dv8tion.jda.api.entities.Guild Guilds}.
-     *
-     * <p><b>Note:</b> just because a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} is present in this list does
-     * not mean that you will be able to send messages to it. Furthermore, if you log into this account on the discord
-     * client, it is possible that you will see fewer channels than this returns. This is because the discord
-     * client hides any {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} that you don't have the
-     * {@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ} permission in.
-     *
-     * <p>This copies the backing store into a list. This means every call
-     * creates a new list with O(n) complexity. It is recommended to store this into
-     * a local variable or use {@link #getTextChannelCache()} and use its more efficient
-     * versions of handling these values.
-     *
-     * @return Possibly-empty list of all known {@link net.dv8tion.jda.api.entities.TextChannel TextChannels}.
-     */
-    @Nonnull
-    default List<TextChannel> getTextChannels()
-    {
-        return getTextChannelCache().asList();
-    }
-
-    /**
-     * This returns the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} with an id that matches the
-     * provided one, then this returns {@code null}.
-     *
-     * <p><b>Note:</b> just because a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} is present does
-     * not mean that you will be able to send messages to it. Furthermore, if you log into this account on the discord
-     * client, it is you will not see the channel that this returns. This is because the discord client
-     * hides any {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} that you don't have the
-     * {@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ} permission in.
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}.
-     * @throws java.lang.NumberFormatException
-     *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} with matching id.
-     */
-    @Nullable
-    default TextChannel getTextChannelById(@Nonnull String id)
-    {
-        return getTextChannelCache().getElementById(id);
-    }
-
-    /**
-     * This returns the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} with an id that matches the
-     * provided one, then this returns {@code null}.
-     *
-     * <p><b>Note:</b> just because a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} is present does
-     * not mean that you will be able to send messages to it. Furthermore, if you log into this account on the discord
-     * client, it is you will not see the channel that this returns. This is because the discord client
-     * hides any {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} that you don't have the
-     * {@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ} permission in.
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}.
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} with matching id.
-     */
-    @Nullable
-    default TextChannel getTextChannelById(long id)
-    {
-        return getTextChannelCache().getElementById(id);
-    }
-
-    /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.TextChannel TextChannels} that have the same name as the one provided.
-     * <br>If there are no {@link net.dv8tion.jda.api.entities.TextChannel TextChannels} with the provided name, then this returns an empty list.
-     *
-     * <p><b>Note:</b> just because a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} is present in this list does
-     * not mean that you will be able to send messages to it. Furthermore, if you log into this account on the discord
-     * client, it is possible that you will see fewer channels than this returns. This is because the discord client
-     * hides any {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} that you don't have the
-     * {@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ} permission in.
-     *
-     * @param  name
-     *         The name of the requested {@link net.dv8tion.jda.api.entities.TextChannel TextChannels}.
-     * @param  ignoreCase
-     *         Whether to ignore case or not when comparing the provided name to each {@link net.dv8tion.jda.api.entities.TextChannel#getName()}.
-     *
-     * @return Possibly-empty list of all the {@link net.dv8tion.jda.api.entities.TextChannel TextChannels} that all have the
-     *         same name as the provided name.
-     */
-    @Nonnull
-    default List<TextChannel> getTextChannelsByName(@Nonnull String name, boolean ignoreCase)
-    {
-        return getTextChannelCache().getElementsByName(name, ignoreCase);
-    }
-
-    /**
-     * {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels} visible to this JDA session.
-     *
-     * <p>This may also contain {@link StageChannel StageChannels}!
-     *
-     * @return {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
-     */
-    @Nonnull
-    SnowflakeCacheView<VoiceChannel> getVoiceChannelCache();
-
-    /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels} of all connected
-     * {@link net.dv8tion.jda.api.entities.Guild Guilds}.
-     *
-     * <p>This copies the backing store into a list. This means every call
-     * creates a new list with O(n) complexity. It is recommended to store this into
-     * a local variable or use {@link #getVoiceChannelCache()} and use its more efficient
-     * versions of handling these values.
-     *
-     * <p>This may also contain {@link StageChannel StageChannels}!
-     *
-     * @return Possible-empty list of all known {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels}.
-     */
-    @Nonnull
-    default List<VoiceChannel> getVoiceChannels()
-    {
-        return getVoiceChannelCache().asList();
-    }
-
-    /**
-     * This returns the {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} with an id that matches the provided
-     * one, then this returns {@code null}.
-     *
-     * <p>This may also contain {@link StageChannel StageChannels}!
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}.
-     * @throws java.lang.NumberFormatException
-     *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} with matching id.
-     */
-    @Nullable
-    default VoiceChannel getVoiceChannelById(@Nonnull String id)
-    {
-        return getVoiceChannelCache().getElementById(id);
-    }
-
-    /**
-     * This returns the {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} with an id that matches the provided
-     * one, then this returns {@code null}.
-     *
-     * <p>This may also contain {@link StageChannel StageChannels}!
-     *
-     * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel}.
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} with matching id.
-     */
-    @Nullable
-    default VoiceChannel getVoiceChannelById(long id)
-    {
-        return getVoiceChannelCache().getElementById(id);
-    }
-
-    /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels} that have the same name as the one provided.
-     * <br>If there are no {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels} with the provided name, then this returns an empty list.
-     *
-     * <p>This may also contain {@link StageChannel StageChannels}!
-     *
-     * @param  name
-     *         The name of the requested {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels}.
-     * @param  ignoreCase
-     *         Whether to ignore case or not when comparing the provided name to each {@link net.dv8tion.jda.api.entities.VoiceChannel#getName()}.
-     *
-     * @return Possibly-empty list of all the {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannels} that all have the
-     *         same name as the provided name.
-     */
-    @Nonnull
-    default List<VoiceChannel> getVoiceChannelsByName(@Nonnull String name, boolean ignoreCase)
-    {
-        return getVoiceChannelCache().getElementsByName(name, ignoreCase);
-    }
-
-    /**
-     * {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannels} visible to this JDA session.
+     * all cached {@link PrivateChannel PrivateChannels} visible to this JDA session.
      *
      * @return {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
      */
@@ -1857,52 +1450,51 @@ public interface JDA
     SnowflakeCacheView<PrivateChannel> getPrivateChannelCache();
 
     /**
-     * An unmodifiable list of all known {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannels}.
+     * An unmodifiable list of all known {@link PrivateChannel PrivateChannels}.
      *
      * <p>This copies the backing store into a list. This means every call
      * creates a new list with O(n) complexity. It is recommended to store this into
      * a local variable or use {@link #getPrivateChannelCache()} and use its more efficient
      * versions of handling these values.
      *
-     * @return Possibly-empty list of all {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannels}.
+     * @return Possibly-empty list of all {@link PrivateChannel PrivateChannels}.
      */
     @Nonnull
-    default List<PrivateChannel> getPrivateChannels()
-    {
+    @Unmodifiable
+    default List<PrivateChannel> getPrivateChannels() {
         return getPrivateChannelCache().asList();
     }
 
     /**
-     * This returns the {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} with an id that matches the provided
+     * This returns the {@link PrivateChannel PrivateChannel} which has the same id as the one provided.
+     * <br>If there is no known {@link PrivateChannel PrivateChannel} with an id that matches the provided
      * one, then this returns {@code null}.
      *
      * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel}.
+     *         The id of the {@link PrivateChannel PrivateChannel}.
+     *
      * @throws java.lang.NumberFormatException
      *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
      *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} with matching id.
+     * @return Possibly-null {@link PrivateChannel PrivateChannel} with matching id.
      */
     @Nullable
-    default PrivateChannel getPrivateChannelById(@Nonnull String id)
-    {
+    default PrivateChannel getPrivateChannelById(@Nonnull String id) {
         return getPrivateChannelCache().getElementById(id);
     }
 
     /**
-     * This returns the {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} which has the same id as the one provided.
-     * <br>If there is no known {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} with an id that matches the provided
+     * This returns the {@link PrivateChannel PrivateChannel} which has the same id as the one provided.
+     * <br>If there is no known {@link PrivateChannel PrivateChannel} with an id that matches the provided
      * one, then this returns {@code null}.
      *
      * @param  id
-     *         The id of the {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel}.
+     *         The id of the {@link PrivateChannel PrivateChannel}.
      *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} with matching id.
+     * @return Possibly-null {@link PrivateChannel PrivateChannel} with matching id.
      */
     @Nullable
-    default PrivateChannel getPrivateChannelById(long id)
-    {
+    default PrivateChannel getPrivateChannelById(long id) {
         return getPrivateChannelCache().getElementById(id);
     }
 
@@ -1911,14 +1503,17 @@ public interface JDA
      * <br>This will fail with {@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_USER UNKNOWN_USER}
      * if the user does not exist.
      *
-     * <h2>Example</h2>
-     * <pre>{@code
+     * <p>If the channel is cached, this will directly return the channel in a completed {@link RestAction} without making a request.
+     * You can use {@link CacheRestAction#useCache(boolean) action.useCache(false)} to force an update.
+     *
+     * <p><b>Example</b><br>
+     * {@snippet lang="java":
      * public void sendMessage(JDA jda, long userId, String content) {
      *     jda.openPrivateChannelById(userId)
      *        .flatMap(channel -> channel.sendMessage(content))
      *        .queue();
      * }
-     * }</pre>
+     * }
      *
      * @param  userId
      *         The id of the target user
@@ -1926,27 +1521,30 @@ public interface JDA
      * @throws UnsupportedOperationException
      *         If the target user is the currently logged in account
      *
-     * @return {@link RestAction} - Type: {@link PrivateChannel}
+     * @return {@link CacheRestAction} - Type: {@link PrivateChannel}
      *
      * @see    User#openPrivateChannel()
      */
     @Nonnull
     @CheckReturnValue
-    RestAction<PrivateChannel> openPrivateChannelById(long userId);
+    CacheRestAction<PrivateChannel> openPrivateChannelById(long userId);
 
     /**
      * Opens a {@link PrivateChannel} with the provided user by id.
      * <br>This will fail with {@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_USER UNKNOWN_USER}
      * if the user does not exist.
      *
-     * <h2>Example</h2>
-     * <pre>{@code
+     * <p>If the channel is cached, this will directly return the channel in a completed {@link RestAction} without making a request.
+     * You can use {@link CacheRestAction#useCache(boolean) action.useCache(false)} to force an update.
+     *
+     * <p><b>Example</b><br>
+     * {@snippet lang="java":
      * public void sendMessage(JDA jda, String userId, String content) {
      *     jda.openPrivateChannelById(userId)
      *        .flatMap(channel -> channel.sendMessage(content))
      *        .queue();
      * }
-     * }</pre>
+     * }
      *
      * @param  userId
      *         The id of the target user
@@ -1962,106 +1560,195 @@ public interface JDA
      */
     @Nonnull
     @CheckReturnValue
-    default RestAction<PrivateChannel> openPrivateChannelById(@Nonnull String userId)
-    {
+    default CacheRestAction<PrivateChannel> openPrivateChannelById(@Nonnull String userId) {
         return openPrivateChannelById(MiscUtil.parseSnowflake(userId));
     }
 
     /**
      * Unified {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView} of
-     * all cached {@link net.dv8tion.jda.api.entities.Emote Emotes} visible to this JDA session.
+     * all cached {@link RichCustomEmoji Custom Emojis} visible to this JDA session.
      *
      * @return Unified {@link net.dv8tion.jda.api.utils.cache.SnowflakeCacheView SnowflakeCacheView}
      *
      * @see    net.dv8tion.jda.api.utils.cache.CacheView#allSnowflakes(java.util.function.Supplier) CacheView.allSnowflakes(...)
      */
     @Nonnull
-    SnowflakeCacheView<Emote> getEmoteCache();
+    SnowflakeCacheView<RichCustomEmoji> getEmojiCache();
 
     /**
-     * A collection of all to us known emotes (managed/restricted included).
-     * <br>This will be empty if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOTE} is disabled.
+     * A collection of all to us known custom emoji (managed/restricted included).
+     * <br>This will be empty if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOJI} is disabled.
      *
-     * <p><b>Hint</b>: To check whether you can use an {@link net.dv8tion.jda.api.entities.Emote Emote} in a specific
-     * context you can use {@link Emote#canInteract(net.dv8tion.jda.api.entities.Member)} or {@link
-     * Emote#canInteract(net.dv8tion.jda.api.entities.User, net.dv8tion.jda.api.entities.MessageChannel)}
+     * <p><b>Hint</b>: To check whether you can use an {@link RichCustomEmoji} in a specific
+     * context you can use {@link RichCustomEmoji#canInteract(net.dv8tion.jda.api.entities.Member)} or {@link
+     * RichCustomEmoji#canInteract(net.dv8tion.jda.api.entities.User, MessageChannel)}
      *
-     * <p><b>Unicode emojis are not included as {@link net.dv8tion.jda.api.entities.Emote Emote}!</b>
+     * <p><b>Unicode emojis are not included as {@link RichCustomEmoji Custom Emoji}!</b>
      *
      * <p>This copies the backing store into a list. This means every call
      * creates a new list with O(n) complexity. It is recommended to store this into
-     * a local variable or use {@link #getEmoteCache()} and use its more efficient
+     * a local variable or use {@link #getEmojiCache()} and use its more efficient
      * versions of handling these values.
      *
-     * @return An immutable list of Emotes (which may or may not be available to usage).
+     * @return An immutable list of Custom Emojis (which may or may not be available to usage).
      */
     @Nonnull
-    default List<Emote> getEmotes()
-    {
-        return getEmoteCache().asList();
+    @Unmodifiable
+    default List<RichCustomEmoji> getEmojis() {
+        return getEmojiCache().asList();
     }
 
     /**
-     * Retrieves an emote matching the specified {@code id} if one is available in our cache.
-     * <br>This will be null if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOTE} is disabled.
+     * Retrieves a custom emoji matching the specified {@code id} if one is available in our cache.
+     * <br>This will be null if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOJI} is disabled.
      *
-     * <p><b>Unicode emojis are not included as {@link net.dv8tion.jda.api.entities.Emote Emote}!</b>
+     * <p><b>Unicode emojis are not included as {@link RichCustomEmoji Custom Emoji}!</b>
      *
      * @param  id
-     *         The id of the requested {@link net.dv8tion.jda.api.entities.Emote}.
+     *         The id of the requested {@link RichCustomEmoji}.
      *
      * @throws java.lang.NumberFormatException
      *         If the provided {@code id} cannot be parsed by {@link Long#parseLong(String)}
      *
-     * @return An {@link net.dv8tion.jda.api.entities.Emote Emote} represented by this id or null if none is found in
+     * @return A {@link RichCustomEmoji Custom Emoji} represented by this id or null if none is found in
      *         our cache.
      */
     @Nullable
-    default Emote getEmoteById(@Nonnull String id)
-    {
-        return getEmoteCache().getElementById(id);
+    default RichCustomEmoji getEmojiById(@Nonnull String id) {
+        return getEmojiCache().getElementById(id);
     }
 
     /**
-     * Retrieves an emote matching the specified {@code id} if one is available in our cache.
-     * <br>This will be null if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOTE} is disabled.
+     * Retrieves a custom emoji matching the specified {@code id} if one is available in our cache.
+     * <br>This will be null if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOJI} is disabled.
      *
-     * <p><b>Unicode emojis are not included as {@link net.dv8tion.jda.api.entities.Emote Emote}!</b>
+     * <p><b>Unicode emojis are not included as {@link RichCustomEmoji Custom Emoji}!</b>
      *
      * @param  id
-     *         The id of the requested {@link net.dv8tion.jda.api.entities.Emote}.
+     *         The id of the requested {@link RichCustomEmoji}.
      *
-     * @return An {@link net.dv8tion.jda.api.entities.Emote Emote} represented by this id or null if none is found in
+     * @return A {@link RichCustomEmoji Custom Emoji} represented by this id or null if none is found in
      *         our cache.
      */
     @Nullable
-    default Emote getEmoteById(long id)
-    {
-        return getEmoteCache().getElementById(id);
+    default RichCustomEmoji getEmojiById(long id) {
+        return getEmojiCache().getElementById(id);
     }
 
     /**
-     * An unmodifiable list of all {@link net.dv8tion.jda.api.entities.Emote Emotes} that have the same name as the one
-     * provided. <br>If there are no {@link net.dv8tion.jda.api.entities.Emote Emotes} with the provided name, then
+     * An unmodifiable list of all {@link RichCustomEmoji Custom Emojis} that have the same name as the one
+     * provided. <br>If there are no {@link RichCustomEmoji Custom Emojis} with the provided name, then
      * this returns an empty list.
-     * <br>This will be empty if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOTE} is disabled.
+     * <br>This will be empty if {@link net.dv8tion.jda.api.utils.cache.CacheFlag#EMOJI} is disabled.
      *
-     * <p><b>Unicode emojis are not included as {@link net.dv8tion.jda.api.entities.Emote Emote}!</b>
+     * <p><b>Unicode emojis are not included as {@link RichCustomEmoji Custom Emoji}!</b>
      *
      * @param  name
-     *         The name of the requested {@link net.dv8tion.jda.api.entities.Emote Emotes}. Without colons.
+     *         The name of the requested {@link RichCustomEmoji Custom Emojis}. Without colons.
      * @param  ignoreCase
      *         Whether to ignore case or not when comparing the provided name to each {@link
-     *         net.dv8tion.jda.api.entities.Emote#getName()}.
+     *         RichCustomEmoji#getName()}.
      *
-     * @return Possibly-empty list of all the {@link net.dv8tion.jda.api.entities.Emote Emotes} that all have the same
+     * @return Possibly-empty list of all the {@link RichCustomEmoji Custom Emojis} that all have the same
      *         name as the provided name.
      */
     @Nonnull
-    default List<Emote> getEmotesByName(@Nonnull String name, boolean ignoreCase)
-    {
-        return getEmoteCache().getElementsByName(name, ignoreCase);
+    @Unmodifiable
+    default List<RichCustomEmoji> getEmojisByName(@Nonnull String name, boolean ignoreCase) {
+        return getEmojiCache().getElementsByName(name, ignoreCase);
     }
+
+    /**
+     * Creates a new {@link ApplicationEmoji} for this bot.
+     *
+     * <p>Note that the bot is limited to {@value ApplicationEmoji#MAX_APPLICATION_EMOJIS} Application Emojis (normal and animated).
+     *
+     * @param  name
+     *         The name for the new emoji (2-{@value CustomEmoji#EMOJI_NAME_MAX_LENGTH} characters)
+     * @param  icon
+     *         The {@link Icon} for the new emoji
+     *
+     * @throws IllegalArgumentException
+     *         If null is provided or the name is not alphanumeric or not between 2 and {@value CustomEmoji#EMOJI_NAME_MAX_LENGTH} characters long
+     *
+     * @return {@link RestAction} - Type: {@link ApplicationEmoji}
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<ApplicationEmoji> createApplicationEmoji(@Nonnull String name, @Nonnull Icon icon);
+
+    /**
+     * Retrieves a list of Application Emojis together with their respective creators.
+     *
+     * @return {@link RestAction RestAction} - Type: List of {@link ApplicationEmoji}
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<List<ApplicationEmoji>> retrieveApplicationEmojis();
+
+    /**
+     * Retrieves an application emoji together with its respective creator.
+     *
+     * @param  emojiId
+     *         The emoji id
+     *
+     * @return {@link RestAction RestAction} - Type: {@link ApplicationEmoji}
+     */
+    @Nonnull
+    @CheckReturnValue
+    default RestAction<ApplicationEmoji> retrieveApplicationEmojiById(long emojiId) {
+        return retrieveApplicationEmojiById(Long.toUnsignedString(emojiId));
+    }
+
+    /**
+     * Retrieves an application emoji together with its respective creator.
+     *
+     * @param  emojiId
+     *         The emoji id
+     *
+     * @throws IllegalArgumentException
+     *         If the provided id is not a valid snowflake
+     *
+     * @return {@link RestAction RestAction} - Type: {@link ApplicationEmoji}
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<ApplicationEmoji> retrieveApplicationEmojiById(@Nonnull String emojiId);
+
+    /**
+     * Attempts to retrieve a {@link Sticker} object based on the provided snowflake reference.
+     * <br>This works for both {@link StandardSticker} and {@link GuildSticker}, and you can resolve them using the provided {@link StickerUnion}.
+     *
+     * <p>If the sticker is not one of the supported {@link Sticker.Type Types}, the request fails with {@link IllegalArgumentException}.
+     *
+     * <p>The returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} can encounter the following Discord errors:
+     * <ul>
+     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_STICKER UNKNOWN_STICKER}
+     *     <br>Occurs when the provided id does not refer to a sticker known by Discord.</li>
+     * </ul>
+     *
+     * @param  sticker
+     *         The reference of the requested {@link Sticker}.
+     *         <br>Can be {@link RichSticker}, {@link StickerItem}, or {@link Sticker#fromId(long)}.
+     *
+     * @throws IllegalArgumentException
+     *         If the provided sticker is null
+     *
+     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link StickerUnion}
+     *         <br>On request, gets the sticker with id matching provided id from Discord.
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<StickerUnion> retrieveSticker(@Nonnull StickerSnowflake sticker);
+
+    /**
+     * Retrieves a list of all the public {@link StickerPack StickerPacks} used for nitro.
+     *
+     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: List of {@link StickerPack}
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<@Unmodifiable List<StickerPack>> retrieveNitroStickerPacks();
 
     /**
      * The EventManager used by this JDA instance.
@@ -2143,7 +1830,7 @@ public interface JDA
     void setRequestTimeoutRetry(boolean retryOnTimeout);
 
     /**
-     * USed to determine whether or not autoReconnect is enabled for JDA.
+     * Used to determine whether or not autoReconnect is enabled for JDA.
      *
      * @return True if JDA will attempt to automatically reconnect when a connection-error is encountered.
      */
@@ -2189,32 +1876,10 @@ public interface JDA
      */
     void shutdownNow();
 
-    ///**
-    // * Installs an auxiliary cable into the given port of your system.
-    // *
-    // * @param  port
-    // *         The port in which the cable should be installed.
-    // *
-    // * @return {@link net.dv8tion.jda.api.requests.restaction.AuditableRestAction AuditableRestAction}{@literal <}{@link Void}{@literal >}
-    // */
-    //AuditableRestAction<Void> installAuxiliaryCable(int port);
-
-    /**
-     * The {@link net.dv8tion.jda.api.AccountType} of the currently logged in account.
-     * <br>Used when determining functions that are restricted based on the type of account.
-     *
-     * @return The current AccountType.
-     */
-    @Nonnull
-    AccountType getAccountType();
-
     /**
      * Retrieves the {@link ApplicationInfo ApplicationInfo} for
      * the application that owns the logged in Bot-Account.
      * <br>This contains information about the owner of the currently logged in bot account!
-     *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         If the currently logged in account is not from {@link net.dv8tion.jda.api.AccountType#BOT AccountType.BOT}
      *
      * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link ApplicationInfo ApplicationInfo}
      *         <br>The {@link ApplicationInfo ApplicationInfo} of the bot's application.
@@ -2222,6 +1887,136 @@ public interface JDA
     @Nonnull
     @CheckReturnValue
     RestAction<ApplicationInfo> retrieveApplicationInfo();
+
+    /**
+     * Retrieves all {@link SKU SKUs} for
+     * the application that owns the logged in Bot-Account.
+     *
+     * <br>Because of how SKUs and subscription systems work, you will see two SKUs for a subscription offering.
+     * For integration and testing entitlements for Subscriptions, you should use the SKU with type: {@link SKUType#SUBSCRIPTION}.
+     *
+     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link List} of {@link SKU SKU}
+     *         <br>The {@link SKU SKUs} of the bot's application.
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<List<SKU>> retrieveSKUList();
+
+    /**
+     * A {@link net.dv8tion.jda.api.requests.restaction.pagination.PaginationAction PaginationAction} implementation
+     * which allows you to {@link Iterable iterate} over {@link Entitlement}s that are applicable to the logged in application.
+     *
+     * @return {@link EntitlementPaginationAction EntitlementPaginationAction}
+     */
+    @Nonnull
+    @CheckReturnValue
+    EntitlementPaginationAction retrieveEntitlements();
+
+    /**
+     * Retrieves an {@link Entitlement} by its id.
+     *
+     * @param  entitlementId
+     *         The id of the entitlement to retrieve
+     *
+     * @throws IllegalArgumentException
+     *         If the provided id is not a valid snowflake
+     *
+     * @return {@link RestAction} - Type: {@link Entitlement}
+     *         <br>The entitlement with the provided id
+     */
+    @Nonnull
+    @CheckReturnValue
+    default RestAction<Entitlement> retrieveEntitlementById(@Nonnull String entitlementId) {
+        return retrieveEntitlementById(MiscUtil.parseSnowflake(entitlementId));
+    }
+
+    /**
+     * Retrieves an {@link Entitlement} by its id.
+     *
+     * @param  entitlementId
+     *         The id of the entitlement to retrieve
+     *
+     * @return {@link RestAction} - Type: {@link Entitlement}
+     *         <br>The entitlement with the provided id
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<Entitlement> retrieveEntitlementById(long entitlementId);
+
+    /**
+     * Constructs a new {@link Entitlement Entitlement} with the skuId and the type.
+     * <br>Use the returned {@link TestEntitlementCreateAction TestEntitlementCreateAction} to provide more details.
+     *
+     * @param  skuId
+     *         The id of the SKU the entitlement is for
+     * @param ownerId
+     *        The id of the owner of the entitlement
+     * @param ownerType
+     *        The type of the owner of the entitlement
+     *
+     * @throws IllegalArgumentException
+     *         If the provided skuId or ownerId is not a valid snowflake
+     *
+     * @return {@link TestEntitlementCreateAction TestEntitlementCreateAction}
+     *         <br>Allows for setting various details for the resulting Entitlement
+     */
+    @Nonnull
+    @CheckReturnValue
+    default TestEntitlementCreateAction createTestEntitlement(
+            @Nonnull String skuId, @Nonnull String ownerId, @Nonnull TestEntitlementCreateAction.OwnerType ownerType) {
+        return createTestEntitlement(MiscUtil.parseSnowflake(skuId), MiscUtil.parseSnowflake(ownerId), ownerType);
+    }
+
+    /**
+     * Constructs a new {@link Entitlement Entitlement} with the skuId and the type.
+     * <br>Use the returned {@link TestEntitlementCreateAction TestEntitlementCreateAction} to provide more details.
+     *
+     * @param  skuId
+     *         The id of the SKU the entitlement is for
+     * @param ownerId
+     *        The id of the owner of the entitlement
+     * @param ownerType
+     *        The type of the owner of the entitlement
+     *
+     * @throws IllegalArgumentException
+     *         If the provided ownerType is null
+     *
+     * @return {@link TestEntitlementCreateAction TestEntitlementCreateAction}
+     *         <br>Allows for setting various details for the resulting Entitlement
+     */
+    @Nonnull
+    @CheckReturnValue
+    TestEntitlementCreateAction createTestEntitlement(
+            long skuId, long ownerId, @Nonnull TestEntitlementCreateAction.OwnerType ownerType);
+
+    /**
+     * Deletes a test entitlement by its id.
+     *
+     * @param  entitlementId
+     *         The id of the entitlement to delete
+     *
+     * @throws IllegalArgumentException
+     *         If the provided id is not a valid snowflake
+     *
+     * @return {@link RestAction} - Type: Void
+     */
+    @Nonnull
+    @CheckReturnValue
+    default RestAction<Void> deleteTestEntitlement(@Nonnull String entitlementId) {
+        return deleteTestEntitlement(MiscUtil.parseSnowflake(entitlementId));
+    }
+
+    /**
+     * Deletes a test entitlement by its id.
+     *
+     * @param  entitlementId
+     *         The id of the entitlement to delete
+     *
+     * @return {@link RestAction} - Type: Void
+     */
+    @Nonnull
+    @CheckReturnValue
+    RestAction<Void> deleteTestEntitlement(long entitlementId);
 
     /**
      * Configures the required scopes applied to the {@link #getInviteUrl(Permission...)} and similar methods.
@@ -2236,8 +2031,7 @@ public interface JDA
      * @return The current JDA instance
      */
     @Nonnull
-    default JDA setRequiredScopes(@Nonnull String... scopes)
-    {
+    default JDA setRequiredScopes(@Nonnull String... scopes) {
         Checks.noneNull(scopes, "Scopes");
         return setRequiredScopes(Arrays.asList(scopes));
     }
@@ -2268,9 +2062,6 @@ public interface JDA
      *         The permissions to use in your invite, these can be changed by the link user.
      *         <br>If no permissions are provided the {@code permissions} parameter is omitted
      *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         If the currently logged in account is not from {@link net.dv8tion.jda.api.AccountType#BOT AccountType.BOT}
-     *
      * @return A valid OAuth2 invite url for the currently logged in Bot-Account
      */
     @Nonnull
@@ -2286,9 +2077,6 @@ public interface JDA
      * @param  permissions
      *         The permissions to use in your invite, these can be changed by the link user.
      *         <br>If no permissions are provided the {@code permissions} parameter is omitted
-     *
-     * @throws net.dv8tion.jda.api.exceptions.AccountTypeException
-     *         If the currently logged in account is not from {@link net.dv8tion.jda.api.AccountType#BOT AccountType.BOT}
      *
      * @return A valid OAuth2 invite url for the currently logged in Bot-Account
      */
@@ -2306,6 +2094,7 @@ public interface JDA
 
     /**
      * Retrieves a {@link net.dv8tion.jda.api.entities.Webhook Webhook} by its id.
+     * <br>If the webhook does not belong to any known guild of this JDA session, it will be {@link Webhook#isPartial() partial}.
      *
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} caused by
      * the returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} include the following:
@@ -2335,6 +2124,7 @@ public interface JDA
 
     /**
      * Retrieves a {@link net.dv8tion.jda.api.entities.Webhook Webhook} by its id.
+     * <br>If the webhook does not belong to any known guild of this JDA session, it will be {@link Webhook#isPartial() partial}.
      *
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} caused by
      * the returned {@link net.dv8tion.jda.api.requests.RestAction RestAction} include the following:
@@ -2357,8 +2147,7 @@ public interface JDA
      */
     @Nonnull
     @CheckReturnValue
-    default RestAction<Webhook> retrieveWebhookById(long webhookId)
-    {
+    default RestAction<Webhook> retrieveWebhookById(long webhookId) {
         return retrieveWebhookById(Long.toUnsignedString(webhookId));
     }
 
@@ -2373,21 +2162,27 @@ public interface JDA
      */
     @Nonnull
     @CheckReturnValue
-    default AuditableRestAction<Integer> installAuxiliaryPort()
-    {
+    default AuditableRestAction<Integer> installAuxiliaryPort() {
         int port = ThreadLocalRandom.current().nextInt();
-        if (Desktop.isDesktopSupported())
-        {
-            try
-            {
+        if (Desktop.isDesktopSupported()) {
+            try {
                 Desktop.getDesktop().browse(new URI("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
-            }
-            catch (IOException | URISyntaxException e)
-            {
+            } catch (IOException | URISyntaxException e) {
                 throw new IllegalStateException("No port available");
             }
+        } else {
+            throw new IllegalStateException("No port available");
         }
-        else throw new IllegalStateException("No port available");
         return new CompletedRestAction<>(this, port);
     }
+
+    /**
+     * Returns the {@link ApplicationManager} that manages the application associated with the bot.
+     * <br>You modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
+     *
+     * @return The corresponding ApplicationManager
+     */
+    @Nonnull
+    @CheckReturnValue
+    ApplicationManager getApplicationManager();
 }

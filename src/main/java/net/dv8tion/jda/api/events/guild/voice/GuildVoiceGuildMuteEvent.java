@@ -26,26 +26,19 @@ import javax.annotation.Nonnull;
  *
  * <p>Can be used to detect when a member is muted or un-muted by a moderator.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.utils.cache.CacheFlag#VOICE_STATE VOICE_STATE} CacheFlag to be enabled, which requires
  * the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_VOICE_STATES GUILD_VOICE_STATES} intent.
  *
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables that CacheFlag by default!
- *
- * <p>Additionally, this event requires the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}
- * to cache the updated members. Discord does not specifically tell us about the updates, but merely tells us the
- * member was updated and gives us the updated member object. In order to fire a specific event like this we
- * need to have the old member cached to compare against.
  */
-public class GuildVoiceGuildMuteEvent extends GenericGuildVoiceEvent
-{
+public class GuildVoiceGuildMuteEvent extends GenericGuildVoiceEvent {
     protected final boolean guildMuted;
 
-    public GuildVoiceGuildMuteEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member)
-    {
+    public GuildVoiceGuildMuteEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, boolean guildMuted) {
         super(api, responseNumber, member);
-        this.guildMuted = member.getVoiceState().isGuildMuted();
+        this.guildMuted = guildMuted;
     }
 
     /**
@@ -54,8 +47,7 @@ public class GuildVoiceGuildMuteEvent extends GenericGuildVoiceEvent
      * @return True, if a moderator muted this member,
      *         <br>False, if a moderator un-muted this member
      */
-    public boolean isGuildMuted()
-    {
+    public boolean isGuildMuted() {
         return guildMuted;
     }
 }

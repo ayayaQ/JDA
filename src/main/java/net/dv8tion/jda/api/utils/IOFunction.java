@@ -16,10 +16,18 @@
 
 package net.dv8tion.jda.api.utils;
 
+import net.dv8tion.jda.annotations.UnknownNullability;
+
 import java.io.IOException;
 
+/**
+ * Function accepting one argument and throwing {@link IOException}.
+ *
+ * @param <T> The type of the argument
+ * @param <R> The type of the return value
+ */
 @FunctionalInterface
-public interface IOFunction<T, R>
-{
+public interface IOFunction<T, R> {
+    @UnknownNullability
     R apply(T t) throws IOException;
 }

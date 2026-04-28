@@ -33,19 +33,18 @@ import javax.annotation.Nullable;
  *
  * <p>Can be used to detect when a member is removed from a guild, either by leaving or being kicked/banned.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
  * {@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disable this by default!
  */
-public class GuildMemberRemoveEvent extends GenericGuildEvent
-{
+public class GuildMemberRemoveEvent extends GenericGuildEvent {
     private final User user;
     private final Member member;
 
-    public GuildMemberRemoveEvent(@Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nonnull User user, @Nullable Member member)
-    {
+    public GuildMemberRemoveEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nonnull User user, @Nullable Member member) {
         super(api, responseNumber, guild);
         this.user = user;
         this.member = member;
@@ -57,8 +56,7 @@ public class GuildMemberRemoveEvent extends GenericGuildEvent
      * @return The user who was removed
      */
     @Nonnull
-    public User getUser()
-    {
+    public User getUser() {
         return user;
     }
 
@@ -69,8 +67,7 @@ public class GuildMemberRemoveEvent extends GenericGuildEvent
      * @return Possibly-null member
      */
     @Nullable
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 }

@@ -26,28 +26,21 @@ import javax.annotation.Nonnull;
  *
  * <p>Can be used to detect when a member is suppressed or un-suppressed.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.utils.cache.CacheFlag#VOICE_STATE VOICE_STATE} CacheFlag to be enabled, which requires
  * the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_VOICE_STATES GUILD_VOICE_STATES} intent.
  *
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables that CacheFlag by default!
  *
- * <p>Additionally, this event requires the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}
- * to cache the updated members. Discord does not specifically tell us about the updates, but merely tells us the
- * member was updated and gives us the updated member object. In order to fire a specific event like this we
- * need to have the old member cached to compare against.
- *
  * @see net.dv8tion.jda.api.entities.GuildVoiceState#isSuppressed() GuildVoiceState.isSuppressed()
  */
-public class GuildVoiceSuppressEvent extends GenericGuildVoiceEvent
-{
+public class GuildVoiceSuppressEvent extends GenericGuildVoiceEvent {
     protected final boolean suppressed;
 
-    public GuildVoiceSuppressEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member)
-    {
+    public GuildVoiceSuppressEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, boolean suppressed) {
         super(api, responseNumber, member);
-        this.suppressed = member.getVoiceState().isSuppressed();
+        this.suppressed = suppressed;
     }
 
     /**
@@ -56,8 +49,7 @@ public class GuildVoiceSuppressEvent extends GenericGuildVoiceEvent
      * @return True, if the member was suppressed,
      *         <br>False, if the member was un-suppressed
      */
-    public boolean isSuppressed()
-    {
+    public boolean isSuppressed() {
         return suppressed;
     }
 }

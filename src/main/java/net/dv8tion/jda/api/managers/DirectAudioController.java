@@ -18,7 +18,7 @@ package net.dv8tion.jda.api.managers;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.VoiceChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 
 import javax.annotation.Nonnull;
 
@@ -28,8 +28,7 @@ import javax.annotation.Nonnull;
  *
  * <p>For normal operation use {@link Guild#getAudioManager()} instead.
  */
-public interface DirectAudioController
-{
+public interface DirectAudioController {
     /**
      * The associated JDA instance
      *
@@ -44,9 +43,9 @@ public interface DirectAudioController
      * @param channel
      *        The channel to connect to
      *
-     * @see   #reconnect(VoiceChannel)
+     * @see   #reconnect(AudioChannel)
      */
-    void connect(@Nonnull VoiceChannel channel);
+    void connect(@Nonnull AudioChannel channel);
 
     /**
      * Requests to terminate the connection to a voice channel.
@@ -54,7 +53,7 @@ public interface DirectAudioController
      * @param guild
      *        The guild we were connected to
      *
-     * @see   #reconnect(VoiceChannel)
+     * @see   #reconnect(AudioChannel)
      */
     void disconnect(@Nonnull Guild guild);
 
@@ -64,5 +63,5 @@ public interface DirectAudioController
      * @param channel
      *        The channel we were connected to
      */
-    void reconnect(@Nonnull VoiceChannel channel);
+    void reconnect(@Nonnull AudioChannel channel);
 }

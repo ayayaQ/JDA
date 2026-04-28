@@ -21,6 +21,7 @@ import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.utils.cache.LRUMemberCachePolicy;
 import net.dv8tion.jda.internal.utils.Checks;
 
 import javax.annotation.Nonnull;
@@ -38,23 +39,27 @@ import javax.annotation.Nonnull;
  *
  * <p>This can be configured with {@link net.dv8tion.jda.api.JDABuilder#setMemberCachePolicy(MemberCachePolicy) JDABuilder.setMemberCachePolicy(MemberCachePolicy)}.
  *
+ * <p><b>Example Policy</b><br>
+ * {@snippet lang="java":
+ * MemberCachePolicy.VOICE                         // Keep in cache if currently in voice (skip LRU and ONLINE)
+ *     .or(MemberCachePolicy.ONLINE)               // Otherwise, only add to cache if online
+ *     .and(MemberCachePolicy.lru(1000)            // keep 1000 recently active members
+ *         .unloadUnless(MemberCachePolicy.VOICE)) // only unload if they are not in voice/guild owner
+ * }
+ *
  * @see #DEFAULT
  * @see #NONE
  * @see #ALL
  * @see #OWNER
  * @see #VOICE
  * @see #ONLINE
- *
  * @see #or(MemberCachePolicy)
  * @see #and(MemberCachePolicy)
  * @see #any(MemberCachePolicy, MemberCachePolicy...)
  * @see #all(MemberCachePolicy, MemberCachePolicy...)
- *
- * @since 4.2.0
  */
 @FunctionalInterface
-public interface MemberCachePolicy
-{
+public interface MemberCachePolicy {
     /**
      * Disable all member caching
      */
@@ -80,7 +85,8 @@ public interface MemberCachePolicy
      * <p>Not recommended without {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent enabled.
      * The api will only send the guild member leave events when this intent is enabled. Without those events the members will stay in cache indefinitely.
      */
-    MemberCachePolicy ONLINE = (member) -> member.getOnlineStatus() != OnlineStatus.OFFLINE && member.getOnlineStatus() != OnlineStatus.UNKNOWN;
+    MemberCachePolicy ONLINE = (member) ->
+            member.getOnlineStatus() != OnlineStatus.OFFLINE && member.getOnlineStatus() != OnlineStatus.UNKNOWN;
     /**
      * Cache members who are connected to a voice channel.
      * <br>Requires {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_VOICE_STATES GatewayIntent.GUILD_VOICE_STATES} and {@link net.dv8tion.jda.api.utils.cache.CacheFlag#VOICE_STATE CacheFlag.VOICE_STATE} to be enabled.
@@ -89,6 +95,11 @@ public interface MemberCachePolicy
         GuildVoiceState voiceState = member.getVoiceState();
         return voiceState != null && voiceState.getChannel() != null;
     };
+    /**
+     * Cache members who are boosting the guild. This checks {@link Member#isBoosting()}
+     * <br>Requires {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} to be enabled.
+     * */
+    MemberCachePolicy BOOSTER = Member::isBoosting;
     /**
      * Caches members who haven't passed Membership Screening.
      *
@@ -132,8 +143,7 @@ public interface MemberCachePolicy
      * @return New policy which combines both using a logical OR
      */
     @Nonnull
-    default MemberCachePolicy or(@Nonnull MemberCachePolicy policy)
-    {
+    default MemberCachePolicy or(@Nonnull MemberCachePolicy policy) {
         Checks.notNull(policy, "Policy");
         return (member) -> cacheMember(member) || policy.cacheMember(member);
     }
@@ -151,8 +161,7 @@ public interface MemberCachePolicy
      * @return New policy which combines both using a logical AND
      */
     @Nonnull
-    default MemberCachePolicy and(@Nonnull MemberCachePolicy policy)
-    {
+    default MemberCachePolicy and(@Nonnull MemberCachePolicy policy) {
         return (member) -> cacheMember(member) && policy.cacheMember(member);
     }
 
@@ -168,12 +177,12 @@ public interface MemberCachePolicy
      * @return New policy which combines all provided polices using a logical OR
      */
     @Nonnull
-    static MemberCachePolicy any(@Nonnull MemberCachePolicy policy, @Nonnull MemberCachePolicy... policies)
-    {
+    static MemberCachePolicy any(@Nonnull MemberCachePolicy policy, @Nonnull MemberCachePolicy... policies) {
         Checks.notNull(policy, "Policy");
         Checks.notNull(policies, "Policy");
-        for (MemberCachePolicy p : policies)
+        for (MemberCachePolicy p : policies) {
             policy = policy.or(p);
+        }
         return policy;
     }
 
@@ -189,12 +198,41 @@ public interface MemberCachePolicy
      * @return New policy which combines all provided polices using a logical AND
      */
     @Nonnull
-    static MemberCachePolicy all(@Nonnull MemberCachePolicy policy, @Nonnull MemberCachePolicy... policies)
-    {
+    static MemberCachePolicy all(@Nonnull MemberCachePolicy policy, @Nonnull MemberCachePolicy... policies) {
         Checks.notNull(policy, "Policy");
         Checks.notNull(policies, "Policy");
-        for (MemberCachePolicy p : policies)
+        for (MemberCachePolicy p : policies) {
             policy = policy.and(p);
+        }
         return policy;
+    }
+
+    /**
+     * Implementation using a Least-Recently-Used (LRU) cache strategy.
+     *
+     * <p><b>Example</b><br>
+     * {@snippet lang="java":
+     * MemberCachePolicy.ONLINE.and( // only cache online members
+     *   MemberCachePolicy.lru(1000) // of those online members, track the 1000 most active members
+     *     .unloadUnless(MemberCachePolicy.VOICE) // always keep voice members cached regardless of age
+     * )
+     * }
+     *
+     * This policy would add online members into the pool of cached members.
+     * The cached members are limited to 1000 active members, which are handled by the LRU policy.
+     * When the LRU cache exceeds the maximum, it will evict the least recently active member from cache.
+     * If the sub-policy, in this case {@link MemberCachePolicy#VOICE}, evaluates to {@code true}, the member is retained in cache.
+     * Otherwise, the member is unloaded using {@link Guild#unloadMember(long)}.
+     *
+     * <p>Note that the LRU policy itself always returns {@code true} for {@link #cacheMember(Member)}, since that makes the member the <b>most recently used</b> instead.
+     *
+     * @param  maxSize
+     *         The maximum cache capacity of the LRU cache
+     *
+     * @return {@link LRUMemberCachePolicy}
+     */
+    @Nonnull
+    static LRUMemberCachePolicy lru(int maxSize) {
+        return new LRUMemberCachePolicy(maxSize);
     }
 }

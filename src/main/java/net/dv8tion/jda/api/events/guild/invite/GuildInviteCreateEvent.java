@@ -17,8 +17,8 @@
 package net.dv8tion.jda.api.events.guild.invite;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.GuildChannel;
 import net.dv8tion.jda.api.entities.Invite;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 
 import javax.annotation.Nonnull;
 
@@ -27,17 +27,16 @@ import javax.annotation.Nonnull;
  *
  * <p>Can be used to track invites for moderation purposes.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_INVITES GUILD_INVITES} intent to be enabled.
  * <br>This event will only fire for invites created in channels where you can {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL MANAGE_CHANNEL}.
  */
-public class GuildInviteCreateEvent extends GenericGuildInviteEvent
-{
+public class GuildInviteCreateEvent extends GenericGuildInviteEvent {
     private final Invite invite;
 
-    public GuildInviteCreateEvent(@Nonnull JDA api, long responseNumber, @Nonnull Invite invite, @Nonnull GuildChannel channel)
-    {
+    public GuildInviteCreateEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Invite invite, @Nonnull GuildChannel channel) {
         super(api, responseNumber, invite.getCode(), channel);
         this.invite = invite;
     }
@@ -48,8 +47,7 @@ public class GuildInviteCreateEvent extends GenericGuildInviteEvent
      * @return {@link Invite}
      */
     @Nonnull
-    public Invite getInvite()
-    {
+    public Invite getInvite() {
         return invite;
     }
 }

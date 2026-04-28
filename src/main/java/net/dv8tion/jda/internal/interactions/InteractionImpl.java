@@ -16,148 +16,218 @@
 
 package net.dv8tion.jda.internal.interactions;
 
-import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.Entitlement;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.interactions.DiscordLocale;
+import net.dv8tion.jda.api.interactions.IntegrationOwners;
 import net.dv8tion.jda.api.interactions.Interaction;
-import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
+import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.entities.GuildImpl;
+import net.dv8tion.jda.internal.entities.InteractionEntityBuilder;
 import net.dv8tion.jda.internal.entities.MemberImpl;
-import net.dv8tion.jda.internal.requests.restaction.interactions.ReplyActionImpl;
+import net.dv8tion.jda.internal.entities.detached.DetachedGuildImpl;
+import net.dv8tion.jda.internal.utils.Helpers;
+
+import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public class InteractionImpl implements Interaction
-{
-    protected final InteractionHookImpl hook;
+public class InteractionImpl implements Interaction {
     protected final long id;
+    protected final long channelId;
     protected final int type;
     protected final String token;
     protected final Guild guild;
     protected final Member member;
     protected final User user;
-    protected final AbstractChannel channel;
+    protected final Channel channel;
+    protected final DiscordLocale userLocale;
+    protected final List<Entitlement> entitlements;
+    protected final InteractionContextType context;
+    protected final IntegrationOwners integrationOwners;
     protected final JDAImpl api;
+    protected final InteractionEntityBuilder interactionEntityBuilder;
 
-    public InteractionImpl(JDAImpl jda, DataObject data)
-    {
+    // This is used to give a proper error when an interaction is ack'd twice
+    // By default, discord only responds with "unknown interaction"
+    // which is horrible UX so we add a check manually here
+    private boolean isAck;
+
+    public InteractionImpl(JDAImpl jda, DataObject data) {
+        DataObject userObj = data.optObject("member").orElse(data).getObject("user");
         this.api = jda;
+        this.interactionEntityBuilder =
+                new InteractionEntityBuilder(jda, data.getLong("channel_id"), userObj.getUnsignedLong("id"));
         this.id = data.getUnsignedLong("id");
         this.token = data.getString("token");
         this.type = data.getInt("type");
-        this.guild = jda.getGuildById(data.getUnsignedLong("guild_id", 0L));
-        this.hook = new InteractionHookImpl(this, jda);
-        if (guild != null)
-        {
+        this.guild = data.optObject("guild")
+                .map(guildJson -> {
+                    if (!guildJson.hasKey("preferred_locale")) {
+                        guildJson.put("preferred_locale", data.getString("guild_locale", "en-US"));
+                    }
+                    return interactionEntityBuilder.getOrCreateGuild(guildJson);
+                })
+                .orElse(null);
+        this.channelId = data.getUnsignedLong("channel_id", 0L);
+        this.userLocale = DiscordLocale.from(data.getString("locale", "en-US"));
+        this.context = InteractionContextType.fromKey(data.getString("context"));
+        this.integrationOwners = new IntegrationOwnersImpl(data.getObject("authorizing_integration_owners"));
+
+        DataObject channelJson = data.getObject("channel");
+        ChannelType channelType = ChannelType.fromId(channelJson.getInt("type"));
+        if (guild instanceof GuildImpl) {
             member = jda.getEntityBuilder().createMember((GuildImpl) guild, data.getObject("member"));
             jda.getEntityBuilder().updateMemberCache((MemberImpl) member);
             user = member.getUser();
-            channel = guild.getGuildChannelById(data.getUnsignedLong("channel_id"));
-        }
-        else
-        {
-            member = null;
-            long channelId = data.getUnsignedLong("channel_id");
-            PrivateChannel channel = jda.getPrivateChannelById(channelId);
-            if (channel == null)
-            {
-                channel = jda.getEntityBuilder().createPrivateChannel(
-                    DataObject.empty()
-                        .put("id", channelId)
-                        .put("recipient", data.getObject("user"))
-                );
+
+            GuildChannel channel = guild.getGuildChannelById(channelJson.getUnsignedLong("id"));
+            if (channel == null && channelType.isThread()) {
+                channel = api.getEntityBuilder()
+                        .createThreadChannel((GuildImpl) guild, channelJson, guild.getIdLong(), false);
+            }
+            if (channel == null) {
+                throw new IllegalStateException("Failed to create channel instance for interaction! Channel Type: "
+                        + channelJson.getInt("type"));
             }
             this.channel = channel;
-            user = channel.getUser();
+        } else if (guild instanceof DetachedGuildImpl) {
+            member = interactionEntityBuilder.createMember(guild, data.getObject("member"));
+            user = member.getUser();
+
+            if (channelType.isThread()) {
+                channel = interactionEntityBuilder.createThreadChannel(guild, channelJson);
+            } else {
+                channel = interactionEntityBuilder.createGuildChannel(guild, channelJson);
+            }
+            if (channel == null) {
+                throw new IllegalStateException("Failed to create channel instance for interaction! Channel Type: "
+                        + channelJson.getInt("type"));
+            }
+        } else {
+            // (G)DMs
+            user = jda.getEntityBuilder().createUser(userObj);
+            member = null;
+            ChannelType type = channelType;
+            switch (type) {
+                case PRIVATE:
+                    this.channel = interactionEntityBuilder.createPrivateChannel(channelJson, user);
+                    break;
+                case GROUP:
+                    this.channel = interactionEntityBuilder.createGroupChannel(channelJson);
+                    break;
+                default:
+                    throw new IllegalArgumentException(
+                            "Received interaction in unexpected channel type! Type " + type + " is not supported yet!");
+            }
         }
+
+        this.entitlements = data.optArray("entitlements").orElseGet(DataArray::empty).stream(DataArray::getObject)
+                .map(jda.getEntityBuilder()::createEntitlement)
+                .collect(Helpers.toUnmodifiableList());
     }
 
-    public InteractionImpl(long id, int type, String token, Guild guild, Member member, User user, AbstractChannel channel)
-    {
-        this.id = id;
-        this.type = type;
-        this.token = token;
-        this.guild = guild;
-        this.member = member;
-        this.user = user;
-        this.channel = channel;
-        this.api = (JDAImpl) user.getJDA();
-        this.hook = new InteractionHookImpl(this, api);
+    // Used to allow interaction hook to send messages after acknowledgements
+    // This is implemented only in DeferrableInteractionImpl where a hook is present!
+    public synchronized void releaseHook(boolean success) {}
+
+    // Ensures that one cannot acknowledge an interaction twice
+    public synchronized boolean ack() {
+        boolean wasAck = isAck;
+        this.isAck = true;
+        return wasAck;
     }
 
     @Override
-    public long getIdLong()
-    {
+    public synchronized boolean isAcknowledged() {
+        return isAck;
+    }
+
+    @Override
+    public long getIdLong() {
         return id;
     }
 
     @Override
-    public int getTypeRaw()
-    {
+    public int getTypeRaw() {
         return type;
     }
 
     @Nonnull
     @Override
-    public String getToken()
-    {
+    public String getToken() {
         return token;
     }
 
     @Nullable
     @Override
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return guild;
     }
 
     @Nullable
     @Override
-    public AbstractChannel getChannel()
-    {
+    public Channel getChannel() {
         return channel;
     }
 
-    @Nonnull
     @Override
-    public InteractionHook getHook()
-    {
-        return hook;
+    public long getChannelIdLong() {
+        return channelId;
+    }
+
+    @Nonnull
+    public DiscordLocale getUserLocale() {
+        return userLocale;
     }
 
     @Nonnull
     @Override
-    public User getUser()
-    {
+    public InteractionContextType getContext() {
+        return context;
+    }
+
+    @Nonnull
+    @Override
+    public IntegrationOwners getIntegrationOwners() {
+        return integrationOwners;
+    }
+
+    @Nonnull
+    @Override
+    public User getUser() {
         return user;
     }
 
     @Nullable
     @Override
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 
+    @Nonnull
     @Override
-    public boolean isAcknowledged()
-    {
-        return hook.isAck();
+    public List<Entitlement> getEntitlements() {
+        return entitlements;
     }
 
     @Nonnull
     @Override
-    public ReplyActionImpl deferReply()
-    {
-        return new ReplyActionImpl(this.hook);
-    }
-
-    @Nonnull
-    @Override
-    public JDA getJDA()
-    {
+    public JDAImpl getJDA() {
         return api;
+    }
+
+    @Nonnull
+    public InteractionEntityBuilder getInteractionEntityBuilder() {
+        return interactionEntityBuilder;
     }
 }

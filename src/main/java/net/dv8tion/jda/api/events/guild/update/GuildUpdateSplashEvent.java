@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.events.guild.update;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.utils.ImageProxy;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,12 +30,11 @@ import javax.annotation.Nullable;
  *
  * <p>Identifier: {@code splash}
  */
-public class GuildUpdateSplashEvent extends GenericGuildUpdateEvent<String>
-{
+public class GuildUpdateSplashEvent extends GenericGuildUpdateEvent<String> {
     public static final String IDENTIFIER = "splash";
 
-    public GuildUpdateSplashEvent(@Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nullable String oldSplashId)
-    {
+    public GuildUpdateSplashEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nullable String oldSplashId) {
         super(api, responseNumber, guild, oldSplashId, guild.getSplashId(), IDENTIFIER);
     }
 
@@ -44,8 +44,7 @@ public class GuildUpdateSplashEvent extends GenericGuildUpdateEvent<String>
      * @return The old splash id, or null
      */
     @Nullable
-    public String getOldSplashId()
-    {
+    public String getOldSplashId() {
         return getOldValue();
     }
 
@@ -55,9 +54,23 @@ public class GuildUpdateSplashEvent extends GenericGuildUpdateEvent<String>
      * @return The url of the old splash, or null
      */
     @Nullable
-    public String getOldSplashUrl()
-    {
+    public String getOldSplashUrl() {
         return previous == null ? null : String.format(Guild.SPLASH_URL, guild.getId(), previous);
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this guild's old splash image.
+     * <p>
+     * <b>Note:</b> the old splash may not always be downloadable as it might have been removed from Discord.
+     *
+     * @return Possibly-null {@link ImageProxy} of this guild's old splash image
+     *
+     * @see    #getOldSplashUrl() ()
+     */
+    @Nullable
+    public ImageProxy getOldSplash() {
+        String oldSplashUrl = getOldSplashUrl();
+        return oldSplashUrl == null ? null : new ImageProxy(oldSplashUrl);
     }
 
     /**
@@ -66,8 +79,7 @@ public class GuildUpdateSplashEvent extends GenericGuildUpdateEvent<String>
      * @return The new splash id, or null
      */
     @Nullable
-    public String getNewSplashId()
-    {
+    public String getNewSplashId() {
         return getNewValue();
     }
 
@@ -77,8 +89,20 @@ public class GuildUpdateSplashEvent extends GenericGuildUpdateEvent<String>
      * @return The url of the new splash, or null
      */
     @Nullable
-    public String getNewSplashUrl()
-    {
+    public String getNewSplashUrl() {
         return next == null ? null : String.format(Guild.SPLASH_URL, guild.getId(), next);
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this guild's new splash image.
+     *
+     * @return Possibly-null {@link ImageProxy} of this guild's new splash image
+     *
+     * @see    #getNewSplashUrl()
+     */
+    @Nullable
+    public ImageProxy getNewSplash() {
+        String newSplashUrl = getNewSplashUrl();
+        return newSplashUrl == null ? null : new ImageProxy(newSplashUrl);
     }
 }

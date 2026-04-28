@@ -19,19 +19,20 @@ package net.dv8tion.jda.api.events.guild.member.update;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
 
+import java.time.OffsetDateTime;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.time.OffsetDateTime;
 
 /**
  * Indicates that a {@link net.dv8tion.jda.api.entities.Member Member} updated their {@link net.dv8tion.jda.api.entities.Guild Guild} boost time.
  * <br>This happens when a member started or stopped boosting a guild.
  *
- * <p>Can be used to retrieve members who boosted, triggering guild.
+ * <p>Can be used to retrieve members who boosted and the triggering guild.
  *
  * <p>Identifier: {@code boost_time}
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -42,12 +43,11 @@ import java.time.OffsetDateTime;
  * member was updated and gives us the updated member object. In order to fire a specific event like this we
  * need to have the old member cached to compare against.
  */
-public class GuildMemberUpdateBoostTimeEvent extends GenericGuildMemberUpdateEvent<OffsetDateTime>
-{
+public class GuildMemberUpdateBoostTimeEvent extends GenericGuildMemberUpdateEvent<OffsetDateTime> {
     public static final String IDENTIFIER = "boost_time";
 
-    public GuildMemberUpdateBoostTimeEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nullable OffsetDateTime previous)
-    {
+    public GuildMemberUpdateBoostTimeEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nullable OffsetDateTime previous) {
         super(api, responseNumber, member, previous, member.getTimeBoosted(), IDENTIFIER);
     }
 
@@ -57,8 +57,7 @@ public class GuildMemberUpdateBoostTimeEvent extends GenericGuildMemberUpdateEve
      * @return The old boost time
      */
     @Nullable
-    public OffsetDateTime getOldTimeBoosted()
-    {
+    public OffsetDateTime getOldTimeBoosted() {
         return getOldValue();
     }
 
@@ -68,8 +67,7 @@ public class GuildMemberUpdateBoostTimeEvent extends GenericGuildMemberUpdateEve
      * @return The new boost time
      */
     @Nullable
-    public OffsetDateTime getNewTimeBoosted()
-    {
+    public OffsetDateTime getNewTimeBoosted() {
         return getNewValue();
     }
 }

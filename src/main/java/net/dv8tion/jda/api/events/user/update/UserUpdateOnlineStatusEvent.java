@@ -17,39 +17,44 @@
 package net.dv8tion.jda.api.events.user.update;
 
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 
 /**
- * Indicates that the {@link OnlineStatus OnlineStatus} of a {@link net.dv8tion.jda.api.entities.User User} changed.
- * <br>As with any presence updates this happened for a {@link net.dv8tion.jda.api.entities.Member Member} in a Guild!
+ * Indicates that the {@link OnlineStatus} of a {@link User} changed.
+ * <br>As with any presence updates this happened for a {@link Member} in a Guild!
  * <p>Can be used to retrieve the User who changed their status and their previous status.
  *
  * <p>Identifier: {@code status}
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
- * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} intent to be enabled.
- * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
- * {@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disable this by default!
+ * <p>This event requires the {@link GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} intent and {@link CacheFlag#ONLINE_STATUS} to be enabled.
+ * <br>{@link JDABuilder#createDefault(String) createDefault(String)} and
+ * {@link JDABuilder#createLight(String) createLight(String)} disable this by default!
  *
- * <p>Additionally, this event requires the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}
+ * <p>Additionally, this event requires the {@link MemberCachePolicy}
  * to cache the updated members. Discord does not specifically tell us about the updates, but merely tells us the
  * member was updated and gives us the updated member object. In order to fire a specific event like this we
  * need to have the old member cached to compare against.
  */
-public class UserUpdateOnlineStatusEvent extends GenericUserUpdateEvent<OnlineStatus> implements GenericUserPresenceEvent
-{
+public class UserUpdateOnlineStatusEvent extends GenericUserUpdateEvent<OnlineStatus>
+        implements GenericUserPresenceEvent {
     public static final String IDENTIFIER = "status";
 
     private final Guild guild;
     private final Member member;
 
-    public UserUpdateOnlineStatusEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull OnlineStatus oldOnlineStatus)
-    {
+    public UserUpdateOnlineStatusEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull OnlineStatus oldOnlineStatus) {
         super(api, responseNumber, member.getUser(), oldOnlineStatus, member.getOnlineStatus(), IDENTIFIER);
         this.guild = member.getGuild();
         this.member = member;
@@ -57,15 +62,13 @@ public class UserUpdateOnlineStatusEvent extends GenericUserUpdateEvent<OnlineSt
 
     @Nonnull
     @Override
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return guild;
     }
 
     @Nonnull
     @Override
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 
@@ -75,8 +78,7 @@ public class UserUpdateOnlineStatusEvent extends GenericUserUpdateEvent<OnlineSt
      * @return The old status
      */
     @Nonnull
-    public OnlineStatus getOldOnlineStatus()
-    {
+    public OnlineStatus getOldOnlineStatus() {
         return getOldValue();
     }
 
@@ -86,15 +88,13 @@ public class UserUpdateOnlineStatusEvent extends GenericUserUpdateEvent<OnlineSt
      * @return The new status
      */
     @Nonnull
-    public OnlineStatus getNewOnlineStatus()
-    {
+    public OnlineStatus getNewOnlineStatus() {
         return getNewValue();
     }
 
     @Nonnull
     @Override
-    public OnlineStatus getOldValue()
-    {
+    public OnlineStatus getOldValue() {
         return super.getOldValue();
     }
 

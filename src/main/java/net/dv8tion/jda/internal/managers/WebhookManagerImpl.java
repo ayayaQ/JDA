@@ -19,21 +19,20 @@ package net.dv8tion.jda.internal.managers;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Icon;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.Webhook;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
-import net.dv8tion.jda.api.exceptions.MissingAccessException;
 import net.dv8tion.jda.api.managers.WebhookManager;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.utils.data.DataObject;
-import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.utils.Checks;
 import okhttp3.RequestBody;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 
-public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements WebhookManager
-{
+public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements WebhookManager {
     protected final Webhook webhook;
     protected String name;
     protected String channel;
@@ -45,41 +44,41 @@ public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements W
      * @param webhook
      *        The target {@link net.dv8tion.jda.api.entities.Webhook Webhook} to modify
      */
-    public WebhookManagerImpl(Webhook webhook)
-    {
+    public WebhookManagerImpl(Webhook webhook) {
         super(webhook.getJDA(), Route.Webhooks.MODIFY_WEBHOOK.compile(webhook.getId()));
         this.webhook = webhook;
-        if (isPermissionChecksEnabled())
+        if (isPermissionChecksEnabled()) {
             checkPermissions();
+        }
     }
 
     @Nonnull
     @Override
-    public Webhook getWebhook()
-    {
+    public Webhook getWebhook() {
         return webhook;
     }
 
     @Nonnull
     @Override
     @CheckReturnValue
-    public WebhookManagerImpl reset(long fields)
-    {
+    public WebhookManagerImpl reset(long fields) {
         super.reset(fields);
-        if ((fields & NAME) == NAME)
+        if ((fields & NAME) == NAME) {
             this.name = null;
-        if ((fields & CHANNEL) == CHANNEL)
+        }
+        if ((fields & CHANNEL) == CHANNEL) {
             this.channel = null;
-        if ((fields & AVATAR) == AVATAR)
+        }
+        if ((fields & AVATAR) == AVATAR) {
             this.avatar = null;
+        }
         return this;
     }
 
     @Nonnull
     @Override
     @CheckReturnValue
-    public WebhookManagerImpl reset(long... fields)
-    {
+    public WebhookManagerImpl reset(@Nonnull long... fields) {
         super.reset(fields);
         return this;
     }
@@ -87,8 +86,7 @@ public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements W
     @Nonnull
     @Override
     @CheckReturnValue
-    public WebhookManagerImpl reset()
-    {
+    public WebhookManagerImpl reset() {
         super.reset();
         this.name = null;
         this.channel = null;
@@ -99,8 +97,7 @@ public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements W
     @Nonnull
     @Override
     @CheckReturnValue
-    public WebhookManagerImpl setName(@Nonnull String name)
-    {
+    public WebhookManagerImpl setName(@Nonnull String name) {
         Checks.notBlank(name, "Name");
         this.name = name;
         set |= NAME;
@@ -110,8 +107,7 @@ public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements W
     @Nonnull
     @Override
     @CheckReturnValue
-    public WebhookManagerImpl setAvatar(Icon icon)
-    {
+    public WebhookManagerImpl setAvatar(Icon icon) {
         this.avatar = icon;
         set |= AVATAR;
         return this;
@@ -120,8 +116,7 @@ public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements W
     @Nonnull
     @Override
     @CheckReturnValue
-    public WebhookManagerImpl setChannel(@Nonnull TextChannel channel)
-    {
+    public WebhookManagerImpl setChannel(@Nonnull TextChannel channel) {
         Checks.notNull(channel, "Channel");
         Checks.check(channel.getGuild().equals(getGuild()), "Channel is not from the same guild");
         this.channel = channel.getId();
@@ -130,28 +125,29 @@ public class WebhookManagerImpl extends ManagerBase<WebhookManager> implements W
     }
 
     @Override
-    protected RequestBody finalizeData()
-    {
+    protected RequestBody finalizeData() {
         DataObject data = DataObject.empty();
-        if (shouldUpdate(NAME))
+        if (shouldUpdate(NAME)) {
             data.put("name", name);
-        if (shouldUpdate(CHANNEL))
+        }
+        if (shouldUpdate(CHANNEL)) {
             data.put("channel_id", channel);
-        if (shouldUpdate(AVATAR))
+        }
+        if (shouldUpdate(AVATAR)) {
             data.put("avatar", avatar == null ? null : avatar.getEncoding());
+        }
 
         return getRequestBody(data);
     }
 
     @Override
-    protected boolean checkPermissions()
-    {
+    protected boolean checkPermissions() {
         Member selfMember = getGuild().getSelfMember();
-        TextChannel channel = getChannel();
-        if (!selfMember.hasAccess(channel))
-            throw new MissingAccessException(channel, Permission.VIEW_CHANNEL);
-        if (!selfMember.hasPermission(channel, Permission.MANAGE_WEBHOOKS))
-            throw new InsufficientPermissionException(channel, Permission.MANAGE_WEBHOOKS);
+        GuildChannel guildChannel = getChannel();
+        Checks.checkAccess(selfMember, guildChannel);
+        if (!selfMember.hasPermission(guildChannel, Permission.MANAGE_WEBHOOKS)) {
+            throw new InsufficientPermissionException(guildChannel, Permission.MANAGE_WEBHOOKS);
+        }
         return super.checkPermissions();
     }
 }

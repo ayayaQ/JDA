@@ -18,8 +18,9 @@ package net.dv8tion.jda.api.managers;
 
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Icon;
-import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.Webhook;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.unions.IWebhookContainerUnion;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
@@ -29,7 +30,7 @@ import javax.annotation.Nullable;
  * Manager providing functionality to update one or more fields for a {@link net.dv8tion.jda.api.entities.Webhook Webhook}.
  *
  * <p><b>Example</b>
- * <pre>{@code
+ * {@snippet lang="java":
  * manager.setName("GitHub Webhook")
  *        .setChannel(channel)
  *        .queue();
@@ -37,18 +38,17 @@ import javax.annotation.Nullable;
  *        .setName("Meme Feed")
  *        .setAvatar(null)
  *        .queue();
- * }</pre>
+ * }
  *
  * @see net.dv8tion.jda.api.entities.Webhook#getManager()
  */
-public interface WebhookManager extends Manager<WebhookManager>
-{
+public interface WebhookManager extends Manager<WebhookManager> {
     /** Used to reset the name field */
-    long NAME    = 0x1;
+    long NAME = 1;
     /** Used to reset the channel field */
-    long CHANNEL = 0x2;
+    long CHANNEL = 1 << 1;
     /** Used to reset the avatar field */
-    long AVATAR  = 0x4;
+    long AVATAR = 1 << 2;
 
     /**
      * Resets the fields specified by the provided bit-flag pattern.
@@ -69,11 +69,11 @@ public interface WebhookManager extends Manager<WebhookManager>
      */
     @Nonnull
     @Override
+    @CheckReturnValue
     WebhookManager reset(long fields);
 
     /**
      * Resets the fields specified by the provided bit-flag patterns.
-     * You can specify a combination by using a bitwise OR concat of the flag constants.
      * <br>Example: {@code manager.reset(WebhookManager.CHANNEL, WebhookManager.NAME);}
      *
      * <p><b>Flag Constants:</b>
@@ -90,7 +90,8 @@ public interface WebhookManager extends Manager<WebhookManager>
      */
     @Nonnull
     @Override
-    WebhookManager reset(long... fields);
+    @CheckReturnValue
+    WebhookManager reset(@Nonnull long... fields);
 
     /**
      * The target {@link net.dv8tion.jda.api.entities.Webhook Webhook}
@@ -102,15 +103,14 @@ public interface WebhookManager extends Manager<WebhookManager>
     Webhook getWebhook();
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} this Manager's
+     * The {@link net.dv8tion.jda.api.entities.channel.attribute.IWebhookContainer channel} that this Manager's
      * {@link net.dv8tion.jda.api.entities.Webhook Webhook} is in.
      * <br>This is logically the same as calling {@code getWebhook().getChannel()}
      *
-     * @return The parent {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}
+     * @return The parent {@link net.dv8tion.jda.api.entities.channel.attribute.IWebhookContainer} instance.
      */
     @Nonnull
-    default TextChannel getChannel()
-    {
+    default IWebhookContainerUnion getChannel() {
         return getWebhook().getChannel();
     }
 
@@ -122,8 +122,7 @@ public interface WebhookManager extends Manager<WebhookManager>
      * @return The parent {@link net.dv8tion.jda.api.entities.Guild Guild}
      */
     @Nonnull
-    default Guild getGuild()
-    {
+    default Guild getGuild() {
         return getWebhook().getGuild();
     }
 
@@ -159,12 +158,12 @@ public interface WebhookManager extends Manager<WebhookManager>
     WebhookManager setAvatar(@Nullable Icon icon);
 
     /**
-     * Sets the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} of the selected {@link net.dv8tion.jda.api.entities.Webhook Webhook}.
+     * Sets the {@link TextChannel TextChannel} of the selected {@link net.dv8tion.jda.api.entities.Webhook Webhook}.
      *
      * <p>A webhook channel <b>must not</b> be {@code null} and <b>must</b> be in the same {@link net.dv8tion.jda.api.entities.Guild Guild}!
      *
      * @param  channel
-     *         The new {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}
+     *         The new {@link TextChannel TextChannel}
      *         for the selected {@link net.dv8tion.jda.api.entities.Webhook Webhook}
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException

@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.events.guild.update;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.utils.ImageProxy;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,12 +30,11 @@ import javax.annotation.Nullable;
  *
  * <p>Identifier: {@code icon}
  */
-public class GuildUpdateIconEvent extends GenericGuildUpdateEvent<String>
-{
+public class GuildUpdateIconEvent extends GenericGuildUpdateEvent<String> {
     public static final String IDENTIFIER = "icon";
 
-    public GuildUpdateIconEvent(@Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nullable String oldIconId)
-    {
+    public GuildUpdateIconEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nullable String oldIconId) {
         super(api, responseNumber, guild, oldIconId, guild.getIconId(), IDENTIFIER);
     }
 
@@ -44,8 +44,7 @@ public class GuildUpdateIconEvent extends GenericGuildUpdateEvent<String>
      * @return The old icon id, or null
      */
     @Nullable
-    public String getOldIconId()
-    {
+    public String getOldIconId() {
         return getOldValue();
     }
 
@@ -55,9 +54,25 @@ public class GuildUpdateIconEvent extends GenericGuildUpdateEvent<String>
      * @return The url of the old icon, or null
      */
     @Nullable
-    public String getOldIconUrl()
-    {
-        return previous == null ? null : String.format(Guild.ICON_URL, guild.getId(), previous, previous.startsWith("a_") ? "gif" : "png");
+    public String getOldIconUrl() {
+        return previous == null
+                ? null
+                : String.format(Guild.ICON_URL, guild.getId(), previous, previous.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this guild's old icon.
+     * <p>
+     * <b>Note:</b> the old icon may not always be downloadable as it might have been removed from Discord.
+     *
+     * @return Possibly-null {@link ImageProxy} of this guild's old icon
+     *
+     * @see    #getOldIconUrl()
+     */
+    @Nullable
+    public ImageProxy getOldIcon() {
+        String oldIconUrl = getOldIconUrl();
+        return oldIconUrl == null ? null : new ImageProxy(oldIconUrl);
     }
 
     /**
@@ -66,8 +81,7 @@ public class GuildUpdateIconEvent extends GenericGuildUpdateEvent<String>
      * @return The old icon id, or null
      */
     @Nullable
-    public String getNewIconId()
-    {
+    public String getNewIconId() {
         return getNewValue();
     }
 
@@ -77,8 +91,22 @@ public class GuildUpdateIconEvent extends GenericGuildUpdateEvent<String>
      * @return The url of the new icon, or null
      */
     @Nullable
-    public String getNewIconUrl()
-    {
-        return next == null ? null : String.format(Guild.ICON_URL, guild.getId(), next, next.startsWith("a_") ? "gif" : "png");
+    public String getNewIconUrl() {
+        return next == null
+                ? null
+                : String.format(Guild.ICON_URL, guild.getId(), next, next.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this guild's new icon.
+     *
+     * @return Possibly-null {@link ImageProxy} of this guild's new icon
+     *
+     * @see    #getNewIconUrl()
+     */
+    @Nullable
+    public ImageProxy getNewIcon() {
+        String newIconUrl = getNewIconUrl();
+        return newIconUrl == null ? null : new ImageProxy(newIconUrl);
     }
 }

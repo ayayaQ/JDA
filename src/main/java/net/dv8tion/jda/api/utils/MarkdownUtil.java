@@ -19,8 +19,10 @@ package net.dv8tion.jda.api.utils;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public final class MarkdownUtil
-{
+/**
+ * Utility class to escape markdown characters.
+ */
+public final class MarkdownUtil {
     private MarkdownUtil() {}
 
     /**
@@ -34,8 +36,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String bold(@Nonnull String input)
-    {
+    public static String bold(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.BOLD);
         return "**" + sanitized + "**";
     }
@@ -51,8 +52,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String italics(@Nonnull String input)
-    {
+    public static String italics(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.ITALICS_U);
         return "_" + sanitized + "_";
     }
@@ -68,8 +68,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String underline(@Nonnull String input)
-    {
+    public static String underline(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.UNDERLINE);
         return "__" + sanitized + "__";
     }
@@ -85,8 +84,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String monospace(@Nonnull String input)
-    {
+    public static String monospace(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.MONO);
         return "`" + sanitized + "`";
     }
@@ -102,8 +100,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String codeblock(@Nonnull String input)
-    {
+    public static String codeblock(@Nonnull String input) {
         return codeblock(null, input);
     }
 
@@ -120,11 +117,11 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String codeblock(@Nullable String language, @Nonnull String input)
-    {
+    public static String codeblock(@Nullable String language, @Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.BLOCK);
-        if (language != null)
+        if (language != null) {
             return "```" + language.trim() + "\n" + sanitized + "```";
+        }
         return "```" + sanitized + "```";
     }
 
@@ -139,8 +136,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String spoiler(@Nonnull String input)
-    {
+    public static String spoiler(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.SPOILER);
         return "||" + sanitized + "||";
     }
@@ -156,8 +152,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String strike(@Nonnull String input)
-    {
+    public static String strike(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.STRIKE);
         return "~~" + sanitized + "~~";
     }
@@ -173,8 +168,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String quote(@Nonnull String input)
-    {
+    public static String quote(@Nonnull String input) {
         String sanitized = MarkdownSanitizer.escape(input, ~MarkdownSanitizer.QUOTE);
         return "> " + sanitized.replace("\n", "\n> ");
     }
@@ -189,15 +183,12 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String quoteBlock(@Nonnull String input)
-    {
+    public static String quoteBlock(@Nonnull String input) {
         return ">>> " + input;
     }
 
     /**
      * Creates a masked link with the provided url as target.
-     * <br>This will replace any closing parentheses (in the url) with the url encoded equivalent
-     * and replace closing square brackets with their escaped equivalent.
      *
      * @param  text
      *         The text to display
@@ -207,8 +198,7 @@ public final class MarkdownUtil
      * @return The resulting output
      */
     @Nonnull
-    public static String maskedLink(@Nonnull String text, @Nonnull String url)
-    {
-        return "[" + text.replace("]", "\\]") + "](" + url.replace(")", "%29") + ")";
+    public static String maskedLink(@Nonnull String text, @Nonnull String url) {
+        return "[" + text + "](" + url + ")";
     }
 }

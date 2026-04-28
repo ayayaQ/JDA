@@ -16,23 +16,23 @@
 
 package net.dv8tion.jda.api.entities;
 
-import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.channel.concrete.StageChannel;
 import net.dv8tion.jda.api.managers.StageInstanceManager;
 import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.internal.utils.Helpers;
+import org.jetbrains.annotations.Unmodifiable;
+
+import java.util.List;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * A Stage Instance holds information about a live stage.
  *
  * <p>This instance indicates an active stage channel with speakers, usually to host events such as presentations or meetings.
  */
-public interface StageInstance extends ISnowflake
-{
+public interface StageInstance extends ISnowflake {
     /**
      * The {@link Guild} this stage instance is in
      *
@@ -42,9 +42,9 @@ public interface StageInstance extends ISnowflake
     Guild getGuild();
 
     /**
-     * The {@link StageChannel} for this stage instance
+     * The {@link net.dv8tion.jda.api.entities.channel.concrete.StageChannel} for this stage instance
      *
-     * @return The {@link StageChannel}
+     * @return The {@link net.dv8tion.jda.api.entities.channel.concrete.StageChannel}
      */
     @Nonnull
     StageChannel getChannel();
@@ -66,13 +66,6 @@ public interface StageInstance extends ISnowflake
     PrivacyLevel getPrivacyLevel();
 
     /**
-     * Whether this stage instance can be found in stage discovery.
-     *
-     * @return True if this is a public stage that can be found in stage discovery
-     */
-    boolean isDiscoverable();
-
-    /**
      * All current speakers of this stage instance.
      *
      * <p>A member is considered a <b>speaker</b> when they are currently connected to the stage channel
@@ -82,15 +75,16 @@ public interface StageInstance extends ISnowflake
      * <p>Only {@link StageChannel#isModerator(Member) stage moderators} can promote or invite speakers.
      * A stage moderator can move between speaker and audience at any time.
      *
-     * @return {@link List} of {@link Member Members} which can speak in this stage instance
+     * @return Immutable {@link List} of {@link Member Members} which can speak in this stage instance
      */
     @Nonnull
-    default List<Member> getSpeakers()
-    {
-        return Collections.unmodifiableList(getChannel().getMembers()
-                .stream()
-                .filter(member -> !member.getVoiceState().isSuppressed()) // voice states should not be null since getMembers() checks only for connected members in the channel
-                .collect(Collectors.toList()));
+    @Unmodifiable
+    default List<Member> getSpeakers() {
+        return getChannel().getMembers().stream()
+                // voice states should not be null
+                // since getMembers() checks only for connected members in the channel
+                .filter(member -> !member.getVoiceState().isSuppressed())
+                .collect(Helpers.toUnmodifiableList());
     }
 
     /**
@@ -103,15 +97,16 @@ public interface StageInstance extends ISnowflake
      * <p>Only {@link StageChannel#isModerator(Member) stage moderators} can promote or invite speakers.
      * A stage moderator can move between speaker and audience at any time.
      *
-     * @return {@link List} of {@link Member Members} which cannot speak in this stage instance
+     * @return Immutable {@link List} of {@link Member Members} which cannot speak in this stage instance
      */
     @Nonnull
-    default List<Member> getAudience()
-    {
-        return Collections.unmodifiableList(getChannel().getMembers()
-                .stream()
-                .filter(member -> member.getVoiceState().isSuppressed()) // voice states should not be null since getMembers() checks only for connected members in the channel
-                .collect(Collectors.toList()));
+    @Unmodifiable
+    default List<Member> getAudience() {
+        return getChannel().getMembers().stream()
+                // voice states should not be null
+                // since getMembers() checks only for connected members in the channel
+                .filter(member -> member.getVoiceState().isSuppressed())
+                .collect(Helpers.toUnmodifiableList());
     }
 
     /**
@@ -135,38 +130,6 @@ public interface StageInstance extends ISnowflake
     RestAction<Void> delete();
 
     /**
-     * Sends a {@link GuildVoiceState#getRequestToSpeakTimestamp() request-to-speak} indicator to the stage instance moderators.
-     * <p>If the self member has {@link Permission#VOICE_MUTE_OTHERS} this will immediately promote them to speaker.
-     *
-     * @throws IllegalStateException
-     *         If the self member is not currently connected to the channel of this stage instance
-     *
-     * @return {@link RestAction}
-     *
-     * @see    #cancelRequestToSpeak()
-     */
-    @Nonnull
-    @CheckReturnValue
-    RestAction<Void> requestToSpeak();
-
-    /**
-     * Cancels the {@link #requestToSpeak() Request-to-Speak}.
-     * <br>This can also be used to move back to the audience if you are currently a speaker.
-     *
-     * <p>If there is no request to speak or the member is not currently connected to an active {@link StageInstance}, this does nothing.
-     *
-     * @throws IllegalStateException
-     *         If the self member is not currently connected to the channel of this stage instance
-     *
-     * @return {@link RestAction}
-     *
-     * @see    #requestToSpeak()
-     */
-    @Nonnull
-    @CheckReturnValue
-    RestAction<Void> cancelRequestToSpeak();
-
-    /**
      * The {@link StageInstanceManager} used to update this stage instance.
      * <p>This can be used to update multiple fields such as topic and privacy level in one request
      *
@@ -186,19 +149,15 @@ public interface StageInstance extends ISnowflake
      *
      * <p>This indicates from where people can join the stage instance.
      */
-    enum PrivacyLevel
-    {
+    enum PrivacyLevel {
         /** Placeholder for future privacy levels, indicates that this version of JDA does not support this privacy level yet */
         UNKNOWN(-1),
-        /** This stage instance can be accessed by lurkers, meaning users that are not active members of the guild */
-        PUBLIC(1),
         /** This stage instance can only be accessed by guild members */
         GUILD_ONLY(2);
 
         private final int key;
 
-        PrivacyLevel(int key)
-        {
+        PrivacyLevel(int key) {
             this.key = key;
         }
 
@@ -207,8 +166,7 @@ public interface StageInstance extends ISnowflake
          *
          * @return The raw API value or {@code -1} if this is {@link #UNKNOWN}
          */
-        public int getKey()
-        {
+        public int getKey() {
             return key;
         }
 
@@ -221,12 +179,11 @@ public interface StageInstance extends ISnowflake
          * @return The enum value or {@link #UNKNOWN}
          */
         @Nonnull
-        public static PrivacyLevel fromKey(int key)
-        {
-            for (PrivacyLevel level : values())
-            {
-                if (level.key == key)
+        public static PrivacyLevel fromKey(int key) {
+            for (PrivacyLevel level : values()) {
+                if (level.key == key) {
                     return level;
+                }
             }
             return UNKNOWN;
         }

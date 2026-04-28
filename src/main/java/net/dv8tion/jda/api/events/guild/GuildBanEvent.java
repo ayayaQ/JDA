@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.events.guild;
 
 import net.dv8tion.jda.api.JDA;
@@ -24,21 +25,19 @@ import javax.annotation.Nonnull;
 /**
  * Indicates that a {@link net.dv8tion.jda.api.entities.User User} was banned from a {@link net.dv8tion.jda.api.entities.Guild Guild}.
  *
- * <p>Can be used to retrieve the user who was banned (if available) and triggering guild.
+ * <p>Can be used to retrieve the user who was banned (if available) and the triggering guild.
  * <br><b>Note</b>: This does not directly indicate that a Member is removed from the Guild!
  *
- * @see net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent GuildMemberRemoveEvent
+ * <p><b>Requirements</b><br>
  *
- * <h2>Requirements</h2>
+ * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MODERATION GUILD_MODERATION} intent to be enabled.
  *
- * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_BANS GUILD_BANS} intent to be enabled.
+ * @see net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent
  */
-public class GuildBanEvent extends GenericGuildEvent
-{
+public class GuildBanEvent extends GenericGuildEvent {
     private final User user;
 
-    public GuildBanEvent(@Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nonnull User user)
-    {
+    public GuildBanEvent(@Nonnull JDA api, long responseNumber, @Nonnull Guild guild, @Nonnull User user) {
         super(api, responseNumber, guild);
         this.user = user;
     }
@@ -49,8 +48,7 @@ public class GuildBanEvent extends GenericGuildEvent
      * @return The banned user
      */
     @Nonnull
-    public User getUser()
-    {
+    public User getUser() {
         return user;
     }
 }

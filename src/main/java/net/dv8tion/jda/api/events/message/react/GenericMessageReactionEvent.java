@@ -17,7 +17,13 @@
 package net.dv8tion.jda.api.events.message.react;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageReaction;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.entities.emoji.EmojiUnion;
 import net.dv8tion.jda.api.events.message.GenericMessageEvent;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.internal.requests.CompletedRestAction;
@@ -32,7 +38,7 @@ import javax.annotation.Nullable;
  *
  * <p>Can be used to detect both remove and add events.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>These events require at least one of the following intents (Will not fire at all if neither is enabled):
  * <ul>
@@ -40,16 +46,19 @@ import javax.annotation.Nullable;
  *     <li>{@link net.dv8tion.jda.api.requests.GatewayIntent#DIRECT_MESSAGE_REACTIONS DIRECT_MESSAGE_REACTIONS} to work in private channels</li>
  * </ul>
  */
-public class GenericMessageReactionEvent extends GenericMessageEvent
-{
+public class GenericMessageReactionEvent extends GenericMessageEvent {
     protected final long userId;
     protected User issuer;
     protected Member member;
     protected MessageReaction reaction;
 
-    public GenericMessageReactionEvent(@Nonnull JDA api, long responseNumber, @Nullable User user,
-                                       @Nullable Member member, @Nonnull MessageReaction reaction, long userId)
-    {
+    public GenericMessageReactionEvent(
+            @Nonnull JDA api,
+            long responseNumber,
+            @Nullable User user,
+            @Nullable Member member,
+            @Nonnull MessageReaction reaction,
+            long userId) {
         super(api, responseNumber, reaction.getMessageIdLong(), reaction.getChannel());
         this.userId = userId;
         this.issuer = user;
@@ -63,8 +72,7 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * @return The user id
      */
     @Nonnull
-    public String getUserId()
-    {
+    public String getUserId() {
         return Long.toUnsignedString(userId);
     }
 
@@ -73,8 +81,7 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      *
      * @return The user id
      */
-    public long getUserIdLong()
-    {
+    public long getUserIdLong() {
         return userId;
     }
 
@@ -86,10 +93,10 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * @return The reacting user or null if this information is missing
      */
     @Nullable
-    public User getUser()
-    {
+    public User getUser() {
         return issuer == null && isFromType(ChannelType.PRIVATE)
-                ? getPrivateChannel().getUser() // this can't be the self user because then issuer would be nonnull
+                // this can't be the self user because then issuer would be nonnull
+                ? getChannel().asPrivateChannel().getUser()
                 : issuer;
     }
 
@@ -100,7 +107,7 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * Use {@link #retrieveMember()} to load the member.
      *
      * @throws java.lang.IllegalStateException
-     *         If this was not sent in a {@link net.dv8tion.jda.api.entities.TextChannel}.
+     *         If this was not sent in a {@link net.dv8tion.jda.api.entities.Guild}.
      *
      * @return Member of the reacting user or null if they are no longer member of this guild
      *
@@ -108,8 +115,7 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * @see    #getChannelType()
      */
     @Nullable
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 
@@ -119,21 +125,18 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * @return The MessageReaction
      */
     @Nonnull
-    public MessageReaction getReaction()
-    {
+    public MessageReaction getReaction() {
         return reaction;
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.MessageReaction.ReactionEmote ReactionEmote}
-     * of the reaction, shortcut for {@code getReaction().getReactionEmote()}
+     * The {@link Emoji} of the reaction, shortcut for {@code getReaction().getEmoji()}
      *
-     * @return The ReactionEmote instance
+     * @return The Emoji instance
      */
     @Nonnull
-    public MessageReaction.ReactionEmote getReactionEmote()
-    {
-        return reaction.getReactionEmote();
+    public EmojiUnion getEmoji() {
+        return reaction.getEmoji();
     }
 
     /**
@@ -141,16 +144,14 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * <br>If a user is known, this will return {@link #getUser()}.
      *
      * @return {@link RestAction} - Type: {@link User}
-     *
-     * @since  4.2.1
      */
     @Nonnull
     @CheckReturnValue
-    public RestAction<User> retrieveUser()
-    {
+    public RestAction<User> retrieveUser() {
         User user = getUser();
-        if (user != null)
+        if (user != null) {
             return new CompletedRestAction<>(getJDA(), user);
+        }
         return getJDA().retrieveUserById(getUserIdLong());
     }
 
@@ -166,15 +167,16 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      *         If this event is not from a guild
      *
      * @return {@link RestAction} - Type: {@link Member}
-     *
-     * @since  4.2.1
      */
     @Nonnull
     @CheckReturnValue
-    public RestAction<Member> retrieveMember()
-    {
-        if (member != null)
+    public RestAction<Member> retrieveMember() {
+        if (member != null) {
             return new CompletedRestAction<>(getJDA(), member);
+        }
+        if (!getChannel().getType().isGuild()) {
+            throw new IllegalStateException("Cannot retrieve member for a private reaction not from a guild");
+        }
         return getGuild().retrieveMemberById(getUserIdLong());
     }
 
@@ -186,13 +188,10 @@ public class GenericMessageReactionEvent extends GenericMessageEvent
      * To retrieve the member you can use {@code getGuild().retrieveMember(message.getAuthor())}.
      *
      * @return {@link RestAction} - Type: {@link Message}
-     *
-     * @since  4.2.1
      */
     @Nonnull
     @CheckReturnValue
-    public RestAction<Message> retrieveMessage()
-    {
+    public RestAction<Message> retrieveMessage() {
         return getChannel().retrieveMessageById(getMessageId());
     }
 }

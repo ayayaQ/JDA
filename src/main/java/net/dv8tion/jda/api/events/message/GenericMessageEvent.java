@@ -13,21 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.events.message;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.entities.channel.unions.GuildMessageChannelUnion;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
 import net.dv8tion.jda.api.events.Event;
+import net.dv8tion.jda.internal.utils.Helpers;
 
 import javax.annotation.Nonnull;
 
 /**
  * Indicates that a {@link net.dv8tion.jda.api.entities.Message Message} was created/deleted/changed.
  * <br>Every MessageEvent is an instance of this event and can be casted.
- * 
+ *
  * <p>Can be used to detect any MessageEvent.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>These events require at least one of the following intents (Will not fire at all if neither is enabled):
  * <ul>
@@ -35,27 +44,43 @@ import javax.annotation.Nonnull;
  *     <li>{@link net.dv8tion.jda.api.requests.GatewayIntent#DIRECT_MESSAGES DIRECT_MESSAGES} to work in private channels</li>
  * </ul>
  */
-public abstract class GenericMessageEvent extends Event
-{
+public abstract class GenericMessageEvent extends Event {
     protected final long messageId;
     protected final MessageChannel channel;
 
-    public GenericMessageEvent(@Nonnull JDA api, long responseNumber, long messageId, @Nonnull MessageChannel channel)
-    {
+    public GenericMessageEvent(@Nonnull JDA api, long responseNumber, long messageId, @Nonnull MessageChannel channel) {
         super(api, responseNumber);
         this.messageId = messageId;
         this.channel = channel;
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.MessageChannel MessageChannel} for this Message
+     * The {@link net.dv8tion.jda.api.entities.channel.middleman.MessageChannel MessageChannel} for this Message
      *
      * @return The MessageChannel
      */
     @Nonnull
-    public MessageChannel getChannel()
-    {
-        return channel;
+    public MessageChannelUnion getChannel() {
+        return (MessageChannelUnion) channel;
+    }
+
+    /**
+     * The {@link net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel GuildMessageChannel} for this Message
+     *  if it was sent in a Guild.
+     * <br>If this Message was not received from a {@link net.dv8tion.jda.api.entities.Guild Guild},
+     * this will throw an {@link java.lang.IllegalStateException}.
+     *
+     * @throws java.lang.IllegalStateException
+     *         If this was not sent in a channel in a Guild.
+     *
+     * @return The GuildMessageChannel
+     */
+    @Nonnull
+    public GuildMessageChannelUnion getGuildChannel() {
+        if (!isFromGuild()) {
+            throw new IllegalStateException("This message event did not happen in a guild");
+        }
+        return (GuildMessageChannelUnion) channel;
     }
 
     /**
@@ -64,8 +89,7 @@ public abstract class GenericMessageEvent extends Event
      * @return The id for this message
      */
     @Nonnull
-    public String getMessageId()
-    {
+    public String getMessageId() {
         return Long.toUnsignedString(messageId);
     }
 
@@ -74,21 +98,19 @@ public abstract class GenericMessageEvent extends Event
      *
      * @return The id for this message
      */
-    public long getMessageIdLong()
-    {
+    public long getMessageIdLong() {
         return messageId;
     }
 
     /**
-     * Indicates whether the message is from the specified {@link net.dv8tion.jda.api.entities.ChannelType ChannelType}
+     * Indicates whether the message is from the specified {@link ChannelType ChannelType}
      *
      * @param  type
      *         The ChannelType
      *
      * @return True, if the message is from the specified channel type
      */
-    public boolean isFromType(@Nonnull ChannelType type)
-    {
+    public boolean isFromType(@Nonnull ChannelType type) {
         return channel.getType() == type;
     }
 
@@ -98,29 +120,27 @@ public abstract class GenericMessageEvent extends Event
      *
      * @return True, if {@link #getChannelType()}.{@link ChannelType#isGuild() isGuild()} is true.
      */
-    public boolean isFromGuild()
-    {
+    public boolean isFromGuild() {
         return getChannelType().isGuild();
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.ChannelType ChannelType} for this message
+     * The {@link ChannelType ChannelType} for this message
      *
      * @return The ChannelType
      */
     @Nonnull
-    public ChannelType getChannelType()
-    {
+    public ChannelType getChannelType() {
         return channel.getType();
     }
 
     /**
      * The {@link net.dv8tion.jda.api.entities.Guild Guild} the Message was received in.
-     * <br>If this Message was not received in a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel},
+     * <br>If this Message was not received in a {@link net.dv8tion.jda.api.entities.Guild Guild},
      * this will throw an {@link java.lang.IllegalStateException}.
      *
      * @throws java.lang.IllegalStateException
-     *         If this was not sent in a {@link net.dv8tion.jda.api.entities.TextChannel}.
+     *         If this was not sent in a {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel}.
      *
      * @return The Guild the Message was received in
      *
@@ -129,52 +149,37 @@ public abstract class GenericMessageEvent extends Event
      * @see    #getChannelType()
      */
     @Nonnull
-    public Guild getGuild()
-    {
-        return getTextChannel().getGuild();
+    public Guild getGuild() {
+        if (!isFromGuild()) {
+            throw new IllegalStateException("This message event did not happen in a guild");
+        }
+
+        return ((GuildChannel) channel).getGuild();
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} the Message was received in.
-     * <br>If this Message was not received in a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel},
-     * this will throw an {@link java.lang.IllegalStateException}.
+     * Returns the jump-to URL for the received message.
+     * <br>Clicking this URL in the Discord client will cause the client to jump to the specified message.
      *
-     * @throws java.lang.IllegalStateException
-     *         If this was not sent in a {@link net.dv8tion.jda.api.entities.TextChannel}.
-     *
-     * @return The TextChannel the Message was received in
-     *
-     * @see    #isFromGuild()
-     * @see    #isFromType(ChannelType)
-     * @see    #getChannelType()
+     * @return A String representing the jump-to URL for the message
      */
     @Nonnull
-    public TextChannel getTextChannel()
-    {
-        if (!isFromType(ChannelType.TEXT))
-            throw new IllegalStateException("This message event did not happen in a text channel");
-        return (TextChannel) channel;
+    public String getJumpUrl() {
+        return Helpers.format(
+                Message.JUMP_URL,
+                isFromGuild() ? getGuild().getId() : "@me",
+                getChannel().getId(),
+                getMessageId());
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} the Message was received in.
-     * <br>If this Message was not received in a {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel},
-     * this will throw an {@link java.lang.IllegalStateException}.
+     * If the message event was from a {@link ThreadChannel ThreadChannel}
      *
-     * @throws java.lang.IllegalStateException
-     *         If this was not sent in a {@link net.dv8tion.jda.api.entities.PrivateChannel}.
+     * @return If the message event was from a ThreadChannel
      *
-     * @return The PrivateChannel the Message was received in
-     *
-     * @see    #isFromGuild()
-     * @see    #isFromType(ChannelType)
-     * @see    #getChannelType()
+     * @see ChannelType#isThread()
      */
-    @Nonnull
-    public PrivateChannel getPrivateChannel()
-    {
-        if (!isFromType(ChannelType.PRIVATE))
-            throw new IllegalStateException("This message event did not happen in a private channel");
-        return (PrivateChannel) channel;
+    public boolean isFromThread() {
+        return getChannelType().isThread();
     }
 }

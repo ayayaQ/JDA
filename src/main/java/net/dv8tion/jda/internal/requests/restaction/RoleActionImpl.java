@@ -20,28 +20,30 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Icon;
 import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.RoleColors;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.requests.Request;
 import net.dv8tion.jda.api.requests.Response;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.requests.restaction.RoleAction;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.entities.GuildImpl;
-import net.dv8tion.jda.internal.managers.RoleManagerImpl;
-import net.dv8tion.jda.internal.requests.Route;
 import net.dv8tion.jda.internal.utils.Checks;
 import okhttp3.RequestBody;
 
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nonnull;
+import java.awt.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
-public class RoleActionImpl extends AuditableRestActionImpl<Role> implements RoleAction
-{
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+public class RoleActionImpl extends AuditableRestActionImpl<Role> implements RoleAction {
     protected final Guild guild;
     protected Long permissions;
     protected String name = null;
-    protected Integer color = null;
+    protected RoleColors colors = null;
     protected Boolean hoisted = null;
     protected Boolean mentionable = null;
     protected Icon icon = null;
@@ -53,47 +55,40 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
      * @param  guild
      *         The {@link net.dv8tion.jda.api.entities.Guild Guild} for which the Role should be created.
      */
-    public RoleActionImpl(Guild guild)
-    {
+    public RoleActionImpl(Guild guild) {
         super(guild.getJDA(), Route.Roles.CREATE_ROLE.compile(guild.getId()));
         this.guild = guild;
     }
 
     @Nonnull
     @Override
-    public RoleActionImpl setCheck(BooleanSupplier checks)
-    {
+    public RoleActionImpl setCheck(BooleanSupplier checks) {
         return (RoleActionImpl) super.setCheck(checks);
     }
 
     @Nonnull
     @Override
-    public RoleActionImpl timeout(long timeout, @Nonnull TimeUnit unit)
-    {
+    public RoleActionImpl timeout(long timeout, @Nonnull TimeUnit unit) {
         return (RoleActionImpl) super.timeout(timeout, unit);
     }
 
     @Nonnull
     @Override
-    public RoleActionImpl deadline(long timestamp)
-    {
+    public RoleActionImpl deadline(long timestamp) {
         return (RoleActionImpl) super.deadline(timestamp);
     }
 
     @Nonnull
     @Override
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return guild;
     }
 
     @Nonnull
     @Override
     @CheckReturnValue
-    public RoleActionImpl setName(String name)
-    {
-        if (name != null)
-        {
+    public RoleActionImpl setName(String name) {
+        if (name != null) {
             Checks.notEmpty(name, "Name");
             Checks.notLonger(name, 100, "Name");
         }
@@ -104,8 +99,7 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     @Nonnull
     @Override
     @CheckReturnValue
-    public RoleActionImpl setHoisted(Boolean hoisted)
-    {
+    public RoleActionImpl setHoisted(Boolean hoisted) {
         this.hoisted = hoisted;
         return this;
     }
@@ -113,30 +107,50 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     @Nonnull
     @Override
     @CheckReturnValue
-    public RoleActionImpl setMentionable(Boolean mentionable)
-    {
+    public RoleActionImpl setMentionable(Boolean mentionable) {
         this.mentionable = mentionable;
         return this;
     }
 
     @Nonnull
     @Override
-    @CheckReturnValue
-    public RoleActionImpl setColor(Integer rgb)
-    {
-        this.color = rgb;
+    public RoleAction setGradientColors(int primaryRgb, int secondaryRgb) {
+        this.colors = new RoleColors(primaryRgb, secondaryRgb, Role.DEFAULT_COLOR_RAW);
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    public RoleAction useHolographicStyle() {
+        this.colors = RoleColors.DEFAULT_HOLOGRAPHIC;
         return this;
     }
 
     @Nonnull
     @Override
     @CheckReturnValue
-    public RoleActionImpl setPermissions(Long permissions)
-    {
-        if (permissions != null)
-        {
-            for (Permission p : Permission.getPermissions(permissions))
+    public RoleActionImpl setColor(Integer rgb) {
+        this.colors = new RoleColors(
+                rgb == null ? Role.DEFAULT_COLOR_RAW : rgb, Role.DEFAULT_COLOR_RAW, Role.DEFAULT_COLOR_RAW);
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    @CheckReturnValue
+    public RoleAction setColors(@Nullable RoleColors colors) {
+        this.colors = colors;
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    @CheckReturnValue
+    public RoleActionImpl setPermissions(Long permissions) {
+        if (permissions != null) {
+            for (Permission p : Permission.getPermissions(permissions)) {
                 checkPermission(p);
+            }
         }
         this.permissions = permissions;
         return this;
@@ -145,8 +159,7 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     @Nonnull
     @Override
     @CheckReturnValue
-    public RoleActionImpl setIcon(Icon icon)
-    {
+    public RoleActionImpl setIcon(Icon icon) {
         this.icon = icon;
         this.emoji = null;
         return this;
@@ -155,44 +168,49 @@ public class RoleActionImpl extends AuditableRestActionImpl<Role> implements Rol
     @Nonnull
     @Override
     @CheckReturnValue
-    public RoleActionImpl setIcon(String emoji)
-    {
+    public RoleActionImpl setIcon(String emoji) {
         this.emoji = emoji;
         this.icon = null;
         return this;
     }
 
     @Override
-    protected RequestBody finalizeData()
-    {
+    protected RequestBody finalizeData() {
         DataObject object = DataObject.empty();
-        if (name != null)
+        if (name != null) {
             object.put("name", name);
-        if (color != null)
-            object.put("color", color & 0xFFFFFF);
-        if (permissions != null)
+        }
+        if (colors != null && !colors.isDefault()) {
+            object.put("colors", colors);
+        }
+        if (permissions != null) {
             object.put("permissions", permissions);
-        if (hoisted != null)
+        }
+        if (hoisted != null) {
             object.put("hoist", hoisted);
-        if (mentionable != null)
+        }
+        if (mentionable != null) {
             object.put("mentionable", mentionable);
-        if (icon != null)
+        }
+        if (icon != null) {
             object.put("icon", icon.getEncoding());
-        if (emoji != null)
+        }
+        if (emoji != null) {
             object.put("unicode_emoji", emoji);
+        }
 
         return getRequestBody(object);
     }
 
     @Override
-    protected void handleSuccess(Response response, Request<Role> request)
-    {
-        request.onSuccess(api.getEntityBuilder().createRole((GuildImpl) guild, response.getObject(), guild.getIdLong()));
+    protected void handleSuccess(Response response, Request<Role> request) {
+        request.onSuccess(
+                api.getEntityBuilder().createRole((GuildImpl) guild, response.getObject(), guild.getIdLong()));
     }
 
-    private void checkPermission(Permission permission)
-    {
-        if (!guild.getSelfMember().hasPermission(permission))
+    private void checkPermission(Permission permission) {
+        if (!guild.getSelfMember().hasPermission(permission)) {
             throw new InsufficientPermissionException(guild, permission);
+        }
     }
 }

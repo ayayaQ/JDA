@@ -13,33 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.unions.IPermissionContainerUnion;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.api.requests.restaction.PermissionOverrideAction;
+
+import java.util.EnumSet;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.EnumSet;
 
 /**
  * Represents the specific {@link net.dv8tion.jda.api.entities.Member Member} or {@link net.dv8tion.jda.api.entities.Role Role}
  * permission overrides that can be set for channels.
  *
- * @see GuildChannel#upsertPermissionOverride(IPermissionHolder)
- * @see GuildChannel#createPermissionOverride(IPermissionHolder)
- * @see GuildChannel#putPermissionOverride(IPermissionHolder)
- *
- * @see GuildChannel#getPermissionOverrides()
- * @see GuildChannel#getPermissionOverride(IPermissionHolder)
- * @see GuildChannel#getMemberPermissionOverrides()
- * @see GuildChannel#getRolePermissionOverrides()
+ * @see net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer#upsertPermissionOverride(IPermissionHolder)
+ * @see net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer#getPermissionOverrides()
+ * @see net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer#getPermissionOverride(IPermissionHolder)
+ * @see net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer#getMemberPermissionOverrides()
+ * @see net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer#getRolePermissionOverrides()
  */
-public interface PermissionOverride extends ISnowflake
-{
+public interface PermissionOverride extends ISnowflake {
     /**
      * This is the raw binary representation (as a base 10 long) of the permissions <b>allowed</b> by this override.
      * <br>The long relates to the offsets used by each {@link net.dv8tion.jda.api.Permission Permission}.
@@ -138,15 +138,15 @@ public interface PermissionOverride extends ISnowflake
     Role getRole();
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} that this PermissionOverride affects.
+     * The {@link net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer GuildChannel} that this PermissionOverride affects.
      *
-     * @return Never-null related {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} that this override is part of.
+     * @return Never-null related {@link net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer GuildChannel} that this override is part of.
      */
     @Nonnull
-    GuildChannel getChannel();
+    IPermissionContainerUnion getChannel();
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.Guild Guild} that the {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}
+     * The {@link net.dv8tion.jda.api.entities.Guild Guild} that the {@link GuildChannel GuildChannel}
      * returned from {@link net.dv8tion.jda.api.entities.PermissionOverride#getChannel()} is a part of.
      * By inference, this is the {@link net.dv8tion.jda.api.entities.Guild Guild} that this PermissionOverride is part of.
      *
@@ -176,15 +176,13 @@ public interface PermissionOverride extends ISnowflake
      * <br>In the PermissionOverrideAction you can modify the permissions of the override.
      * You modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
      *
-     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
-     * This getter is not thread-safe and would require guards by the user.
-     *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_PERMISSIONS Permission.MANAGE_PERMISSIONS}
      *
      * @return The PermissionOverrideAction of this override.
      */
     @Nonnull
+    @CheckReturnValue
     PermissionOverrideAction getManager();
 
     /**

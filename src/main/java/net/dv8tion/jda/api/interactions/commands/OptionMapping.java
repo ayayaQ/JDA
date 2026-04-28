@@ -17,12 +17,23 @@
 package net.dv8tion.jda.api.interactions.commands;
 
 import gnu.trove.map.TLongObjectMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.unions.GuildChannelUnion;
+import net.dv8tion.jda.api.interactions.Interaction;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.utils.data.DataObject;
+import net.dv8tion.jda.internal.JDAImpl;
+import net.dv8tion.jda.internal.entities.InteractionMentions;
+import net.dv8tion.jda.internal.utils.EntityString;
+
+import java.util.Objects;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Objects;
 
 /**
  * Name/Value pair for a {@link CommandInteraction} option.
@@ -33,19 +44,40 @@ import java.util.Objects;
  * @see CommandInteraction#getOption(String)
  * @see CommandInteraction#getOptions()
  */
-public class OptionMapping
-{
+public class OptionMapping {
     private final DataObject data;
     private final OptionType type;
     private final String name;
     private final TLongObjectMap<Object> resolved;
+    private final Mentions mentions;
 
-    public OptionMapping(DataObject data, TLongObjectMap<Object> resolved)
-    {
+    public OptionMapping(DataObject data, TLongObjectMap<Object> resolved, JDA jda, Guild guild) {
         this.data = data;
         this.type = OptionType.fromKey(data.getInt("type", -1));
         this.name = data.getString("name");
         this.resolved = resolved;
+        if (type == OptionType.STRING) {
+            mentions = new InteractionMentions(getAsString(), resolved, (JDAImpl) jda, guild);
+        } else {
+            mentions = new InteractionMentions("", new TLongObjectHashMap<>(0), (JDAImpl) jda, guild);
+        }
+    }
+
+    /**
+     * Resolved mentions for a {@link OptionType#STRING STRING} option.
+     * <br>If this option is not of type {@link OptionType#STRING STRING}, this always returns empty lists.
+     * Mentions are sorted by occurrence.
+     *
+     * <p>Mentioned {@link Member members} and {@link Role roles} are always of the same guild.
+     * If the interaction {@link Interaction#getUser() user}, mentions users from other guilds, they will only be provided by {@link net.dv8tion.jda.api.entities.Mentions#getUsers()}.
+     *
+     * <p>This is not supported for {@link CommandAutoCompleteInteraction}.
+     *
+     * @return {@link net.dv8tion.jda.api.entities.Mentions} for this option
+     */
+    @Nonnull
+    public Mentions getMentions() {
+        return mentions;
     }
 
     /**
@@ -54,8 +86,7 @@ public class OptionMapping
      * @return The {@link OptionType OptionType}
      */
     @Nonnull
-    public OptionType getType()
-    {
+    public OptionType getType() {
         return type;
     }
 
@@ -65,9 +96,27 @@ public class OptionMapping
      * @return The option name
      */
     @Nonnull
-    public String getName()
-    {
+    public String getName() {
         return name;
+    }
+
+    /**
+     * The file uploaded for this option.
+     * <br>This is represented as an {@link Message.Attachment#isEphemeral() ephemeral} attachment which will only be hosted for up to 2 weeks.
+     * If you want a permanent reference, you must download it.
+     *
+     * @throws IllegalStateException
+     *         If this option {@link #getType() type} is not {@link OptionType#ATTACHMENT}
+     *
+     * @return {@link net.dv8tion.jda.api.entities.Message.Attachment Attachment}
+     */
+    @Nonnull
+    public Message.Attachment getAsAttachment() {
+        Object obj = resolved.get(getAsLong());
+        if (obj instanceof Message.Attachment) {
+            return (Message.Attachment) obj;
+        }
+        throw new IllegalStateException("Cannot resolve option of type " + type + " to Attachment!");
     }
 
     /**
@@ -78,8 +127,7 @@ public class OptionMapping
      * @return The String representation of this option value
      */
     @Nonnull
-    public String getAsString()
-    {
+    public String getAsString() {
         return data.getString("value");
     }
 
@@ -91,10 +139,10 @@ public class OptionMapping
      *
      * @return The boolean value
      */
-    public boolean getAsBoolean()
-    {
-        if (type != OptionType.BOOLEAN)
+    public boolean getAsBoolean() {
+        if (type != OptionType.BOOLEAN) {
             throw new IllegalStateException("Cannot convert option of type " + type + " to boolean");
+        }
         return data.getBoolean("value");
     }
 
@@ -109,10 +157,8 @@ public class OptionMapping
      *
      * @return The long value
      */
-    public long getAsLong()
-    {
-        switch (type)
-        {
+    public long getAsLong() {
+        switch (type) {
             default:
                 throw new IllegalStateException("Cannot convert option of type " + type + " to long");
             case STRING:
@@ -121,24 +167,42 @@ public class OptionMapping
             case ROLE:
             case USER:
             case INTEGER:
+            case ATTACHMENT:
                 return data.getLong("value");
         }
     }
 
     /**
+     * The int value for this option.
+     * <br>This will be the ID of any resolved entity such as {@link Role} or {@link Member}.
+     *
+     * <p><b>It is highly recommended to assert int values by using {@link OptionData#setRequiredRange(long, long)}</b>
+     *
+     * @throws IllegalStateException
+     *         If this option {@link #getType() type} cannot be converted to a long
+     * @throws NumberFormatException
+     *         If this option is of type {@link OptionType#STRING STRING} and could not be parsed to a valid long value
+     * @throws ArithmeticException
+     *         If the provided integer value cannot fit into a 32bit signed int
+     *
+     * @return The int value
+     */
+    public int getAsInt() {
+        return Math.toIntExact(getAsLong());
+    }
+
+    /**
      * The double value for this option.
-     * 
+     *
      * @throws IllegalStateException
      *         If this option {@link #getType() type} cannot be converted to a double
      * @throws NumberFormatException
      *         If this option is of type {@link OptionType#STRING STRING} and could not be parsed to a valid double value
-     * 
+     *
      * @return The double value
      */
-    public double getAsDouble()
-    {
-        switch (type)
-        {
+    public double getAsDouble() {
+        switch (type) {
             default:
                 throw new IllegalStateException("Cannot convert option of type " + type + " to double");
             case STRING:
@@ -157,11 +221,11 @@ public class OptionMapping
      * @return The resolved {@link IMentionable}
      */
     @Nonnull
-    public IMentionable getAsMentionable()
-    {
+    public IMentionable getAsMentionable() {
         Object entity = resolved.get(getAsLong());
-        if (entity instanceof IMentionable)
+        if (entity instanceof IMentionable) {
             return (IMentionable) entity;
+        }
         throw new IllegalStateException("Cannot resolve option of type " + type + " to IMentionable");
     }
 
@@ -170,18 +234,19 @@ public class OptionMapping
      * <br>Note that {@link OptionType#USER OptionType.USER} can also accept users that are not members of a guild, in which case this will be null!
      *
      * @throws IllegalStateException
-     *         If this option is not of type {@link OptionType#USER USER}
+     *         If this option is not of type {@link OptionType#USER USER} or {@link OptionType#MENTIONABLE MENTIONABLE}
      *
      * @return The resolved {@link Member}, or null
      */
     @Nullable
-    public Member getAsMember()
-    {
-        if (type != OptionType.USER)
+    public Member getAsMember() {
+        if (type != OptionType.USER && type != OptionType.MENTIONABLE) {
             throw new IllegalStateException("Cannot resolve Member for option " + getName() + " of type " + type);
+        }
         Object object = resolved.get(getAsLong());
-        if (object instanceof Member)
+        if (object instanceof Member) {
             return (Member) object;
+        }
         return null; // Unresolved
     }
 
@@ -189,75 +254,45 @@ public class OptionMapping
      * The resolved {@link User} for this option value.
      *
      * @throws IllegalStateException
-     *         If this option is not of type {@link OptionType#USER USER}
+     *         If this option is not of type {@link OptionType#USER USER} or
+     *         {@link OptionType#MENTIONABLE MENTIONABLE} without a resolved user
      *
      * @return The resolved {@link User}
      */
     @Nonnull
-    public User getAsUser()
-    {
-        if (type != OptionType.USER)
+    public User getAsUser() {
+        if (type != OptionType.USER && type != OptionType.MENTIONABLE) {
             throw new IllegalStateException("Cannot resolve User for option " + getName() + " of type " + type);
+        }
         Object object = resolved.get(getAsLong());
-        if (object instanceof Member)
+        if (object instanceof Member) {
             return ((Member) object).getUser();
-        if (object instanceof User)
+        }
+        if (object instanceof User) {
             return (User) object;
-        throw new IllegalStateException("Could not resolve user!");
+        }
+        throw new IllegalStateException("Could not resolve User from option type " + type);
     }
 
     /**
      * The resolved {@link Role} for this option value.
      *
      * @throws IllegalStateException
-     *         If this option is not of type {@link OptionType#ROLE ROLE}
+     *         If this option is not of type {@link OptionType#ROLE ROLE} or
+     *         {@link OptionType#MENTIONABLE MENTIONABLE} without a resolved role
      *
      * @return The resolved {@link Role}
      */
     @Nonnull
-    public Role getAsRole()
-    {
-        if (type != OptionType.ROLE)
+    public Role getAsRole() {
+        if (type != OptionType.ROLE && type != OptionType.MENTIONABLE) {
             throw new IllegalStateException("Cannot resolve Role for option " + getName() + " of type " + type);
+        }
         Object role = resolved.get(getAsLong());
-        if (role instanceof Role)
+        if (role instanceof Role) {
             return (Role) role;
-        throw new IllegalStateException("Could not resolve role!");
-    }
-
-    /**
-     * The resolved {@link GuildChannel} for this option value.
-     * <br>Note that {@link OptionType#CHANNEL OptionType.CHANNEL} can accept channels of any type!
-     *
-     * @throws IllegalStateException
-     *         If this option is not of type {@link OptionType#CHANNEL CHANNEL}
-     *         or could not be resolved for unexpected reasons
-     *
-     * @return The resolved {@link GuildChannel}
-     */
-    @Nonnull
-    public GuildChannel getAsGuildChannel()
-    {
-        AbstractChannel value = getAsChannel();
-        if (value instanceof GuildChannel)
-            return (GuildChannel) value;
-        throw new IllegalStateException("Could not resolve GuildChannel!");
-    }
-
-    /**
-     * The resolved {@link MessageChannel} for this option value.
-     * <br>Note that {@link OptionType#CHANNEL OptionType.CHANNEL} can accept channels of any type!
-     *
-     * @throws IllegalStateException
-     *         If this option is not of type {@link OptionType#CHANNEL CHANNEL}
-     *
-     * @return The resolved {@link MessageChannel}, or null if this was not a message channel
-     */
-    @Nullable
-    public MessageChannel getAsMessageChannel()
-    {
-        AbstractChannel value = getAsChannel();
-        return value instanceof MessageChannel ? (MessageChannel) value : null;
+        }
+        throw new IllegalStateException("Could not resolve Role from option type " + type);
     }
 
     /**
@@ -269,40 +304,57 @@ public class OptionMapping
      * @return The {@link ChannelType}
      */
     @Nonnull
-    public ChannelType getChannelType()
-    {
-        AbstractChannel channel = getAsChannel();
-        return channel == null ? ChannelType.UNKNOWN : channel.getType();
+    public ChannelType getChannelType() {
+        return getAsChannel().getType();
+    }
+
+    /**
+     * The resolved {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel} for this option value.
+     * <br>Note that {@link OptionType#CHANNEL OptionType.CHANNEL} can accept channels of any type!
+     *
+     * @throws IllegalStateException
+     *         If this option is not of type {@link OptionType#CHANNEL CHANNEL}
+     *         or could not be resolved for unexpected reasons
+     *
+     * @return The resolved {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel}
+     */
+    @Nonnull
+    public GuildChannelUnion getAsChannel() {
+        if (type != OptionType.CHANNEL) {
+            throw new IllegalStateException("Cannot resolve Channel for option " + getName() + " of type " + type);
+        }
+
+        Object entity = resolved.get(getAsLong());
+        if (entity instanceof GuildChannel) {
+            return (GuildChannelUnion) entity;
+        }
+
+        throw new IllegalStateException("Could not resolve GuildChannel!");
     }
 
     @Override
-    public String toString()
-    {
-        return "Option[" + getType() + "](" + getName() + "=" + getAsString() + ")";
+    public String toString() {
+        return new EntityString(this)
+                .setType(getType())
+                .addMetadata("name", name)
+                .addMetadata("value", getAsString())
+                .toString();
     }
 
     @Override
-    public int hashCode()
-    {
+    public int hashCode() {
         return Objects.hash(getType(), getName());
     }
 
     @Override
-    public boolean equals(Object obj)
-    {
-        if (obj == this)
+    public boolean equals(Object obj) {
+        if (obj == this) {
             return true;
-        if (!(obj instanceof OptionMapping))
+        }
+        if (!(obj instanceof OptionMapping)) {
             return false;
+        }
         OptionMapping data = (OptionMapping) obj;
         return getType() == data.getType() && getName().equals(data.getName());
-    }
-
-    @Nullable
-    private AbstractChannel getAsChannel()
-    {
-        if (type != OptionType.CHANNEL)
-            throw new IllegalStateException("Cannot resolve AbstractChannel for option " + getName() + " of type " + type);
-        return (AbstractChannel) resolved.get(getAsLong());
     }
 }

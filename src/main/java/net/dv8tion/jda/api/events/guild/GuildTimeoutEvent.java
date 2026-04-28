@@ -18,28 +18,26 @@ package net.dv8tion.jda.api.events.guild;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.events.Event;
-import net.dv8tion.jda.api.events.ReadyEvent;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
 
 import javax.annotation.Nonnull;
 
 /**
  * Indicates that a guild failed to ready up and timed out.
- * <br>Usually this event will be fired right before a {@link net.dv8tion.jda.api.events.ReadyEvent ReadyEvent}.
+ * <br>Usually this event will be fired right before a {@link ReadyEvent ReadyEvent}.
  *
  * <p>This will mark the guild as <b>unavailable</b> and it will not be usable when JDA becomes ready.
  * You can check all unavailable guilds with {@link ReadyEvent#getGuildUnavailableCount()} and {@link JDA#getUnavailableGuilds()}.
  *
- * <h2>Developer Note</h2>
+ * <p><b>Developer Note</b><br>
  *
  * <p>Discord may also explicitly mark guilds as unavailable during the setup, in which case this event will not fire.
  * It is recommended to check for unavailable guilds in the ready event explicitly to avoid any ambiguity.
  */
-public class GuildTimeoutEvent extends Event
-{
+public class GuildTimeoutEvent extends Event {
     private final long guildId;
 
-    public GuildTimeoutEvent(@Nonnull JDA api, long guildId)
-    {
+    public GuildTimeoutEvent(@Nonnull JDA api, long guildId) {
         super(api);
         this.guildId = guildId;
     }
@@ -49,8 +47,7 @@ public class GuildTimeoutEvent extends Event
      *
      * @return The guild id
      */
-    public long getGuildIdLong()
-    {
+    public long getGuildIdLong() {
         return guildId;
     }
 
@@ -60,8 +57,7 @@ public class GuildTimeoutEvent extends Event
      * @return The guild id
      */
     @Nonnull
-    public String getGuildId()
-    {
+    public String getGuildId() {
         return Long.toUnsignedString(guildId);
     }
 }

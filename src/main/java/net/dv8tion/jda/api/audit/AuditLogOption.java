@@ -16,6 +16,10 @@
 
 package net.dv8tion.jda.api.audit;
 
+import net.dv8tion.jda.internal.utils.EntityString;
+
+import javax.annotation.Nonnull;
+
 /**
  * Enum constants for possible options
  * <br>Providing detailed description of possible occasions and expected types.
@@ -24,8 +28,7 @@ package net.dv8tion.jda.api.audit;
  *
  * @see <a href="https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object-optional-audit-entry-info" target="_blank">Optional Audit Entry Info</a>
  */
-public enum AuditLogOption
-{
+public enum AuditLogOption {
     /**
      * Possible detail for
      * <ul>
@@ -43,7 +46,7 @@ public enum AuditLogOption
 
     /**
      * Possible message id for actions of type {@link ActionType#MESSAGE_PIN} and {@link ActionType#MESSAGE_UNPIN}.
-     * <br>Use with {@link net.dv8tion.jda.api.entities.MessageChannel#retrieveMessageById(String)}.
+     * <br>Use with {@link net.dv8tion.jda.api.entities.channel.middleman.MessageChannel#retrieveMessageById(String)}.
      *
      * <p>Expected type: <b>String</b>
      */
@@ -127,8 +130,7 @@ public enum AuditLogOption
 
     private final String key;
 
-    AuditLogOption(String key)
-    {
+    AuditLogOption(String key) {
         this.key = key;
     }
 
@@ -137,14 +139,13 @@ public enum AuditLogOption
      *
      * @return Key for this option
      */
-    public String getKey()
-    {
+    @Nonnull
+    public String getKey() {
         return key;
     }
 
     @Override
-    public String toString()
-    {
-        return name() + '(' + key + ')';
+    public String toString() {
+        return new EntityString(this).setType(this).addMetadata("key", key).toString();
     }
 }

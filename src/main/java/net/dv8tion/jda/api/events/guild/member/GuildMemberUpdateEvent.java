@@ -30,18 +30,14 @@ import javax.annotation.Nonnull;
  * <p>You can use this to do stateless checks on member instances to update database entries or check for special roles.
  * Note that the member might not be in cache when this event is fired due to the {@link net.dv8tion.jda.api.utils.MemberCachePolicy MemberCachePolicy}.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
  * {@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disable this by default!
- *
- * @since  4.2.1
  */
-public class GuildMemberUpdateEvent extends GenericGuildMemberEvent
-{
-    public GuildMemberUpdateEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member)
-    {
+public class GuildMemberUpdateEvent extends GenericGuildMemberEvent {
+    public GuildMemberUpdateEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member) {
         super(api, responseNumber, member);
     }
 }

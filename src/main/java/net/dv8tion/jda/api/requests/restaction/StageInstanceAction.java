@@ -19,29 +19,32 @@ package net.dv8tion.jda.api.requests.restaction;
 import net.dv8tion.jda.api.entities.StageInstance;
 import net.dv8tion.jda.api.requests.RestAction;
 
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
 
 /**
  * Specialized {@link RestAction} used to create a {@link StageInstance}
  *
- * @see net.dv8tion.jda.api.entities.StageChannel#createStageInstance(String)
+ * @see net.dv8tion.jda.api.entities.channel.concrete.StageChannel#createStageInstance(String)
  */
-public interface StageInstanceAction extends RestAction<StageInstance>
-{
+public interface StageInstanceAction extends RestAction<StageInstance> {
     @Nonnull
     @Override
+    @CheckReturnValue
     StageInstanceAction setCheck(@Nullable BooleanSupplier checks);
 
     @Nonnull
     @Override
+    @CheckReturnValue
     StageInstanceAction timeout(long timeout, @Nonnull TimeUnit unit);
 
     @Nonnull
     @Override
+    @CheckReturnValue
     StageInstanceAction deadline(long timestamp);
 
     /**
@@ -59,20 +62,4 @@ public interface StageInstanceAction extends RestAction<StageInstance>
     @Nonnull
     @CheckReturnValue
     StageInstanceAction setTopic(@Nonnull String topic);
-
-    /**
-     * Sets the {@link net.dv8tion.jda.api.entities.StageInstance.PrivacyLevel PrivacyLevel} for the stage instance.
-     * <br>This indicates whether guild lurkers are allowed to join the stage instance or only guild members.
-     *
-     * @param  level
-     *         The {@link net.dv8tion.jda.api.entities.StageInstance.PrivacyLevel}
-     *
-     * @throws IllegalArgumentException
-     *         If the provided level is null or {@link net.dv8tion.jda.api.entities.StageInstance.PrivacyLevel#UNKNOWN UNKNOWN}
-     *
-     * @return The StageInstanceAction for chaining
-     */
-    @Nonnull
-    @CheckReturnValue
-    StageInstanceAction setPrivacyLevel(@Nonnull StageInstance.PrivacyLevel level);
 }

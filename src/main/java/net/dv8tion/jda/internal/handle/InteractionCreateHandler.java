@@ -16,81 +16,118 @@
 
 package net.dv8tion.jda.internal.handle;
 
-import net.dv8tion.jda.api.events.interaction.ButtonClickEvent;
+import net.dv8tion.jda.api.components.Component;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent;
-import net.dv8tion.jda.api.events.interaction.SelectionMenuEvent;
-import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.MessageContextInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.UserContextInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.interactions.InteractionType;
-import net.dv8tion.jda.api.interactions.components.Component;
+import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
-import net.dv8tion.jda.internal.interactions.ButtonInteractionImpl;
-import net.dv8tion.jda.internal.interactions.CommandInteractionImpl;
 import net.dv8tion.jda.internal.interactions.InteractionImpl;
-import net.dv8tion.jda.internal.interactions.SelectionMenuInteractionImpl;
+import net.dv8tion.jda.internal.interactions.command.CommandAutoCompleteInteractionImpl;
+import net.dv8tion.jda.internal.interactions.command.MessageContextInteractionImpl;
+import net.dv8tion.jda.internal.interactions.command.SlashCommandInteractionImpl;
+import net.dv8tion.jda.internal.interactions.command.UserContextInteractionImpl;
+import net.dv8tion.jda.internal.interactions.components.buttons.ButtonInteractionImpl;
+import net.dv8tion.jda.internal.interactions.components.selections.EntitySelectInteractionImpl;
+import net.dv8tion.jda.internal.interactions.components.selections.StringSelectInteractionImpl;
+import net.dv8tion.jda.internal.interactions.modal.ModalInteractionImpl;
 import net.dv8tion.jda.internal.requests.WebSocketClient;
 
-public class InteractionCreateHandler extends SocketHandler
-{
-    public InteractionCreateHandler(JDAImpl api)
-    {
+public class InteractionCreateHandler extends SocketHandler {
+    public InteractionCreateHandler(JDAImpl api) {
         super(api);
     }
 
     @Override
-    protected Long handleInternally(DataObject content)
-    {
+    protected Long handleInternally(DataObject content) {
         int type = content.getInt("type");
-        if (content.getInt("version", 1) != 1)
-        {
-            WebSocketClient.LOG.debug("Received interaction with version {}. This version is currently unsupported by this version of JDA. Consider updating!", content.getInt("version", 1));
+        int version = content.getInt("version", 1);
+        if (version != 1) {
+            WebSocketClient.LOG.debug(
+                    "Received interaction with version {}. This version is currently unsupported by this version of JDA. Consider updating!",
+                    version);
             return null;
         }
 
         long guildId = content.getUnsignedLong("guild_id", 0);
-        if (api.getGuildSetupController().isLocked(guildId))
+        if (api.getGuildSetupController().isLocked(guildId)) {
             return guildId;
-        if (guildId != 0 && api.getGuildById(guildId) == null)
-            return null; // discard event if its not from a guild we are currently in
+        }
 
-        switch (InteractionType.fromKey(type))
-        {
-            case SLASH_COMMAND: // slash commands
+        // Check channel type
+        DataObject channelJson = content.getObject("channel");
+        ChannelType channelType = ChannelType.fromId(channelJson.getInt("type"));
+        if (!channelType.isMessage()) {
+            WebSocketClient.LOG.debug(
+                    "Discarding INTERACTION_CREATE event from unexpected channel type. Channel: {}", channelJson);
+            return null;
+        }
+
+        switch (InteractionType.fromKey(type)) {
+            case COMMAND: // slash commands
                 handleCommand(content);
                 break;
             case COMPONENT: // buttons/components
                 handleAction(content);
                 break;
+            case COMMAND_AUTOCOMPLETE:
+                api.handleEvent(new CommandAutoCompleteInteractionEvent(
+                        api, responseNumber, new CommandAutoCompleteInteractionImpl(api, content)));
+                break;
+            case MODAL_SUBMIT:
+                api.handleEvent(new ModalInteractionEvent(api, responseNumber, new ModalInteractionImpl(api, content)));
+                break;
             default:
                 api.handleEvent(
-                    new GenericInteractionCreateEvent(api, responseNumber,
-                        new InteractionImpl(api, content)));
+                        new GenericInteractionCreateEvent(api, responseNumber, new InteractionImpl(api, content)));
         }
 
         return null;
     }
 
-    private void handleCommand(DataObject content)
-    {
-        api.handleEvent(
-            new SlashCommandEvent(api, responseNumber,
-                new CommandInteractionImpl(api, content)));
+    private void handleCommand(DataObject content) {
+        switch (Command.Type.fromId(content.getObject("data").getInt("type"))) {
+            case SLASH:
+                api.handleEvent(new SlashCommandInteractionEvent(
+                        api, responseNumber, new SlashCommandInteractionImpl(api, content)));
+                break;
+            case MESSAGE:
+                api.handleEvent(new MessageContextInteractionEvent(
+                        api, responseNumber, new MessageContextInteractionImpl(api, content)));
+                break;
+            case USER:
+                api.handleEvent(new UserContextInteractionEvent(
+                        api, responseNumber, new UserContextInteractionImpl(api, content)));
+                break;
+        }
     }
 
-    private void handleAction(DataObject content)
-    {
-        switch (Component.Type.fromKey(content.getObject("data").getInt("component_type")))
-        {
-        case BUTTON:
-            api.handleEvent(
-                new ButtonClickEvent(api, responseNumber,
-                    new ButtonInteractionImpl(api, content)));
-            break;
-        case SELECTION_MENU:
-            api.handleEvent(
-                new SelectionMenuEvent(api, responseNumber,
-                    new SelectionMenuInteractionImpl(api, content)));
-            break;
+    private void handleAction(DataObject content) {
+        switch (Component.Type.fromKey(content.getObject("data").getInt("component_type"))) {
+            case BUTTON:
+                api.handleEvent(
+                        new ButtonInteractionEvent(api, responseNumber, new ButtonInteractionImpl(api, content)));
+                break;
+            case STRING_SELECT:
+                api.handleEvent(new StringSelectInteractionEvent(
+                        api, responseNumber, new StringSelectInteractionImpl(api, content)));
+                break;
+            case USER_SELECT:
+            case ROLE_SELECT:
+            case MENTIONABLE_SELECT:
+            case CHANNEL_SELECT:
+                api.handleEvent(new EntitySelectInteractionEvent(
+                        api, responseNumber, new EntitySelectInteractionImpl(api, content)));
+                break;
         }
     }
 }

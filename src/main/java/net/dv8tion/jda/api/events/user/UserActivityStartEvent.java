@@ -36,7 +36,7 @@ import javax.annotation.Nonnull;
  * This means you can check {@link Member#getActivities()} when handling this event and it will already
  * contain all new activities, even ones that have not yet fired the start event.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_PRESENCES GUILD_PRESENCES} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -50,13 +50,12 @@ import javax.annotation.Nonnull;
  * <p>This also requires {@link net.dv8tion.jda.api.utils.cache.CacheFlag#ACTIVITY CacheFlag.ACTIVITY} to be enabled.
  * You can enable the cache flag with {@link net.dv8tion.jda.api.JDABuilder#enableCache(CacheFlag, CacheFlag...) enableCache(CacheFlag.ACTIVITY)}.
  */
-public class UserActivityStartEvent extends GenericUserEvent implements GenericUserPresenceEvent
-{
+public class UserActivityStartEvent extends GenericUserEvent implements GenericUserPresenceEvent {
     private final Activity newActivity;
     private final Member member;
 
-    public UserActivityStartEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull Activity newActivity)
-    {
+    public UserActivityStartEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull Activity newActivity) {
         super(api, responseNumber, member.getUser());
         this.newActivity = newActivity;
         this.member = member;
@@ -67,22 +66,19 @@ public class UserActivityStartEvent extends GenericUserEvent implements GenericU
      *
      * @return The activity
      */
-    public Activity getNewActivity()
-    {
+    public Activity getNewActivity() {
         return newActivity;
     }
 
     @Nonnull
     @Override
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return member.getGuild();
     }
 
     @Nonnull
     @Override
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 }

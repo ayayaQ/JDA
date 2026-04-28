@@ -16,11 +16,8 @@
 
 package net.dv8tion.jda.api.utils;
 
-import net.dv8tion.jda.annotations.DeprecatedSince;
-import net.dv8tion.jda.annotations.ForRemoval;
-import net.dv8tion.jda.annotations.ReplaceWith;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.internal.utils.tuple.Pair;
+import net.dv8tion.jda.api.requests.RestRateLimiter;
 
 import javax.annotation.Nonnull;
 
@@ -32,54 +29,50 @@ import javax.annotation.Nonnull;
  * <p>The {@link net.dv8tion.jda.api.utils.SessionControllerAdapter SessionControllerAdapter} provides
  * a default implementation that can be extended and overridden.
  *
- * <h2>States {@literal &} Behaviour</h2>
+ * <p><b>States {@literal &} Behaviour</b><br>
  * <b>Identify Ratelimit Handling</b>
  * <br>This will enable handling of (re-)connecting gateway sessions.
  *
  * <p><b>Global REST Ratelimit</b>
  * <br>The global REST ratelimit is not bound to a single session and should be
- * handled on all JDA instances. This controller will receive updates of this ratelimit through {@link #setGlobalRatelimit(long)}
- * and should report the last ratelimit information it received through {@link #getGlobalRatelimit()}.
+ * handled on all JDA instances. This controller will manage the global ratelimit using {@link #getRateLimitHandle}.
  *
  * <p><b>Gateway Provider</b>
  * <br>This provider can be used to change the gateway retrieval (using cache, http, or static) and
  * allows to set a custom gateway endpoint. <b>Use carefully.</b>
  *
- * <h2>Examples</h2>
+ * <p><b>Examples</b><br>
  *
  * <b>Using {@link net.dv8tion.jda.api.JDABuilder JDABuilder}</b>
- * <br>
- * <pre><code>
+ * {@snippet lang="java":
  * JDABuilder builder = JDABuilder.createDefault(BOT_TOKEN);
  * builder.setSessionController(new SessionControllerAdapter() {
- *     {@literal @Override}
+ *     @Override
  *     public void appendSession(SessionConnectNode node) {
  *         System.out.println("[SessionController] Adding SessionConnectNode to Queue!");
  *         super.appendSession(node);
  *     }
  * });
  * builder.addEventListeners(myListener);
- * for (int i = 0; i {@literal <} 10; i++) {
+ * for (int i = 0; i < 10; i++) {
  *     builder.useSharding(i, 10).build();
  * }
- * </code></pre>
+ * }
  *
  * <p><b>Using {@link net.dv8tion.jda.api.sharding.ShardManager ShardManager}</b>
- * <br>
- * <pre><code>
+ * {@snippet lang="java":
  * DefaultShardManagerBuilder builder = DefaultShardManagerBuilder.createDefault(BOT_TOKEN);
  * builder.setSessionController(new SessionControllerAdapter() {
- *     {@literal @Override}
- *     public {@literal Pair<String, Integer>} getGatewayBot(JDA api) {
+ *     @Override
+ *     public Pair<String, Integer> getGatewayBot(JDA api) {
  *         return Pair.of(getGateway(), 10);
  *     }
  * });
  * builder.addEventListeners(myListener);
  * builder.build();
- * </code></pre>
+ * }
  */
-public interface SessionController
-{
+public interface SessionController {
     /**
      * The default delay (in seconds) to wait between running {@link net.dv8tion.jda.api.utils.SessionController.SessionConnectNode SessionConnectNodes}
      */
@@ -102,8 +95,6 @@ public interface SessionController
      *
      * @throws AssertionError
      *         If the provided level is not a valid array length size
-     *
-     * @since  4.2.0
      */
     default void setConcurrency(int level) {}
 
@@ -127,55 +118,27 @@ public interface SessionController
     void removeSession(@Nonnull SessionConnectNode node);
 
     /**
-     * Provides the cross-session global REST ratelimit it received through {@link #setGlobalRatelimit(long)}.
+     * The store for global rate-limits of all types.
+     * <br>This can be used to share the global rate-limit information between shards on the same IP.
      *
-     * @return The current global REST ratelimit or -1 if unset
+     * @return The global rate-limiter
      */
-    long getGlobalRatelimit();
+    @Nonnull
+    default RestRateLimiter.GlobalRateLimit getRateLimitHandle() {
+        return RestRateLimiter.GlobalRateLimit.create();
+    }
 
     /**
-     * Called by the RateLimiter if the global rest ratelimit has changed.
+     * Discord's gateway URL, which is used to receive events.
      *
-     * @param ratelimit
-     *        The new global ratelimit
-     */
-    void setGlobalRatelimit(long ratelimit);
-
-    /**
-     * Called by a JDA session when a new gateway session starts (Connecting, Reconnecting).
-     * <br>Should provide the gateway endpoint (wss) to connect to.
-     *
-     * @param  api
-     *         The current JDA instance (used for RestActions and ShardInfo)
+     * <p>Called by JDA when starting a new gateway session (Connecting, Reconnecting).
      *
      * @return The gateway endpoint
      */
     @Nonnull
-    String getGateway(@Nonnull JDA api);
-
-    /**
-     * Called by {@link net.dv8tion.jda.api.sharding.DefaultShardManager DefaultShardManager}
-     * when a new shards is starting.
-     * <br>Should provide a {@link net.dv8tion.jda.internal.utils.tuple.Pair Pair} with {@code (gateway, shardTotal)}.
-     *
-     * @param  api
-     *         The current JDA instance (used for RestActions and ShardInfo)
-     *
-     * @return The Pair consisting of the gateway endpoint to connect to and the shardTotal
-     *
-     * @see    #getGateway(net.dv8tion.jda.api.JDA)
-     *
-     * @deprecated
-     *         Use {@link #getShardedGateway(JDA)} instead, an implementation for this is ignored
-     *         if {@link #getShardedGateway(JDA)} is implemented instead.
-     */
-    @Nonnull
-    @Deprecated
-    @ForRemoval(deadline = "4.4.0")
-    @DeprecatedSince("4.0.0")
-    @ReplaceWith("getShardedGateway(api)")
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    Pair<String, Integer> getGatewayBot(@Nonnull JDA api);
+    default String getGateway() {
+        return "wss://gateway.discord.gg/";
+    }
 
     /**
      * Called by {@link net.dv8tion.jda.api.sharding.DefaultShardManager DefaultShardManager}
@@ -187,21 +150,15 @@ public interface SessionController
      *
      * @return The ShardedGateway instance consisting of the gateway endpoint to connect to and the shardTotal
      *
-     * @see    #getGateway(net.dv8tion.jda.api.JDA)
+     * @see    #getGateway()
      */
     @Nonnull
-    @SuppressWarnings({"deprecation", "RedundantSuppression"})
-    default ShardedGateway getShardedGateway(@Nonnull JDA api)
-    {
-        Pair<String, Integer> tuple = getGatewayBot(api);
-        return new ShardedGateway(tuple.getLeft(), tuple.getRight());
-    }
+    ShardedGateway getShardedGateway(@Nonnull JDA api);
 
     /**
      * POJO containing the gateway endpoint and recommended shard total for a shard manager.
      */
-    class ShardedGateway
-    {
+    class ShardedGateway {
         private final String url;
         private final int shardTotal;
         private final int concurrency;
@@ -214,13 +171,11 @@ public interface SessionController
          * @param shardTotal
          *        The recommended shard total
          */
-        public ShardedGateway(String url, int shardTotal)
-        {
+        public ShardedGateway(String url, int shardTotal) {
             this(url, shardTotal, 1);
         }
 
-        public ShardedGateway(String url, int shardTotal, int concurrency)
-        {
+        public ShardedGateway(String url, int shardTotal, int concurrency) {
             this.url = url;
             this.shardTotal = shardTotal;
             this.concurrency = concurrency;
@@ -231,8 +186,8 @@ public interface SessionController
          *
          * @return The endpoint
          */
-        public String getUrl()
-        {
+        @Nonnull
+        public String getUrl() {
             return url;
         }
 
@@ -241,8 +196,7 @@ public interface SessionController
          *
          * @return The shard total
          */
-        public int getShardTotal()
-        {
+        public int getShardTotal() {
             return shardTotal;
         }
 
@@ -255,8 +209,7 @@ public interface SessionController
          *
          * @see    #setConcurrency(int)
          */
-        public int getConcurrency()
-        {
+        public int getConcurrency() {
             return concurrency;
         }
     }
@@ -267,8 +220,7 @@ public interface SessionController
      *
      * <p><b>Note: None of the provided session nodes can be resumed, the resume timeframe has already passed</b>
      */
-    interface SessionConnectNode
-    {
+    interface SessionConnectNode {
         /**
          * Whether this node is reconnecting. Can be used to setup a priority based system.
          *

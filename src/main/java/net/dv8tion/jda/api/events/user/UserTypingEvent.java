@@ -13,19 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.events.user;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
+
+import java.time.OffsetDateTime;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.time.OffsetDateTime;
 
 /**
  * Indicates that a {@link net.dv8tion.jda.api.entities.User User} started typing. (Similar to the typing indicator in the Discord client)
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MESSAGE_TYPING GUILD_MESSAGE_TYPING} intent to be enabled to fire
  * for guild channels, and {@link net.dv8tion.jda.api.requests.GatewayIntent#DIRECT_MESSAGE_TYPING DIRECT_MESSAGE_TYPING} to fire for private channels.
@@ -34,14 +41,18 @@ import java.time.OffsetDateTime;
  *
  * <p>Can be used to retrieve the User who started typing and when and in which MessageChannel they started typing.
  */
-public class UserTypingEvent extends GenericUserEvent
-{
+public class UserTypingEvent extends GenericUserEvent {
     private final Member member;
     private final MessageChannel channel;
     private final OffsetDateTime timestamp;
 
-    public UserTypingEvent(@Nonnull JDA api, long responseNumber, @Nonnull User user, @Nonnull MessageChannel channel, @Nonnull OffsetDateTime timestamp, @Nullable Member member)
-    {
+    public UserTypingEvent(
+            @Nonnull JDA api,
+            long responseNumber,
+            @Nonnull User user,
+            @Nonnull MessageChannel channel,
+            @Nonnull OffsetDateTime timestamp,
+            @Nullable Member member) {
         super(api, responseNumber, user);
         this.member = member;
         this.channel = channel;
@@ -54,8 +65,7 @@ public class UserTypingEvent extends GenericUserEvent
      * @return The time when the typing started
      */
     @Nonnull
-    public OffsetDateTime getTimestamp()
-    {
+    public OffsetDateTime getTimestamp() {
         return timestamp;
     }
 
@@ -65,57 +75,30 @@ public class UserTypingEvent extends GenericUserEvent
      * @return The channel
      */
     @Nonnull
-    public MessageChannel getChannel()
-    {
-        return channel;
+    public MessageChannelUnion getChannel() {
+        return (MessageChannelUnion) channel;
     }
 
     /**
      * Whether the user started typing in a channel of the specified type.
      *
      * @param  type
-     *         {@link net.dv8tion.jda.api.entities.ChannelType ChannelType}
+     *         {@link ChannelType ChannelType}
      *
      * @return True, if the user started typing in a channel of the specified type
      */
-    public boolean isFromType(@Nonnull ChannelType type)
-    {
+    public boolean isFromType(@Nonnull ChannelType type) {
         return channel.getType() == type;
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.ChannelType ChannelType}
+     * The {@link ChannelType ChannelType}
      *
-     * @return The {@link net.dv8tion.jda.api.entities.ChannelType ChannelType}
+     * @return The {@link ChannelType ChannelType}
      */
     @Nonnull
-    public ChannelType getType()
-    {
+    public ChannelType getType() {
         return channel.getType();
-    }
-
-    /**
-     * {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel} in which this users started typing,
-     * or {@code null} if this was not in a PrivateChannel.
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.PrivateChannel PrivateChannel}
-     */
-    @Nullable
-    public PrivateChannel getPrivateChannel()
-    {
-        return isFromType(ChannelType.PRIVATE) ? (PrivateChannel) channel : null;
-    }
-
-    /**
-     * {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} in which this users started typing,
-     * or {@code null} if this was not in a TextChannel.
-     *
-     * @return Possibly-null {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}
-     */
-    @Nullable
-    public TextChannel getTextChannel()
-    {
-        return isFromType(ChannelType.TEXT) ? (TextChannel) channel : null;
     }
 
     /**
@@ -125,9 +108,8 @@ public class UserTypingEvent extends GenericUserEvent
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.Guild Guild}
      */
     @Nullable
-    public Guild getGuild()
-    {
-        return isFromType(ChannelType.TEXT) ? member.getGuild() : null;
+    public Guild getGuild() {
+        return getType().isGuild() ? member.getGuild() : null;
     }
 
     /**
@@ -136,8 +118,7 @@ public class UserTypingEvent extends GenericUserEvent
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.Member Member}
      */
     @Nullable
-    public Member getMember()
-    {
+    public Member getMember() {
         return member;
     }
 }

@@ -18,38 +18,40 @@ package net.dv8tion.jda.api.managers;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.GuildChannel;
 import net.dv8tion.jda.api.entities.PermissionOverride;
+import net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.unions.IPermissionContainerUnion;
 import net.dv8tion.jda.internal.utils.Checks;
+
+import java.util.Collection;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
-import java.util.Collection;
 
 /**
  * Manager providing functionality to update one or more fields for a {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverride}.
  *
  * <p><b>Example</b>
- * <pre>{@code
- * manager.setDenied(Permission.MESSAGE_WRITE)
- *        .setAllowed(Permission.MESSAGE_READ)
+ * {@snippet lang="java":
+ * manager.setDenied(Permission.MESSAGE_SEND)
+ *        .setAllowed(Permission.VIEW_CHANNEL)
  *        .queue();
  * manager.reset(PermOverrideManager.DENIED | PermOverrideManager.ALLOWED)
- *        .grant(Permission.MESSAGE_WRITE)
+ *        .grant(Permission.MESSAGE_SEND)
  *        .clear(Permission.MESSAGE_MANAGE)
  *        .queue();
- * }</pre>
+ * }
  *
  * @see net.dv8tion.jda.api.entities.PermissionOverride#getManager()
  */
-public interface PermOverrideManager extends Manager<PermOverrideManager>
-{
+public interface PermOverrideManager extends Manager<PermOverrideManager> {
     /** Used to reset the denied field */
-    long DENIED      = 0x1;
+    long DENIED = 1;
     /** Used to reset the granted field */
-    long ALLOWED     = 0x2;
+    long ALLOWED = 1 << 1;
     /** Used to reset <b>all</b> permissions to their original value */
-    long PERMISSIONS = 0x3;
+    long PERMISSIONS = ALLOWED | DENIED;
 
     /**
      * Resets the fields specified by the provided bit-flag pattern.
@@ -70,11 +72,11 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @Override
+    @CheckReturnValue
     PermOverrideManager reset(long fields);
 
     /**
      * Resets the fields specified by the provided bit-flag patterns.
-     * You can specify a combination by using a bitwise OR concat of the flag constants.
      * <br>Example: {@code manager.reset(PermOverrideManager.ALLOWED, PermOverrideManager.DENIED);}
      *
      * <p><b>Flag Constants:</b>
@@ -91,31 +93,30 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @Override
-    PermOverrideManager reset(long... fields);
+    @CheckReturnValue
+    PermOverrideManager reset(@Nonnull long... fields);
 
     /**
      * The {@link net.dv8tion.jda.api.entities.Guild Guild} this Manager's
-     * {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} is in.
+     * {@link GuildChannel GuildChannel} is in.
      * <br>This is logically the same as calling {@code getPermissionOverride().getGuild()}
      *
      * @return The parent {@link net.dv8tion.jda.api.entities.Guild Guild}
      */
     @Nonnull
-    default Guild getGuild()
-    {
+    default Guild getGuild() {
         return getPermissionOverride().getGuild();
     }
 
     /**
-     * The {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel} this Manager's
+     * The {@link IPermissionContainer GuildChannel} this Manager's
      * {@link net.dv8tion.jda.api.entities.PermissionOverride PermissionOverride} is in.
      * <br>This is logically the same as calling {@code getPermissionOverride().getChannel()}
      *
-     * @return The parent {@link net.dv8tion.jda.api.entities.GuildChannel GuildChannel}
+     * @return The parent {@link GuildChannel GuildChannel}
      */
     @Nonnull
-    default GuildChannel getChannel()
-    {
+    default IPermissionContainerUnion getChannel() {
         return getPermissionOverride().getChannel();
     }
 
@@ -157,8 +158,7 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @CheckReturnValue
-    default PermOverrideManager grant(@Nonnull Permission... permissions)
-    {
+    default PermOverrideManager grant(@Nonnull Permission... permissions) {
         Checks.notNull(permissions, "Permissions");
         return grant(Permission.getRaw(permissions));
     }
@@ -180,8 +180,7 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @CheckReturnValue
-    default PermOverrideManager grant(@Nonnull Collection<Permission> permissions)
-    {
+    default PermOverrideManager grant(@Nonnull Collection<Permission> permissions) {
         return grant(Permission.getRaw(permissions));
     }
 
@@ -214,8 +213,7 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @CheckReturnValue
-    default PermOverrideManager deny(@Nonnull Permission... permissions)
-    {
+    default PermOverrideManager deny(@Nonnull Permission... permissions) {
         Checks.notNull(permissions, "Permissions");
         return deny(Permission.getRaw(permissions));
     }
@@ -237,8 +235,7 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @CheckReturnValue
-    default PermOverrideManager deny(@Nonnull Collection<Permission> permissions)
-    {
+    default PermOverrideManager deny(@Nonnull Collection<Permission> permissions) {
         return deny(Permission.getRaw(permissions));
     }
 
@@ -271,8 +268,7 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @CheckReturnValue
-    default PermOverrideManager clear(@Nonnull Permission... permissions)
-    {
+    default PermOverrideManager clear(@Nonnull Permission... permissions) {
         Checks.notNull(permissions, "Permissions");
         return clear(Permission.getRaw(permissions));
     }
@@ -295,8 +291,7 @@ public interface PermOverrideManager extends Manager<PermOverrideManager>
      */
     @Nonnull
     @CheckReturnValue
-    default PermOverrideManager clear(@Nonnull Collection<Permission> permissions)
-    {
+    default PermOverrideManager clear(@Nonnull Collection<Permission> permissions) {
         return clear(Permission.getRaw(permissions));
     }
 }

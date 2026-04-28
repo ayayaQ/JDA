@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
  * Manager providing functionality to update one or more fields for a {@link net.dv8tion.jda.api.entities.templates.Template Template}.
  *
  * <p><b>Example</b>
- * <pre>{@code
+ * {@snippet lang="java":
  * manager.setName("backup")
  *        .setDescription("backup for our server")
  *        .queue();
@@ -34,16 +34,15 @@ import javax.annotation.Nullable;
  *        .setName("server template")
  *        .setDescription(null)
  *        .queue();
- * }</pre>
+ * }
  *
  * @see net.dv8tion.jda.api.entities.templates.Template#getManager()
  */
-public interface TemplateManager extends Manager<TemplateManager>
-{
+public interface TemplateManager extends Manager<TemplateManager> {
     /** Used to reset the name field */
-    long NAME = 0x1;
+    long NAME = 1;
     /** Used to reset the description field */
-    long DESCRIPTION = 0x2;
+    long DESCRIPTION = 1 << 1;
 
     /**
      * Resets the fields specified by the provided bit-flag pattern.
@@ -63,6 +62,7 @@ public interface TemplateManager extends Manager<TemplateManager>
      */
     @Nonnull
     @Override
+    @CheckReturnValue
     TemplateManager reset(long fields);
 
     /**
@@ -82,7 +82,8 @@ public interface TemplateManager extends Manager<TemplateManager>
      */
     @Nonnull
     @Override
-    TemplateManager reset(long... fields);
+    @CheckReturnValue
+    TemplateManager reset(@Nonnull long... fields);
 
     /**
      * Sets the name of this {@link Template Template}.

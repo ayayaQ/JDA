@@ -13,87 +13,98 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.internal.handle;
 
-import net.dv8tion.jda.api.entities.*;
-import net.dv8tion.jda.api.events.message.MessageEmbedEvent;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageType;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.events.message.MessageUpdateEvent;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageEmbedEvent;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageUpdateEvent;
-import net.dv8tion.jda.api.events.message.priv.PrivateMessageEmbedEvent;
-import net.dv8tion.jda.api.events.message.priv.PrivateMessageUpdateEvent;
-import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.entities.EntityBuilder;
 import net.dv8tion.jda.internal.requests.WebSocketClient;
 
-import java.util.LinkedList;
+public class MessageUpdateHandler extends SocketHandler {
 
-public class MessageUpdateHandler extends SocketHandler
-{
-
-    public MessageUpdateHandler(JDAImpl api)
-    {
+    public MessageUpdateHandler(JDAImpl api) {
         super(api);
     }
 
     @Override
-    protected Long handleInternally(DataObject content)
-    {
-        if (!content.isNull("guild_id"))
-        {
+    protected Long handleInternally(DataObject content) {
+        Guild guild = null;
+        if (!content.isNull("guild_id")) {
             long guildId = content.getLong("guild_id");
-            if (getJDA().getGuildSetupController().isLocked(guildId))
+            if (getJDA().getGuildSetupController().isLocked(guildId)) {
                 return guildId;
+            }
+            guild = api.getGuildById(guildId);
+            if (guild == null) {
+                api.getEventCache().cache(EventCache.Type.GUILD, guildId, responseNumber, allContent, this::handle);
+                EventCache.LOG.debug("Received message for a guild that JDA does not currently have cached");
+                return null;
+            }
         }
 
-        //TODO: Rewrite this entire handler
-        if (content.hasKey("author"))
-        {
-            if (content.hasKey("type"))
-            {
+        // Drop ephemeral messages since they are broken due to missing guild_id
+        if ((content.getInt("flags", 0) & 64) != 0) {
+            return null;
+        }
+
+        if (content.hasKey("author")) {
+            if (content.hasKey("type")) {
                 MessageType type = MessageType.fromId(content.getInt("type"));
-                if (!type.isSystem())
-                    return handleMessage(content);
-                WebSocketClient.LOG.debug("JDA received a message update for an unexpected message type. Type: {} JSON: {}", type, content);
-                return null;
-            }
-            else if (!content.isNull("embeds"))
-            {
-                //Received update with no "type" field which means its an update for a rich embed message
-                handleMessageEmbed(content);
+                if (!type.isSystem()) {
+                    return handleMessage(content, guild);
+                }
+                WebSocketClient.LOG.debug(
+                        "JDA received a message update for an unexpected message type. Type: {} JSON: {}",
+                        type,
+                        content);
                 return null;
             }
         }
-        else if (!content.isNull("embeds"))
-            return handleMessageEmbed(content);
         return null;
     }
 
-    private Long handleMessage(DataObject content)
-    {
+    private Long handleMessage(DataObject content, Guild guild) {
         Message message;
-        try
-        {
-            message = getJDA().getEntityBuilder().createMessage(content);
-        }
-        catch (IllegalArgumentException e)
-        {
-            switch (e.getMessage())
-            {
-                case EntityBuilder.MISSING_CHANNEL:
-                {
-                    final long channelId = content.getLong("channel_id");
-                    getJDA().getEventCache().cache(EventCache.Type.CHANNEL, channelId, responseNumber, allContent, this::handle);
-                    EventCache.LOG.debug("Received a message update for a channel that JDA does not currently have cached");
+        try {
+            message = getJDA().getEntityBuilder().createMessageWithLookup(content, guild, true);
+            if (!message.hasChannel()) {
+                throw new IllegalArgumentException(EntityBuilder.MISSING_CHANNEL);
+            }
+        } catch (IllegalArgumentException e) {
+            switch (e.getMessage()) {
+                case EntityBuilder.MISSING_CHANNEL: {
+                    long channelId = content.getUnsignedLong("channel_id");
+
+                    // If discord adds message support for unexpected types in the future,
+                    // drop the event instead of caching it
+                    if (guild != null) {
+                        GuildChannel actual = guild.getGuildChannelById(channelId);
+                        if (actual != null) {
+                            WebSocketClient.LOG.debug(
+                                    "Dropping MESSAGE_UPDATE for unexpected channel of type {}", actual.getType());
+                            return null;
+                        }
+                    }
+
+                    getJDA().getEventCache()
+                            .cache(EventCache.Type.CHANNEL, channelId, responseNumber, allContent, this::handle);
+                    EventCache.LOG.debug(
+                            "Received a message update for a channel that JDA does not currently have cached");
                     return null;
                 }
-                case EntityBuilder.MISSING_USER:
-                {
-                    final long authorId = content.getObject("author").getLong("id");
-                    getJDA().getEventCache().cache(EventCache.Type.USER, authorId, responseNumber, allContent, this::handle);
-                    EventCache.LOG.debug("Received a message update for a user that JDA does not currently have cached");
+                case EntityBuilder.MISSING_USER: {
+                    long authorId = content.getObject("author").getLong("id");
+                    getJDA().getEventCache()
+                            .cache(EventCache.Type.USER, authorId, responseNumber, allContent, this::handle);
+                    EventCache.LOG.debug(
+                            "Received a message update for a user that JDA does not currently have cached");
                     return null;
                 }
                 default:
@@ -101,96 +112,11 @@ public class MessageUpdateHandler extends SocketHandler
             }
         }
 
-        switch (message.getChannelType())
-        {
-            case TEXT:
-            {
-                TextChannel channel = message.getTextChannel();
-                if (getJDA().getGuildSetupController().isLocked(channel.getGuild().getIdLong()))
-                    return channel.getGuild().getIdLong();
-                getJDA().handleEvent(
-                        new GuildMessageUpdateEvent(
-                                getJDA(), responseNumber,
-                                message));
-                break;
-            }
-            case PRIVATE:
-            {
-                getJDA().usedPrivateChannel(message.getChannel().getIdLong());
-                getJDA().handleEvent(
-                        new PrivateMessageUpdateEvent(
-                                getJDA(), responseNumber,
-                                message));
-                break;
-            }
-            case GROUP:
-            {
-                WebSocketClient.LOG.warn("Received a MESSAGE_UPDATE for a group which is not supported");
-                break;
-            }
-
-            default:
-                WebSocketClient.LOG.warn("Received a MESSAGE_UPDATE with a unknown MessageChannel ChannelType. JSON: {}", content);
-                return null;
+        if (message.getChannelType() == ChannelType.PRIVATE) {
+            getJDA().usedPrivateChannel(message.getChannel().getIdLong());
         }
 
-        //Combo event
-        getJDA().handleEvent(
-                new MessageUpdateEvent(
-                        getJDA(), responseNumber,
-                        message));
-        return null;
-    }
-
-    private Long handleMessageEmbed(DataObject content)
-    {
-        EntityBuilder builder = getJDA().getEntityBuilder();
-        final long messageId = content.getLong("id");
-        final long channelId = content.getLong("channel_id");
-        LinkedList<MessageEmbed> embeds = new LinkedList<>();
-        MessageChannel channel = getJDA().getTextChannelsView().get(channelId);
-        if (channel == null)
-            channel = getJDA().getPrivateChannelsView().get(channelId);
-        if (channel == null)
-        {
-            getJDA().getEventCache().cache(EventCache.Type.CHANNEL, channelId, responseNumber, allContent, this::handle);
-            EventCache.LOG.debug("Received message update for embeds for a channel/group that JDA does not have cached yet.");
-            return null;
-        }
-
-        DataArray embedsJson = content.getArray("embeds");
-        for (int i = 0; i < embedsJson.length(); i++)
-            embeds.add(builder.createMessageEmbed(embedsJson.getObject(i)));
-
-        switch (channel.getType())
-        {
-            case TEXT:
-                TextChannel tChannel = (TextChannel) channel;
-                if (getJDA().getGuildSetupController().isLocked(tChannel.getGuild().getIdLong()))
-                    return tChannel.getGuild().getIdLong();
-                getJDA().handleEvent(
-                    new GuildMessageEmbedEvent(
-                        getJDA(), responseNumber,
-                        messageId, tChannel, embeds));
-                break;
-            case PRIVATE:
-                getJDA().handleEvent(
-                    new PrivateMessageEmbedEvent(
-                        getJDA(), responseNumber,
-                        messageId, (PrivateChannel) channel, embeds));
-                break;
-            case GROUP:
-                WebSocketClient.LOG.error("Received a message update for a group which should not be possible");
-                return null;
-            default:
-                WebSocketClient.LOG.warn("No event handled for message update of type {}", channel.getType());
-
-        }
-        //Combo event
-        getJDA().handleEvent(
-                new MessageEmbedEvent(
-                        getJDA(), responseNumber,
-                        messageId, channel, embeds));
+        getJDA().handleEvent(new MessageUpdateEvent(getJDA(), responseNumber, message));
         return null;
     }
 }

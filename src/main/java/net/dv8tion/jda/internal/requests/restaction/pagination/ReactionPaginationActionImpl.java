@@ -17,108 +17,110 @@
 package net.dv8tion.jda.internal.requests.restaction.pagination;
 
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageReaction;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.exceptions.ParsingException;
 import net.dv8tion.jda.api.requests.Request;
 import net.dv8tion.jda.api.requests.Response;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.requests.restaction.pagination.ReactionPaginationAction;
 import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.internal.entities.EntityBuilder;
-import net.dv8tion.jda.internal.requests.Route;
-import net.dv8tion.jda.internal.utils.EncodingUtil;
 
-import javax.annotation.Nonnull;
+import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 
-public class ReactionPaginationActionImpl
-    extends PaginationActionImpl<User, ReactionPaginationAction>
-    implements ReactionPaginationAction
-{
+import javax.annotation.Nonnull;
+
+public class ReactionPaginationActionImpl extends PaginationActionImpl<User, ReactionPaginationAction>
+        implements ReactionPaginationAction {
     protected final MessageReaction reaction;
 
     /**
      * Creates a new PaginationAction instance
      *
      * @param reaction
-     *        The target {@link net.dv8tion.jda.api.entities.MessageReaction MessageReaction}
+     *        The target {@link MessageReaction MessageReaction}
      */
-    public ReactionPaginationActionImpl(MessageReaction reaction)
-    {
-        super(reaction.getJDA(), Route.Messages.GET_REACTION_USERS.compile(reaction.getChannel().getId(), reaction.getMessageId(), getCode(reaction)), 1, 100, 100);
+    public ReactionPaginationActionImpl(MessageReaction reaction) {
+        this(reaction, MessageReaction.ReactionType.NORMAL);
+    }
+
+    /**
+     * Creates a new PaginationAction instance
+     *
+     * @param reaction
+     *        The target {@link MessageReaction MessageReaction}
+     * @param type
+     *        Type of {@link MessageReaction.ReactionType MessageReaction.ReactionType} to retrieve users for
+     */
+    public ReactionPaginationActionImpl(MessageReaction reaction, MessageReaction.ReactionType type) {
+        super(
+                reaction.getJDA(),
+                getCompiledRoute(reaction.getChannelId(), reaction.getMessageId(), getCode(reaction), type),
+                1,
+                100,
+                100);
+        super.order(PaginationOrder.FORWARD);
         this.reaction = reaction;
     }
 
-    public ReactionPaginationActionImpl(Message message, String code)
-    {
-        super(message.getJDA(), Route.Messages.GET_REACTION_USERS.compile(message.getChannel().getId(), message.getId(), code), 1, 100, 100);
+    public ReactionPaginationActionImpl(Message message, String code, MessageReaction.ReactionType type) {
+        super(message.getJDA(), getCompiledRoute(message.getChannelId(), message.getId(), code, type), 1, 100, 100);
+        super.order(PaginationOrder.FORWARD);
         this.reaction = null;
     }
 
-    public ReactionPaginationActionImpl(MessageChannel channel, String messageId, String code)
-    {
-        super(channel.getJDA(), Route.Messages.GET_REACTION_USERS.compile(channel.getId(), messageId, code), 1, 100, 100);
+    public ReactionPaginationActionImpl(
+            MessageChannel channel, String messageId, String code, MessageReaction.ReactionType type) {
+        super(channel.getJDA(), getCompiledRoute(channel.getId(), messageId, code, type), 1, 100, 100);
+        super.order(PaginationOrder.FORWARD);
         this.reaction = null;
     }
 
-    protected static String getCode(MessageReaction reaction)
-    {
-        MessageReaction.ReactionEmote emote = reaction.getReactionEmote();
+    private static Route.CompiledRoute getCompiledRoute(
+            String channelId, String messageId, String code, MessageReaction.ReactionType type) {
+        return Route.Messages.GET_REACTION_USERS
+                .compile(channelId, messageId, code)
+                .withQueryParams("type", String.valueOf(type.getId()));
+    }
 
-        return emote.isEmote()
-            ? emote.getName() + ":" + emote.getId()
-            : EncodingUtil.encodeUTF8(emote.getName());
+    protected static String getCode(MessageReaction reaction) {
+        return reaction.getEmoji().getAsReactionCode();
     }
 
     @Nonnull
     @Override
-    public MessageReaction getReaction()
-    {
-        if (reaction == null)
+    public MessageReaction getReaction() {
+        if (reaction == null) {
             throw new IllegalStateException("Cannot get reaction for this action");
+        }
         return reaction;
     }
 
+    @Nonnull
     @Override
-    protected Route.CompiledRoute finalizeRoute()
-    {
-        Route.CompiledRoute route = super.finalizeRoute();
-
-        String after = null;
-        String limit = String.valueOf(getLimit());
-        long last = this.lastKey;
-        if (last != 0)
-            after = Long.toUnsignedString(last);
-
-        route = route.withQueryParams("limit", limit);
-
-        if (after != null)
-            route = route.withQueryParams("after", after);
-
-        return route;
+    public EnumSet<PaginationOrder> getSupportedOrders() {
+        return EnumSet.of(PaginationOrder.FORWARD);
     }
 
     @Override
-    protected void handleSuccess(Response response, Request<List<User>> request)
-    {
-        final EntityBuilder builder = api.getEntityBuilder();
-        final DataArray array = response.getArray();
-        final List<User> users = new LinkedList<>();
-        for (int i = 0; i < array.length(); i++)
-        {
-            try
-            {
-                final User user = builder.createUser(array.getObject(i));
+    protected void handleSuccess(Response response, Request<List<User>> request) {
+        EntityBuilder builder = api.getEntityBuilder();
+        DataArray array = response.getArray();
+        List<User> users = new LinkedList<>();
+        for (int i = 0; i < array.length(); i++) {
+            try {
+                User user = builder.createUser(array.getObject(i));
                 users.add(user);
-                if (useCache)
+                if (useCache) {
                     cached.add(user);
+                }
                 last = user;
                 lastKey = last.getIdLong();
-            }
-            catch (ParsingException | NullPointerException e)
-            {
+            } catch (ParsingException | NullPointerException e) {
                 LOG.warn("Encountered exception in ReactionPagination", e);
             }
         }
@@ -127,8 +129,7 @@ public class ReactionPaginationActionImpl
     }
 
     @Override
-    protected long getKey(User it)
-    {
+    protected long getKey(User it) {
         return it.getIdLong();
     }
 }

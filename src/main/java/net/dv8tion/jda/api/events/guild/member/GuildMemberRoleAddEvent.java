@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.events.guild.member;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 
-import javax.annotation.Nonnull;
 import java.util.Collections;
 import java.util.List;
+
+import javax.annotation.Nonnull;
 
 /**
  * Indicates that one or more {@link net.dv8tion.jda.api.entities.Role Roles} were assigned to a {@link net.dv8tion.jda.api.entities.Member Member}.
  *
  * <p>Can be used to retrieve affected member and guild. Provides a list of added roles.
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -39,12 +41,11 @@ import java.util.List;
  * member was updated and gives us the updated member object. In order to fire a specific event like this we
  * need to have the old member cached to compare against.
  */
-public class GuildMemberRoleAddEvent extends GenericGuildMemberEvent
-{
+public class GuildMemberRoleAddEvent extends GenericGuildMemberEvent {
     private final List<Role> addedRoles;
 
-    public GuildMemberRoleAddEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull List<Role> addedRoles)
-    {
+    public GuildMemberRoleAddEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nonnull List<Role> addedRoles) {
         super(api, responseNumber, member);
         this.addedRoles = Collections.unmodifiableList(addedRoles);
     }
@@ -55,8 +56,7 @@ public class GuildMemberRoleAddEvent extends GenericGuildMemberEvent
      * @return The list of roles that were added
      */
     @Nonnull
-    public List<Role> getRoles()
-    {
+    public List<Role> getRoles() {
         return addedRoles;
     }
 }

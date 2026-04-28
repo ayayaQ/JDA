@@ -17,6 +17,23 @@
 package net.dv8tion.jda.api.audit;
 
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.automod.AutoModRule;
+import net.dv8tion.jda.api.entities.automod.AutoModTriggerType;
+import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.attribute.ICategorizableChannel;
+import net.dv8tion.jda.api.entities.channel.attribute.ISlowmodeChannel;
+import net.dv8tion.jda.api.entities.channel.attribute.IThreadContainer;
+import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
+import net.dv8tion.jda.api.entities.sticker.GuildSticker;
+import net.dv8tion.jda.internal.utils.EntityString;
+
+import javax.annotation.Nonnull;
 
 /**
  * Enum of possible/expected keys that can be provided
@@ -28,8 +45,7 @@ import net.dv8tion.jda.api.entities.Guild;
  *
  * @see <a href="https://discord.com/developers/docs/resources/audit-log#audit-log-change-object-audit-log-change-key" target="_blank">Audit Log Change Key</a>
  */
-public enum AuditLogKey
-{
+public enum AuditLogKey {
     /**
      * This is sometimes visible for {@link ActionType ActionTypes}
      * which create a new entity.
@@ -139,6 +155,21 @@ public enum AuditLogKey
     GUILD_SPLASH("splash_hash"),
 
     /**
+     * Change of the {@link net.dv8tion.jda.api.entities.Guild#getBannerId() Banner ID} of a Guild.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    GUILD_BANNER("banner_hash"),
+
+    /**
+     * Change of the primary brand color of a Guild.
+     * <br>The color is encoded as a hexadecimal string. For instance: {@code "#4fe2ca"}
+     *
+     * <p>Expected type: <b>String</b></p>
+     */
+    GUILD_BRAND_COLOR_PRIMARY("brand_color_primary"),
+
+    /**
      * Change of the {@link net.dv8tion.jda.api.entities.Guild#getVerificationLevel() Guild.getVerificationLevel()} value.
      * <br>Use with {@link net.dv8tion.jda.api.entities.Guild.VerificationLevel#fromKey(int) Guild.VerificationLevel.fromKey(int)}
      *
@@ -190,17 +221,23 @@ public enum AuditLogKey
      */
     GUILD_WIDGET_CHANNEL_ID("widget_channel_id"),
 
-
     // CHANNEL
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.GuildChannel#getName() GuildChannel.getName()} value.
+     * Change of the {@link GuildChannel#getName() GuildChannel.getName()} value.
      *
      * <p>Expected type: <b>String</b>
      */
     CHANNEL_NAME("name"),
 
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.GuildChannel#getParent() GuildChannel.getParent()} value.
+     * Change of the {@link Channel#getFlags() flags} value.
+     *
+     * <p>Expected type: <b>Integer</b>
+     */
+    CHANNEL_FLAGS("flags"),
+
+    /**
+     * Change of the {@link ICategorizableChannel#getParentCategory()} ICategorizable.getParentCategory()} value.
      * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getCategoryById(String) Guild.getCategoryById(String)}
      *
      * <p>Expected type: <b>String</b>
@@ -208,40 +245,60 @@ public enum AuditLogKey
     CHANNEL_PARENT("parent_id"),
 
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.TextChannel#getTopic() TextChannel.getTopic()} value.
-     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#TEXT ChannelType.TEXT}
+     * Change of the {@link TextChannel#getTopic() TextChannel.getTopic()} value.
+     * <br>Only for {@link ChannelType#TEXT ChannelType.TEXT}
      *
      * <p>Expected type: <b>String</b>
      */
     CHANNEL_TOPIC("topic"),
 
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.TextChannel#getSlowmode() TextChannel.getSlowmode()} value.
-     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#TEXT ChannelType.TEXT}
+     * Change of the {@link VoiceChannel#getStatus() VoiceChannel.getStatus()} value.
+     * <br>Only for {@link ChannelType#VOICE ChannelType.VOICE}
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    CHANNEL_VOICE_STATUS("status"),
+
+    /**
+     * Change of the {@link ISlowmodeChannel#getSlowmode()} value.
      *
      * <p>Expected type: <b>Integer</b>
      */
     CHANNEL_SLOWMODE("rate_limit_per_user"),
 
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.VoiceChannel#getBitrate() VoiceChannel.getBitrate()} value.
-     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#VOICE ChannelType.VOICE}
+     * Change of the {@link IThreadContainer#getDefaultThreadSlowmode()} value.
+     *
+     * <p>Expected type: <b>Integer</b>
+     */
+    CHANNEL_DEFAULT_THREAD_SLOWMODE("default_thread_rate_limit_per_user"),
+
+    /**
+     * Change of the {@link ForumChannel#getDefaultReaction()} value.
+     *
+     * <p>Expected type: <b>Map</b> containing {@code emoji_id} and {@code emoji_name}
+     */
+    CHANNEL_DEFAULT_REACTION_EMOJI("default_reaction_emoji"),
+
+    /**
+     * Change of the {@link VoiceChannel#getBitrate() VoiceChannel.getBitrate()} value.
+     * <br>Only for {@link ChannelType#VOICE ChannelType.VOICE}
      *
      * <p>Expected type: <b>Integer</b>
      */
     CHANNEL_BITRATE("bitrate"),
 
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.VoiceChannel#getUserLimit() VoiceChannel.getUserLimit()} value.
-     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#VOICE ChannelType.VOICE}
+     * Change of the {@link VoiceChannel#getUserLimit() VoiceChannel.getUserLimit()} value.
+     * <br>Only for {@link ChannelType#VOICE ChannelType.VOICE}
      *
      * <p>Expected type: <b>Integer</b>
      */
     CHANNEL_USER_LIMIT("user_limit"),
 
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.TextChannel#isNSFW() TextChannel.isNSFW()} value.
-     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#TEXT ChannelType.TEXT}
+     * Change of the {@link net.dv8tion.jda.api.entities.channel.attribute.IAgeRestrictedChannel#isNSFW() IAgeRestrictedChannel.isNSFW()} value.
      *
      * <p>Expected type: <b>Boolean</b>
      */
@@ -249,7 +306,7 @@ public enum AuditLogKey
 
     /**
      * Change of the {@link net.dv8tion.jda.api.Region Region} value.
-     * <br>Only for {@link net.dv8tion.jda.api.entities.ChannelType#VOICE ChannelType.VOICE} and {@link net.dv8tion.jda.api.entities.ChannelType#STAGE ChannelType.STAGE}
+     * <br>Only for {@link ChannelType#VOICE ChannelType.VOICE} and {@link ChannelType#STAGE ChannelType.STAGE}
      *
      * <p>Expected type: <b>String</b></p>
      */
@@ -257,7 +314,7 @@ public enum AuditLogKey
 
     /**
      * The integer type of this channel.
-     * <br>Use with {@link net.dv8tion.jda.api.entities.ChannelType#fromId(int) ChannelType.fromId(int)}.
+     * <br>Use with {@link ChannelType#fromId(int) ChannelType.fromId(int)}.
      *
      * <p>Expected type: <b>int</b>
      */
@@ -270,6 +327,81 @@ public enum AuditLogKey
      */
     CHANNEL_OVERRIDES("permission_overwrites"),
 
+    /**
+     * The available tags of this {@link net.dv8tion.jda.api.entities.channel.concrete.ForumChannel ForumChannel}.
+     *
+     * <p>Expected type: <b>List{@literal <Map<String, Object>>}</b>
+     */
+    CHANNEL_AVAILABLE_TAGS("available_tags"),
+
+    /**
+     * The relevant channel for the audit log entry.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    CHANNEL_ID("channel_id"),
+
+    /**
+     * The {@link ForumChannel#getDefaultSortOrder()} value.
+     * <br>Only for {@link ChannelType#FORUM} and {@link ChannelType#MEDIA}.
+     *
+     * <p>Expected type: <b>Integer</b>
+     */
+    CHANNEL_DEFAULT_SORT_ORDER("default_sort_order"),
+
+    /**
+     * The {@link ForumChannel#getDefaultLayout()} value.
+     * <br>Only for {@link ChannelType#FORUM}.
+     *
+     * <p>Expected type: <b>Integer</b>
+     */
+    DEFAULT_FORUM_LAYOUT("default_forum_layout"),
+
+    // THREADS
+
+    /**
+     * Change of the {@link ThreadChannel#getName() ThreadChannel.getName()} value.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    THREAD_NAME("name"),
+
+    /**
+     * Change of the {@link ThreadChannel#getAutoArchiveDuration() ThreadChannel.getAutoArchiveDuration()} value.
+     *
+     * <p>Expected type: <b>Integer</b>
+     */
+    THREAD_AUTO_ARCHIVE_DURATION("auto_archive_duration"),
+
+    /**
+     * Change of the {@link ThreadChannel#isArchived() ThreadChannel.isArchived()} value.
+     *
+     * <p>Expected type: <b>Boolean</b>
+     */
+    THREAD_ARCHIVED("archived"),
+
+    /**
+     * Change of the {@link ThreadChannel#isLocked() ThreadChannel.isLocked()} value.
+     *
+     * <p>Expected type: <b>Boolean</b>
+     */
+    THREAD_LOCKED("locked"),
+
+    /**
+     * Change of the {@link ThreadChannel#isInvitable() ThreadChannel.isInvitable()} value.
+     * This can only be set/modified on a {@link ThreadChannel#isPublic() private thread}.
+     *
+     * <p>Expected type: <b>Boolean</b>
+     */
+    THREAD_INVITABLE("invitable"),
+
+    /**
+     * The applied tags of this {@link ThreadChannel}, given that it is a forum post.
+     *
+     * <p>Expected type: <b>List{@literal <String>}</b>
+     */
+    THREAD_APPLIED_TAGS("applied_tags"),
+
     // STAGE_INSTANCE
 
     /**
@@ -279,7 +411,6 @@ public enum AuditLogKey
      * <p>Expected type: <b>Integer</b>
      */
     PRIVACY_LEVEL("privacy_level"),
-
 
     // MEMBER
     /**
@@ -307,22 +438,30 @@ public enum AuditLogKey
 
     /**
      * Roles added to {@link net.dv8tion.jda.api.entities.Member#getRoles() Member.getRoles()} with this action
-     * <br>Containing a list of {@link net.dv8tion.jda.api.entities.Role Role} IDs
+     * <br>Containing a list of role objects (maps) with entries for {@code id} and {@code name}
      * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getRoleById(String) Guild.getRoleById(String)}
      *
-     * <p>Expected type: <b>List{@literal <String>}</b>
+     * <p>Expected type: <b>List{@literal <Map<String, String>>}</b>
      */
     MEMBER_ROLES_ADD("$add"),
 
     /**
      * Roles removed from {@link net.dv8tion.jda.api.entities.Member#getRoles() Member.getRoles()} with this action
-     * <br>Containing a list of {@link net.dv8tion.jda.api.entities.Role Role} IDs
+     * <br>Containing a list of role objects (maps) with entries for {@code id} and {@code name}
      * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getRoleById(String) Guild.getRoleById(String)}
      *
-     * <p>Expected type: <b>List{@literal <String>}</b>
+     * <p>Expected type: <b>List{@literal <Map<String, String>>}</b>
      */
     MEMBER_ROLES_REMOVE("$remove"),
 
+    /**
+     * Change of the {@link net.dv8tion.jda.api.entities.Member#getTimeOutEnd() Time out} of a Member.
+     * <br>Indicating that the {@link net.dv8tion.jda.api.entities.Member#getTimeOutEnd() Member.getTimeOutEnd()} value updated.
+     * <br>This is provided as an ISO8601 Date-Time string.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    MEMBER_TIME_OUT("communication_disabled_until"),
 
     // PERMISSION OVERRIDE
     /**
@@ -350,7 +489,6 @@ public enum AuditLogKey
      * <p>Expected type: <b>String</b>
      */
     OVERRIDE_TYPE("type"),
-
 
     // ROLE
     /**
@@ -390,33 +528,61 @@ public enum AuditLogKey
      */
     ROLE_MENTIONABLE("mentionable"),
 
-
-    // EMOTE
+    // EMOJI
     /**
-     * Change of the {@link net.dv8tion.jda.api.entities.Emote#getName() Emote.getName()} value.
+     * Change of the {@link RichCustomEmoji#getName() Emoji.getName()} value.
      *
      * <p>Expected type: <b>String</b>
      */
-    EMOTE_NAME("name"),
+    EMOJI_NAME("name"),
 
     /**
-     * Roles added to {@link net.dv8tion.jda.api.entities.Emote#getRoles() Emote.getRoles()} with this action
+     * Roles added to {@link RichCustomEmoji#getRoles() RichCustomEmoji.getRoles()} with this action
      * <br>Containing a list of {@link net.dv8tion.jda.api.entities.Role Role} IDs
      * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getRoleById(String) Guild.getRoleById(String)}
      *
      * <p>Expected type: <b>List{@literal <String>}</b>
      */
-    EMOTE_ROLES_ADD("$add"),
+    EMOJI_ROLES_ADD("$add"),
 
     /**
-     * Roles remove from {@link net.dv8tion.jda.api.entities.Emote#getRoles() Emote.getRoles()} with this action
+     * Roles remove from {@link RichCustomEmoji#getRoles() RichCustomEmoji.getRoles()} with this action
      * <br>Containing a list of {@link net.dv8tion.jda.api.entities.Role Role} IDs
      * <br>Use with {@link net.dv8tion.jda.api.entities.Guild#getRoleById(String) Guild.getRoleById(String)}
      *
      * <p>Expected type: <b>List{@literal <String>}</b>
      */
-    EMOTE_ROLES_REMOVE("$remove"),
+    EMOJI_ROLES_REMOVE("$remove"),
 
+    // STICKER
+
+    /**
+     * Change of the {@link GuildSticker#getName() Sticker.getName()} value.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    STICKER_NAME("name"),
+
+    /**
+     * Change of the {@link GuildSticker#getFormatType() Sticker.getFormatType()} value.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    STICKER_FORMAT("format_type"),
+
+    /**
+     * Change of the {@link GuildSticker#getDescription() Sticker.getDescription()} value.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    STICKER_DESCRIPTION("description"),
+
+    /**
+     * Change of the {@link GuildSticker#getTags() Sticker.getTags()} value.
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    STICKER_TAGS("tags"),
 
     // WEBHOOK
     /**
@@ -442,7 +608,6 @@ public enum AuditLogKey
      * <p>Expected type: <b>String</b>
      */
     WEBHOOK_CHANNEL("channel_id"),
-
 
     // INVITE
     /**
@@ -503,24 +668,40 @@ public enum AuditLogKey
      *
      * <p>Expected type: <b>int</b>
      */
-    INVITE_MAX_USES("max_uses");
+    INVITE_MAX_USES("max_uses"),
 
+    // AUTO MODERATION
+    /**
+     * Change of the {@link AutoModRule#getName()} for the target {@link AutoModRule}
+     *
+     * <p>Expected type: <b>String</b>
+     */
+    AUTO_MODERATION_RULE_NAME("auto_moderation_rule_name"),
+
+    /**
+     * The {@link AutoModRule#getTriggerType()} for an {@link AutoModRule} trigger
+     *
+     * <p>Use with {@link AutoModTriggerType#fromKey(int)}
+     *
+     * <p>Expected type: <b>int</b>
+     */
+    AUTO_MODERATION_RULE_TRIGGER_TYPE("auto_moderation_rule_trigger_type"),
+    ;
 
     private final String key;
 
-    AuditLogKey(String key)
-    {
+    AuditLogKey(String key) {
         this.key = key;
     }
 
-    public String getKey()
-    {
+    @Nonnull
+    public String getKey() {
         return key;
     }
 
+    @Nonnull
     @Override
-    public String toString()
-    {
-        return name() + '(' + key + ')';
+    public String toString() {
+        return new EntityString(this).setType(this).addMetadata("key", key).toString();
     }
 }

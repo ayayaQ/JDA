@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.events.guild.member.update;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.utils.ImageProxy;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -25,11 +26,11 @@ import javax.annotation.Nullable;
 /**
  * Indicates that a {@link net.dv8tion.jda.api.entities.Member Member} updated their {@link net.dv8tion.jda.api.entities.Guild Guild} avatar.
  *
- * <p>Can be used to retrieve members who change their per guild avatar, triggering guild, the old avatar id and the new avatar id.
+ * <p>Can be used to retrieve members who change their per guild avatar, the triggering guild, the old avatar id and the new avatar id.
  *
  * <p>Identifier: {@code avatar}
  *
- * <h2>Requirements</h2>
+ * <p><b>Requirements</b><br>
  *
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#GUILD_MEMBERS GUILD_MEMBERS} intent to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createDefault(String) createDefault(String)} and
@@ -40,12 +41,11 @@ import javax.annotation.Nullable;
  * member was updated and gives us the updated member object. In order to fire a specific event like this we
  * need to have the old member cached to compare against.
  */
-public class GuildMemberUpdateAvatarEvent extends GenericGuildMemberUpdateEvent<String>
-{
+public class GuildMemberUpdateAvatarEvent extends GenericGuildMemberUpdateEvent<String> {
     public static final String IDENTIFIER = "avatar";
 
-    public GuildMemberUpdateAvatarEvent(@Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nullable String oldAvatarId)
-    {
+    public GuildMemberUpdateAvatarEvent(
+            @Nonnull JDA api, long responseNumber, @Nonnull Member member, @Nullable String oldAvatarId) {
         super(api, responseNumber, member, oldAvatarId, member.getAvatarId(), IDENTIFIER);
     }
 
@@ -55,8 +55,7 @@ public class GuildMemberUpdateAvatarEvent extends GenericGuildMemberUpdateEvent<
      * @return The old avatar id
      */
     @Nullable
-    public String getOldAvatarId()
-    {
+    public String getOldAvatarId() {
         return getOldValue();
     }
 
@@ -67,7 +66,29 @@ public class GuildMemberUpdateAvatarEvent extends GenericGuildMemberUpdateEvent<
      */
     @Nullable
     public String getOldAvatarUrl() {
-        return previous == null ? null : String.format(Member.AVATAR_URL, getMember().getGuild().getId(), getMember().getId(), previous, previous.startsWith("a_") ? "gif" : "png");
+        return previous == null
+                ? null
+                : String.format(
+                        Member.AVATAR_URL,
+                        getMember().getGuild().getId(),
+                        getMember().getId(),
+                        previous,
+                        previous.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this member's old avatar.
+     * <p>
+     * <b>Note:</b> the old avatar may not always be downloadable as it might have been removed from Discord.
+     *
+     * @return Possibly-null {@link ImageProxy} of this member's old avatar
+     *
+     * @see    #getOldAvatarUrl()
+     */
+    @Nullable
+    public ImageProxy getOldAvatar() {
+        String oldAvatarUrl = getOldAvatarUrl();
+        return oldAvatarUrl == null ? null : new ImageProxy(oldAvatarUrl);
     }
 
     /**
@@ -76,8 +97,7 @@ public class GuildMemberUpdateAvatarEvent extends GenericGuildMemberUpdateEvent<
      * @return The new avatar id
      */
     @Nullable
-    public String getNewAvatarId()
-    {
+    public String getNewAvatarId() {
         return getNewValue();
     }
 
@@ -88,6 +108,26 @@ public class GuildMemberUpdateAvatarEvent extends GenericGuildMemberUpdateEvent<
      */
     @Nullable
     public String getNewAvatarUrl() {
-        return next == null ? null : String.format(Member.AVATAR_URL, getMember().getGuild().getId(), getMember().getId(), next, next.startsWith("a_") ? "gif" : "png");
+        return next == null
+                ? null
+                : String.format(
+                        Member.AVATAR_URL,
+                        getMember().getGuild().getId(),
+                        getMember().getId(),
+                        next,
+                        next.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this member's new avatar.
+     *
+     * @return Possibly-null {@link ImageProxy} of this member's new avatar
+     *
+     * @see    #getNewAvatarUrl()
+     */
+    @Nullable
+    public ImageProxy getNewAvatar() {
+        String newAvatarUrl = getNewAvatarUrl();
+        return newAvatarUrl == null ? null : new ImageProxy(newAvatarUrl);
     }
 }

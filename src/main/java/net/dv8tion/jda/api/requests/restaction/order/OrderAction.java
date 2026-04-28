@@ -17,13 +17,16 @@
 package net.dv8tion.jda.api.requests.restaction.order;
 
 import net.dv8tion.jda.api.requests.RestAction;
+import org.jetbrains.annotations.Unmodifiable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Extension of {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: Void
@@ -40,21 +43,21 @@ import java.util.function.BooleanSupplier;
  *        implementation rather than a mask of this class. It allows us to implement
  *        chaining operations in this class instead of having to implement it in every
  *        inheriting class!
- *
- * @since 3.0
  */
-public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<Void>
-{
+public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<Void> {
     @Nonnull
     @Override
+    @CheckReturnValue
     M setCheck(@Nullable BooleanSupplier checks);
 
     @Nonnull
     @Override
+    @CheckReturnValue
     M timeout(long timeout, @Nonnull TimeUnit unit);
 
     @Nonnull
     @Override
+    @CheckReturnValue
     M deadline(long timestamp);
 
     /**
@@ -72,6 +75,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @return Immutable List representing the current order
      */
     @Nonnull
+    @Unmodifiable
     List<T> getCurrentOrder();
 
     /**
@@ -91,6 +95,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    #getSelectedEntity()
      */
     @Nonnull
+    @CheckReturnValue
     M selectPosition(int selectedPosition);
 
     /**
@@ -109,6 +114,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    #getSelectedEntity()
      */
     @Nonnull
+    @CheckReturnValue
     M selectPosition(@Nonnull T selectedEntity);
 
     /**
@@ -123,7 +129,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * The entity which is currently at the {@link #getSelectedPosition() selected position}
      *
      * @throws java.lang.IllegalStateException
-     *         If no entity has been selected yet
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
      *
      * @return The currently selected entity
      */
@@ -138,7 +144,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      *         The amount of positions that should be moved
      *
      * @throws java.lang.IllegalStateException
-     *         If no entity has been selected yet
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
      * @throws java.lang.IllegalArgumentException
      *         If the specified amount would cause the entity to go out-of-bounds
      *
@@ -147,6 +153,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    #moveTo(int)
      */
     @Nonnull
+    @CheckReturnValue
     M moveUp(int amount);
 
     /**
@@ -157,7 +164,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      *         The amount of positions that should be moved
      *
      * @throws java.lang.IllegalStateException
-     *         If no entity has been selected yet
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
      * @throws java.lang.IllegalArgumentException
      *         If the specified amount would cause the entity to go out-of-bounds
      *
@@ -166,6 +173,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    #moveTo(int)
      */
     @Nonnull
+    @CheckReturnValue
     M moveDown(int amount);
 
     /**
@@ -177,7 +185,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      *         The new not-negative position for the currently selected entity
      *
      * @throws java.lang.IllegalStateException
-     *         If no entity has been selected yet
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
      * @throws java.lang.IllegalArgumentException
      *         If the specified position is out-of-bounds
      *
@@ -185,9 +193,54 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      *
      * @see    #moveDown(int)
      * @see    #moveUp(int)
+     * @see    #moveBelow(Object)
+     * @see    #moveAbove(Object)
      */
     @Nonnull
+    @CheckReturnValue
     M moveTo(int position);
+
+    /**
+     * Moves the currently selected entity below the specified target entity.
+     *
+     * @param  other
+     *         The reference entity that should end up above the selected entity
+     *
+     * @throws IllegalStateException
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
+     * @throws IllegalArgumentException
+     *         If the specified target entity is not managed by this instance or null
+     *
+     * @return The current OrderAction sub-implementation instance
+     *
+     * @see    #moveUp(int)
+     * @see    #moveDown(int)
+     * @see    #moveAbove(Object)
+     */
+    @Nonnull
+    @CheckReturnValue
+    M moveBelow(@Nonnull T other);
+
+    /**
+     * Moves the currently selected entity above the specified target entity.
+     *
+     * @param  other
+     *         The reference entity that should end up below the selected entity
+     *
+     * @throws IllegalStateException
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
+     * @throws IllegalArgumentException
+     *         If the specified target entity is not managed by this instance or null
+     *
+     * @return The current OrderAction sub-implementation instance
+     *
+     * @see    #moveUp(int)
+     * @see    #moveDown(int)
+     * @see    #moveBelow(Object)
+     */
+    @Nonnull
+    @CheckReturnValue
+    M moveAbove(@Nonnull T other);
 
     /**
      * Swaps the currently selected entity with the entity located
@@ -197,13 +250,14 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      *         0 based index of target position
      *
      * @throws java.lang.IllegalStateException
-     *         If no entity has been selected yet
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
      * @throws java.lang.IllegalArgumentException
      *         If the specified position is out-of-bounds
      *
      * @return The current OrderAction sub-implementation instance
      */
     @Nonnull
+    @CheckReturnValue
     M swapPosition(int swapPosition);
 
     /**
@@ -214,7 +268,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      *         Target entity to switch positions with
      *
      * @throws java.lang.IllegalStateException
-     *         If no entity has been selected yet
+     *         If no entity has been selected yet, use {@link #selectPosition(Object)}
      * @throws java.lang.IllegalArgumentException
      *         If the specified position is out-of-bounds,
      *         or if the target entity is {@code null} or not
@@ -225,6 +279,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    #swapPosition(int)
      */
     @Nonnull
+    @CheckReturnValue
     M swapPosition(@Nonnull T swapEntity);
 
     /**
@@ -236,6 +291,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    java.util.Collections#reverse(java.util.List)
      */
     @Nonnull
+    @CheckReturnValue
     M reverseOrder();
 
     /**
@@ -247,6 +303,7 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    java.util.Collections#shuffle(java.util.List)
      */
     @Nonnull
+    @CheckReturnValue
     M shuffleOrder();
 
     /**
@@ -265,5 +322,6 @@ public interface OrderAction<T, M extends OrderAction<T, M>> extends RestAction<
      * @see    java.util.ArrayList#sort(java.util.Comparator)
      */
     @Nonnull
-    M sortOrder(@Nonnull final Comparator<T> comparator);
+    @CheckReturnValue
+    M sortOrder(@Nonnull Comparator<T> comparator);
 }

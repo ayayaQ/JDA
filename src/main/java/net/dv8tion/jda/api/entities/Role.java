@@ -13,18 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.entities;
 
+import net.dv8tion.jda.annotations.ReplaceWith;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.detached.IDetachableEntity;
 import net.dv8tion.jda.api.managers.RoleManager;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.api.requests.restaction.RoleAction;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
+import java.awt.*;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.awt.*;
 
 /**
  * Represents a {@link net.dv8tion.jda.api.entities.Guild Guild}'s Role. Used to control permissions for Members.
@@ -33,16 +37,15 @@ import java.awt.*;
  * @see Guild#getRoleById(long)
  * @see Guild#getRolesByName(String, boolean)
  * @see Guild#getRoles()
- *
  * @see JDA#getRoleCache()
  * @see JDA#getRoleById(long)
  * @see JDA#getRolesByName(String, boolean)
  * @see JDA#getRoles()
  */
-public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
-{
+public interface Role extends IMentionable, IPermissionHolder, IDetachableEntity, Comparable<Role> {
+    // java.awt.Color fills the MSB with FF, we just use 1F to provide better consistency
     /** Used to keep consistency between color values used in the API */
-    int DEFAULT_COLOR_RAW = 0x1FFFFFFF; // java.awt.Color fills the MSB with FF, we just use 1F to provide better consistency
+    int DEFAULT_COLOR_RAW = 0x1F_FFFFFF;
 
     /**
      * The hierarchical position of this {@link net.dv8tion.jda.api.entities.Role Role}
@@ -51,6 +54,8 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      *
      * @throws IllegalStateException
      *         If this role is not in the guild cache
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this role is {@link #isDetached() detached}, use {@link #getPermissionsRaw()} instead
      *
      * @return The position of this {@link net.dv8tion.jda.api.entities.Role Role} as integer.
      */
@@ -100,29 +105,55 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
 
     /**
      * The {@code long} representation of the literal permissions that this {@link net.dv8tion.jda.api.entities.Role Role} has.
-     * <br><b>NOTE:</b> these do not necessarily represent the permissions this role will have in a {@link GuildChannel GuildChannel}.
+     * <br><b>NOTE:</b> these do not necessarily represent the permissions this role will have in a {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel GuildChannel}.
      *
      * @return Never-negative long containing offset permissions of this role.
      */
     long getPermissionsRaw();
 
     /**
+     * The colors this Role is displayed in.
+     *
+     * <p>See {@link RoleColors} for detailed information on how these work.
+     *
+     * @return {@link RoleColors}
+     *
+     * @see RoleColors#isDefault()
+     * @see RoleColors#isGradient()
+     * @see RoleColors#isHolographic()
+     */
+    @Nonnull
+    RoleColors getColors();
+
+    /**
      * The color this {@link net.dv8tion.jda.api.entities.Role Role} is displayed in.
      *
      * @return Color value of Role-color
      *
+     * @deprecated Replaced by {@link #getColors()}
+     *
      * @see    #getColorRaw()
      */
     @Nullable
-    Color getColor();
+    @Deprecated
+    @ReplaceWith("getColors().getPrimary()")
+    default Color getColor() {
+        return getColors().getPrimary();
+    }
 
     /**
      * The raw color RGB value used for this role
      * <br>Defaults to {@link #DEFAULT_COLOR_RAW} if this role has no set color
      *
      * @return The raw RGB color value or default
+     *
+     * @deprecated Replaced by {@link #getColors()}
      */
-    int getColorRaw();
+    @Deprecated
+    @ReplaceWith("getColors().getPrimaryRaw()")
+    default int getColorRaw() {
+        return getColors().getPrimaryRaw();
+    }
 
     /**
      * Whether this role is the @everyone role for its {@link net.dv8tion.jda.api.entities.Guild Guild},
@@ -184,6 +215,8 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      *         If the logged in account does not have the {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES} Permission and every Permission the provided Role has
      * @throws java.lang.IllegalArgumentException
      *         If the specified guild is {@code null}
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If the guild the role should be copied to is {@link Guild#isDetached() detached}
      *
      * @return {@link RoleAction RoleAction}
      *         <br>RoleAction with already copied values from the specified {@link net.dv8tion.jda.api.entities.Role Role}
@@ -214,14 +247,15 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      *
      * @throws net.dv8tion.jda.api.exceptions.PermissionException
      *         If the logged in account does not have the {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES} Permission and every Permission the provided Role has
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this entity is {@link #isDetached() detached}
      *
      * @return {@link RoleAction RoleAction}
      *         <br>RoleAction with already copied values from the specified {@link net.dv8tion.jda.api.entities.Role Role}
      */
     @Nonnull
     @CheckReturnValue
-    default RoleAction createCopy()
-    {
+    default RoleAction createCopy() {
         return createCopy(getGuild());
     }
 
@@ -230,17 +264,17 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      * In the RoleManager, you can modify all its values.
      * <br>You modify multiple fields in one request by chaining setters before calling {@link net.dv8tion.jda.api.requests.RestAction#queue() RestAction.queue()}.
      *
-     * <p>This is a lazy idempotent getter. The manager is retained after the first call.
-     * This getter is not thread-safe and would require guards by the user.
-     *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
      *         If the currently logged in account does not have {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES Permission.MANAGE_ROLES}
      * @throws net.dv8tion.jda.api.exceptions.HierarchyException
      *         If the currently logged in account does not have the required position to modify this role
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this entity is {@link #isDetached() detached}
      *
      * @return The RoleManager of this Role
      */
     @Nonnull
+    @CheckReturnValue
     RoleManager getManager();
 
     /**
@@ -263,6 +297,8 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      *         If we don't have the permission to {@link net.dv8tion.jda.api.Permission#MANAGE_ROLES MANAGE_ROLES}
      * @throws net.dv8tion.jda.api.exceptions.HierarchyException
      *         If the role is too high in the role hierarchy to be deleted
+     * @throws net.dv8tion.jda.api.exceptions.DetachedEntityException
+     *         If this entity is {@link #isDetached() detached}
      *
      * @return {@link net.dv8tion.jda.api.requests.RestAction}
      */
@@ -287,8 +323,6 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      * See {@link net.dv8tion.jda.api.JDABuilder#enableCache(CacheFlag, CacheFlag...) JDABuilder.enableCache(...)}.
      *
      * @return {@link RoleTags}
-     *
-     * @since  4.2.1
      */
     @Nonnull
     RoleTags getTags();
@@ -298,19 +332,14 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
      * This icon will be displayed next to the role's name in the members tab and in chat.
      *
      * @return Possibly-null {@link RoleIcon Icon} of this role
-     *
-     * @since  4.3.1
      */
     @Nullable
     RoleIcon getIcon();
 
     /**
      * Tags associated with this role.
-     *
-     * @since  4.2.1
      */
-    interface RoleTags
-    {
+    interface RoleTags {
         /**
          * Whether this role is associated with a bot.
          *
@@ -335,8 +364,7 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
          * @see    #isBot()
          */
         @Nullable
-        default String getBotId()
-        {
+        default String getBotId() {
             return isBot() ? Long.toUnsignedString(getBotIdLong()) : null;
         }
 
@@ -372,9 +400,68 @@ public interface Role extends IMentionable, IPermissionHolder, Comparable<Role>
          * @see    #isIntegration()
          */
         @Nullable
-        default String getIntegrationId()
-        {
+        default String getIntegrationId() {
             return isIntegration() ? Long.toUnsignedString(getIntegrationIdLong()) : null;
         }
+
+        /**
+         * Whether this role can be acquired through a premium subscription purchase.
+         * A role would also need {@link #isAvailableForPurchase()} to also be true for a user to actually be
+         * able to purchase the role.
+         *
+         * @return True, if this is a subscription role
+         *
+         * @see    #getSubscriptionIdLong()
+         * @see    #isAvailableForPurchase()
+         */
+        default boolean hasSubscriptionListing() {
+            return getSubscriptionIdLong() != 0;
+        }
+
+        /**
+         * The subscription listing id for this role. If a role has a subscription id then it is a premium role that
+         * can be acquired by users via purchase.
+         *
+         * @return The listing id, or 0 if this role is not for a subscription listing
+         *
+         * @see    #isAvailableForPurchase()
+         */
+        long getSubscriptionIdLong();
+
+        /**
+         * The subscription listing id for this role. If a role has a subscription id then it is a premium role that
+         * can be acquired by users via purchase.
+         *
+         * @return The listing id, or null if this role is not for a subscription listing
+         *
+         * @see    #isAvailableForPurchase()
+         */
+        @Nullable
+        default String getSubscriptionId() {
+            return hasSubscriptionListing() ? Long.toUnsignedString(getSubscriptionIdLong()) : null;
+        }
+
+        /**
+         * Whether this role has been published for user purchasing. Only {@link #hasSubscriptionListing() premium roles}
+         * can be purchased. However, a premium role must be published before it can be purchased.
+         * Additionally, a premium role can be unpublished after it has been published. Doing so will make it
+         * no longer available for purchase but will not remove the role from users who have already purchased it.
+         *
+         * @return True, if this role is purchasable
+         *
+         * @see    #hasSubscriptionListing()
+         */
+        boolean isAvailableForPurchase();
+
+        /**
+         * Whether this role is acquired through a user connection.
+         * <br>Such as external services like twitter or reddit.
+         * This also includes custom third-party applications, such as those managed by bots via {@link RoleConnectionMetadata}.
+         *
+         * @return True, if this role is acquired through a user connection
+         *
+         * @see    <a href="https://discord.com/developers/docs/tutorials/configuring-app-metadata-for-linked-roles" target="_blank">Configuring App Metadata for Linked Roles</a>
+         */
+        boolean isLinkedRole();
     }
 }

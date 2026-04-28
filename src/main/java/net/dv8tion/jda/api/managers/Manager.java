@@ -19,13 +19,18 @@ package net.dv8tion.jda.api.managers;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.internal.managers.ManagerBase;
 
-import javax.annotation.CheckReturnValue;
-import javax.annotation.Nonnull;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
-public interface Manager<M extends Manager<M>> extends AuditableRestAction<Void>
-{
+import javax.annotation.CheckReturnValue;
+import javax.annotation.Nonnull;
+
+/**
+ * Top-level abstraction for managers.
+ *
+ * @param <M> The manager type
+ */
+public interface Manager<M extends Manager<M>> extends AuditableRestAction<Void> {
     /**
      * Enables internal checks for missing permissions
      * <br>When this is disabled the chances of hitting a
@@ -39,8 +44,7 @@ public interface Manager<M extends Manager<M>> extends AuditableRestAction<Void>
      *
      * @see   #isPermissionChecksEnabled()
      */
-    static void setPermissionChecksEnabled(boolean enable)
-    {
+    static void setPermissionChecksEnabled(boolean enable) {
         ManagerBase.setPermissionChecksEnabled(enable);
     }
 
@@ -55,21 +59,23 @@ public interface Manager<M extends Manager<M>> extends AuditableRestAction<Void>
      *
      * @see    #setPermissionChecksEnabled(boolean)
      */
-    static boolean isPermissionChecksEnabled()
-    {
+    static boolean isPermissionChecksEnabled() {
         return ManagerBase.isPermissionChecksEnabled();
     }
 
     @Nonnull
     @Override
-    M setCheck(BooleanSupplier checks);
+    @CheckReturnValue
+    M setCheck(@Nonnull BooleanSupplier checks);
 
     @Nonnull
     @Override
+    @CheckReturnValue
     M timeout(long timeout, @Nonnull TimeUnit unit);
 
     @Nonnull
     @Override
+    @CheckReturnValue
     M deadline(long timestamp);
 
     @Nonnull
@@ -78,7 +84,7 @@ public interface Manager<M extends Manager<M>> extends AuditableRestAction<Void>
 
     @Nonnull
     @CheckReturnValue
-    M reset(long... fields);
+    M reset(@Nonnull long... fields);
 
     /**
      * Resets all fields for this Manager

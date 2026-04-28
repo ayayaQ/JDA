@@ -16,39 +16,39 @@
 
 package net.dv8tion.jda.api.entities;
 
-import net.dv8tion.jda.annotations.DeprecatedSince;
-import net.dv8tion.jda.annotations.ForRemoval;
-import net.dv8tion.jda.annotations.ReplaceWith;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild.VerificationLevel;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
+import net.dv8tion.jda.api.utils.ImageProxy;
 import net.dv8tion.jda.internal.entities.InviteImpl;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Set;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Set;
+
+import static net.dv8tion.jda.api.entities.Guild.BANNER_URL;
+import static net.dv8tion.jda.api.entities.Guild.NSFWLevel;
 
 /**
  * Representation of a Discord Invite.
  * This class is immutable.
  *
- * @since  3.0
- * @author Aljoscha Grebe
- *
  * @see    #resolve(JDA, String)
  * @see    #resolve(JDA, String, boolean)
- *
  * @see    net.dv8tion.jda.api.entities.Guild#retrieveInvites() Guild.retrieveInvites()
- * @see    GuildChannel#retrieveInvites()
+ * @see    net.dv8tion.jda.api.entities.channel.attribute.IInviteContainer#retrieveInvites()
+ *
+ * @author Aljoscha Grebe
  */
-public interface Invite
-{
+public interface Invite {
     /**
-     * Retrieves a new {@link net.dv8tion.jda.api.entities.Invite Invite} instance for the given invite code.
+     * Retrieves a new {@link Invite Invite} instance for the given invite code.
      * <br><b>You cannot resolve invites if you were banned from the origin Guild!</b>
      *
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} include:
@@ -62,17 +62,17 @@ public interface Invite
      * @param  code
      *         A valid invite code
      *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.Invite Invite}
+     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link Invite Invite}
      *         <br>The Invite object
      */
     @Nonnull
-    static RestAction<Invite> resolve(@Nonnull final JDA api, @Nonnull final String code)
-    {
+    @CheckReturnValue
+    static RestAction<Invite> resolve(@Nonnull JDA api, @Nonnull String code) {
         return resolve(api, code, false);
     }
-    
+
     /**
-     * Retrieves a new {@link net.dv8tion.jda.api.entities.Invite Invite} instance for the given invite code.
+     * Retrieves a new {@link Invite Invite} instance for the given invite code.
      * <br><b>You cannot resolve invites if you were banned from the origin Guild!</b>
      *
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} include:
@@ -88,12 +88,12 @@ public interface Invite
      * @param  withCounts
      *         Whether or not to include online and member counts for guild invites or users for group invites
      *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.Invite Invite}
+     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link Invite Invite}
      *         <br>The Invite object
      */
     @Nonnull
-    static RestAction<Invite> resolve(@Nonnull final JDA api, @Nonnull final String code, final boolean withCounts)
-    {
+    @CheckReturnValue
+    static RestAction<Invite> resolve(@Nonnull JDA api, @Nonnull String code, boolean withCounts) {
         return InviteImpl.resolve(api, code, withCounts);
     }
 
@@ -112,7 +112,7 @@ public interface Invite
     AuditableRestAction<Void> delete();
 
     /**
-     * Tries to retrieve a new expanded {@link net.dv8tion.jda.api.entities.Invite Invite} with more info.
+     * Tries to retrieve a new expanded {@link Invite Invite} with more info.
      * <br>As bots can't be in groups this is only available for guild invites and will throw an {@link java.lang.IllegalStateException IllegalStateException}
      * for other types.
      * <br>Requires either {@link net.dv8tion.jda.api.Permission#MANAGE_SERVER MANAGE_SERVER} in the invite's guild or
@@ -125,7 +125,7 @@ public interface Invite
      * @throws java.lang.IllegalStateException
      *         If this is a group invite
      *
-     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.Invite Invite}
+     * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link Invite Invite}
      *         <br>The expanded Invite object
      *
      * @see    #getType()
@@ -154,23 +154,23 @@ public interface Invite
     Invite.TargetType getTargetType();
 
     /**
-     * An {@link net.dv8tion.jda.api.entities.Invite.Channel Invite.Channel} object
+     * An {@link Invite.Channel Invite.Channel} object
      * containing information about this invite's origin channel.
      *
      * @return Information about this invite's origin channel or null in case of a group invite
-     * 
-     * @see    net.dv8tion.jda.api.entities.Invite.Channel
+     *
+     * @see    Invite.Channel
      */
     @Nullable
     Channel getChannel();
 
     /**
-     * An {@link net.dv8tion.jda.api.entities.Invite.Group Invite.Group} object
+     * An {@link Invite.Group Invite.Group} object
      * containing information about this invite's origin group.
      *
      * @return Information about this invite's origin group or null in case of a guild invite
      *
-     * @see    net.dv8tion.jda.api.entities.Invite.Group
+     * @see    Invite.Group
      */
     @Nullable
     Group getGroup();
@@ -182,7 +182,7 @@ public interface Invite
      *
      * @return Information about this invite's target or {@code null}
      *
-     * @see    net.dv8tion.jda.api.entities.Invite.InviteTarget
+     * @see    Invite.InviteTarget
      */
     @Nullable
     InviteTarget getTarget();
@@ -202,41 +202,17 @@ public interface Invite
      * @return Invite URL for this Invite
      */
     @Nonnull
-    default String getUrl()
-    {
+    default String getUrl() {
         return "https://discord.gg/" + getCode();
     }
 
     /**
-     * Returns creation date of this invite.
-     *
-     * <p>This works only for expanded invites and will throw a {@link IllegalStateException} otherwise!
-     *
-     * @throws IllegalStateException
-     *         if this invite is not expanded
-     *
-     * @return The creation date of this invite
-     *
-     * @see    #expand()
-     * @see    #isExpanded()
-     *
-     * @deprecated
-     *         Use {@link #getTimeCreated()} instead
-     */
-    @Nonnull
-    @Deprecated
-    @ForRemoval(deadline = "5.0.0")
-    @DeprecatedSince("4.0.0")
-    @ReplaceWith("getTimeCreated()")
-    OffsetDateTime getCreationTime();
-
-    /**
-     * An {@link net.dv8tion.jda.api.entities.Invite.Guild Invite.Guild} object
+     * An {@link Invite.Guild Invite.Guild} object
      * containing information about this invite's origin guild.
      *
      * @return Information about this invite's origin guild or null in case of a group invite
-     * 
-     * @see    net.dv8tion.jda.api.entities.Invite.Guild
+     *
+     * @see    Invite.Guild
      */
     @Nullable
     Guild getGuild();
@@ -273,18 +249,18 @@ public interface Invite
     int getMaxAge();
 
     /**
-    * The max uses of this invite. If there is no limit thus will return {@code 0}.
-    *
-    * <p>This works only for expanded invites and will throw a {@link IllegalStateException} otherwise!
-    *
-    * @throws IllegalStateException
+     * The max uses of this invite. If there is no limit thus will return {@code 0}.
+     *
+     * <p>This works only for expanded invites and will throw a {@link IllegalStateException} otherwise!
+     *
+     * @throws IllegalStateException
      *        if this invite is not expanded
-    *
-    * @return The max uses of this invite or {@code 0} if there is no limit
-    *
-    * @see    #expand()
-    * @see    #isExpanded()
-    */
+     *
+     * @return The max uses of this invite or {@code 0} if there is no limit
+     *
+     * @see    #expand()
+     * @see    #isExpanded()
+     */
     int getMaxUses();
 
     /**
@@ -322,7 +298,7 @@ public interface Invite
      * Whether this Invite is expanded or not. Expanded invites contain more information, but they can only be
      * obtained by {@link net.dv8tion.jda.api.entities.Guild#retrieveInvites() Guild#retrieveInvites()} (requires
      * {@link net.dv8tion.jda.api.Permission#MANAGE_SERVER Permission.MANAGE_SERVER}) or
-     * {@link net.dv8tion.jda.api.entities.GuildChannel#retrieveInvites() GuildChannel#retrieveInvites()} (requires
+     * {@link net.dv8tion.jda.api.entities.channel.attribute.IInviteContainer#retrieveInvites() IInviteContainer#retrieveInvites()} (requires
      * {@link net.dv8tion.jda.api.Permission#MANAGE_CHANNEL Permission.MANAGE_CHANNEL}).
      *
      * <p>There is a convenience method {@link #expand()} to get the expanded invite for an unexpanded one.
@@ -349,12 +325,24 @@ public interface Invite
     boolean isTemporary();
 
     /**
-     * POJO for the channel information provided by an invite.
-     * 
+     * Whether this Invite is a guest invite for a voice channel or not. A guest is able to join a voice call
+     * from the invite without being granted guild membership nor having visibility to other guild channels.
+     * Once the user leaves the voice call, their ability to rejoin the voice call and see the guild is revoked.
+     *
+     * <p>Applicable only to invites to a specific {@linkplain #getChannel() channel}.
+     *
+     * @return Whether this invite is a guest invite for a voice channel or not
+     *
      * @see #getChannel()
      */
-    interface Channel extends ISnowflake
-    {
+    boolean isGuest();
+
+    /**
+     * POJO for the channel information provided by an invite.
+     *
+     * @see #getChannel()
+     */
+    interface Channel extends ISnowflake {
         /**
          * The name of this channel.
          *
@@ -364,8 +352,8 @@ public interface Invite
         String getName();
 
         /**
-         * The {@link net.dv8tion.jda.api.entities.ChannelType ChannelType} of this channel.
-         * <br>Valid values are only {@link net.dv8tion.jda.api.entities.ChannelType#TEXT TEXT} or {@link net.dv8tion.jda.api.entities.ChannelType#VOICE VOICE}
+         * The {@link ChannelType ChannelType} of this channel.
+         * <br>Valid values are only {@link ChannelType#TEXT TEXT} or {@link ChannelType#VOICE VOICE}
          *
          * @return The channel's type
          */
@@ -375,11 +363,80 @@ public interface Invite
 
     /**
      * POJO for the guild information provided by an invite.
-     * 
+     *
      * @see #getGuild()
      */
-    interface Guild extends ISnowflake
-    {
+    interface Guild extends ISnowflake {
+        /**
+         * The vanity url code for this Guild. The vanity url is the custom invite code of partnered / official / boosted Guilds.
+         * <br>The returned String will be the code that can be provided to {@code discord.gg/{code}} to get the invite link.
+         *
+         * @return The vanity code or null
+         *
+         * @see    #getVanityUrl()
+         */
+        @Nullable
+        String getVanityCode();
+
+        /**
+         * The vanity url for this Guild. The vanity url is the custom invite code of partnered / official / boosted Guilds.
+         * <br>The returned String will be the vanity invite link to this guild.
+         *
+         * @return The vanity url or null
+         */
+        @Nullable
+        default String getVanityUrl() {
+            return getVanityCode() == null ? null : "https://discord.gg/" + getVanityCode();
+        }
+
+        /**
+         * The guild banner id.
+         * <br>This is shown in guilds below the guild name.
+         *
+         * @return The guild banner id or null
+         *
+         * @see    #getBannerUrl()
+         */
+        @Nullable
+        String getBannerId();
+
+        /**
+         * The guild banner url.
+         * <br>This is shown in guilds below the guild name.
+         *
+         * @return The guild banner url or null
+         */
+        @Nullable
+        default String getBannerUrl() {
+            String bannerId = getBannerId();
+            return bannerId == null
+                    ? null
+                    : String.format(BANNER_URL, getId(), bannerId, bannerId.startsWith("a_") ? "gif" : "png");
+        }
+
+        /**
+         * Returns an {@link ImageProxy} for this guild's banner image.
+         *
+         * @return Possibly-null {@link ImageProxy} of this guild's banner image
+         *
+         * @see    #getBannerUrl()
+         */
+        @Nullable
+        default ImageProxy getBanner() {
+            String bannerUrl = getBannerUrl();
+            return bannerUrl == null ? null : new ImageProxy(bannerUrl);
+        }
+
+        /**
+         * The description for this guild.
+         * <br>This is displayed in the server browser below the guild name for verified guilds,
+         * and in embedded invite links.
+         *
+         * @return The guild's description
+         */
+        @Nullable
+        String getDescription();
+
         /**
          * The icon id of this guild.
          *
@@ -399,6 +456,19 @@ public interface Invite
          */
         @Nullable
         String getIconUrl();
+
+        /**
+         * Returns an {@link ImageProxy} for this guild's icon
+         *
+         * @return Possibly-null {@link ImageProxy} of this guild's icon
+         *
+         * @see    #getIconUrl()
+         */
+        @Nullable
+        default ImageProxy getIcon() {
+            String iconUrl = getIconUrl();
+            return iconUrl == null ? null : new ImageProxy(iconUrl);
+        }
 
         /**
          * The name of this guild.
@@ -427,37 +497,58 @@ public interface Invite
          */
         @Nullable
         String getSplashUrl();
-        
+
+        /**
+         * Returns an {@link ImageProxy} for this invite guild's splash image.
+         *
+         * @return Possibly-null {@link ImageProxy} of this invite guild's splash image
+         *
+         * @see    #getSplashUrl()
+         */
+        @Nullable
+        default ImageProxy getSplash() {
+            String splashUrl = getSplashUrl();
+            return splashUrl == null ? null : new ImageProxy(splashUrl);
+        }
+
         /**
          * Returns the {@link net.dv8tion.jda.api.entities.Guild.VerificationLevel VerificationLevel} of this guild.
-         * 
+         *
          * @return the verification level of the guild
          */
         @Nonnull
         VerificationLevel getVerificationLevel();
-        
+
+        /**
+         * Returns the {@link NSFWLevel} of this guild.
+         *
+         * @return the nsfw level of the guild
+         */
+        @Nonnull
+        NSFWLevel getNSFWLevel();
+
         /**
          * Returns the approximate count of online members in the guild. If the online member count was not included in the
-         * invite, this will return -1. Counts will usually only be returned when resolving the invite via the 
+         * invite, this will return -1. Counts will usually only be returned when resolving the invite via the
          * {@link #resolve(net.dv8tion.jda.api.JDA, java.lang.String, boolean) Invite.resolve()} method with the
          * withCounts boolean set to {@code true}
-         * 
+         *
          * @return the approximate count of online members in the guild, or -1 if not present in the invite
          */
         int getOnlineCount();
-        
+
         /**
          * Returns the approximate count of total members in the guild. If the total member count was not included in the
-         * invite, this will return -1. Counts will usually only be returned when resolving the invite via the 
+         * invite, this will return -1. Counts will usually only be returned when resolving the invite via the
          * {@link #resolve(net.dv8tion.jda.api.JDA, java.lang.String, boolean) Invite.resolve()} method with the
          * withCounts boolean set to {@code true}
-         * 
+         *
          * @return the approximate count of total members in the guild, or -1 if not present in the invite
          */
         int getMemberCount();
 
         /**
-         * The Features of the {@link net.dv8tion.jda.api.entities.Invite.Guild Guild}.
+         * The Features of the {@link Invite.Guild Guild}.
          * <p>
          * <b>Possible known features:</b>
          * <ul>
@@ -472,6 +563,16 @@ public interface Invite
          */
         @Nonnull
         Set<String> getFeatures();
+
+        /**
+         * The welcome screen of the {@link Invite.Guild Guild}.
+         * <br>This will be {@code null} if the Guild has no welcome screen,
+         * or if the invite came from a {@link net.dv8tion.jda.api.events.guild.invite.GuildInviteCreateEvent GuildInviteCreateEvent}.
+         *
+         * @return The welcome screen of this Guild or {@code null}
+         */
+        @Nullable
+        GuildWelcomeScreen getWelcomeScreen();
     }
 
     /**
@@ -479,8 +580,7 @@ public interface Invite
      *
      * @see #getChannel()
      */
-    interface Group extends ISnowflake
-    {
+    interface Group extends ISnowflake {
         /**
          * The icon id of this group or {@code null} if the group has no icon.
          *
@@ -500,6 +600,19 @@ public interface Invite
          */
         @Nullable
         String getIconUrl();
+
+        /**
+         * Returns an {@link ImageProxy} for this group invite's icon.
+         *
+         * @return Possibly-null {@link ImageProxy} of this group invite's icon
+         *
+         * @see    #getIconUrl()
+         */
+        @Nullable
+        default ImageProxy getIcon() {
+            String iconUrl = getIconUrl();
+            return iconUrl == null ? null : new ImageProxy(iconUrl);
+        }
 
         /**
          * The name of this group or {@code null} if the group has no name.
@@ -526,8 +639,7 @@ public interface Invite
      *
      * @see #getTarget()
      */
-    interface InviteTarget
-    {
+    interface InviteTarget {
 
         /**
          * The type of this invite target.
@@ -573,7 +685,7 @@ public interface Invite
          *
          * @return The target application of this invite
          *
-         * @see    net.dv8tion.jda.api.entities.Invite.EmbeddedApplication
+         * @see    Invite.EmbeddedApplication
          */
         @Nullable
         EmbeddedApplication getApplication();
@@ -584,8 +696,7 @@ public interface Invite
      *
      * @see InviteTarget#getApplication()
      */
-    interface EmbeddedApplication extends ISnowflake
-    {
+    interface EmbeddedApplication extends ISnowflake {
         /**
          * The name of this application.
          *
@@ -631,6 +742,19 @@ public interface Invite
         String getIconUrl();
 
         /**
+         * Returns an {@link ImageProxy} for this application invite's icon.
+         *
+         * @return Possibly-null {@link ImageProxy} of this application invite's icon
+         *
+         * @see    #getIconUrl()
+         */
+        @Nullable
+        default ImageProxy getIcon() {
+            String iconUrl = getIconUrl();
+            return iconUrl == null ? null : new ImageProxy(iconUrl);
+        }
+
+        /**
          * The max participant count of this application or {@code -1} if no max participant count is set
          *
          * @return {@code -1} if this application does not have a max participant count
@@ -643,8 +767,7 @@ public interface Invite
      *
      * @see #getType()
      */
-    enum InviteType
-    {
+    enum InviteType {
         GUILD,
         GROUP,
         UNKNOWN
@@ -654,12 +777,11 @@ public interface Invite
      * A TargetType indicates additional action to be taken by the client on accepting the invite,
      * typically connecting external services or launching external applications depending on the specific TargetType.
      *
-     * Some actions might not be available or show up on certain devices.
+     * <p>Some actions might not be available or show up on certain devices.
      *
      * @see InviteTarget#getType()
      */
-    enum TargetType
-    {
+    enum TargetType {
         /**
          * The invite does not have a target type, {@link Invite#getTarget()} will return {@code null}.
          */
@@ -682,6 +804,12 @@ public interface Invite
         EMBEDDED_APPLICATION(2),
 
         /**
+         * The invite points to a role subscription listing in a guild.
+         * <br>These cannot be created by bots.
+         */
+        ROLE_SUBSCRIPTIONS_PURCHASE(3),
+
+        /**
          * Unknown Discord invite target type. Should never happen and would only possibly happen if Discord implemented a new
          * target type and JDA had yet to implement support for it.
          */
@@ -689,8 +817,7 @@ public interface Invite
 
         private final int id;
 
-        TargetType(int id)
-        {
+        TargetType(int id) {
             this.id = id;
         }
 
@@ -699,8 +826,7 @@ public interface Invite
          *
          * @return The id key used by discord for this channel type.
          */
-        public int getId()
-        {
+        public int getId() {
             return id;
         }
 
@@ -713,12 +839,11 @@ public interface Invite
          * @return The TargetType that is referred to by the provided key. If the id key is unknown, {@link #UNKNOWN} is returned.
          */
         @Nonnull
-        public static TargetType fromId(int id)
-        {
-            for (TargetType type : values())
-            {
-                if (type.id == id)
+        public static TargetType fromId(int id) {
+            for (TargetType type : values()) {
+                if (type.id == id) {
                     return type;
+                }
             }
             return UNKNOWN;
         }

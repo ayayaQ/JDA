@@ -16,49 +16,57 @@
 
 package net.dv8tion.jda.api.entities.templates;
 
-import net.dv8tion.jda.annotations.ForRemoval;
-import net.dv8tion.jda.api.Region;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Guild.ExplicitContentLevel;
 import net.dv8tion.jda.api.entities.Guild.NotificationLevel;
 import net.dv8tion.jda.api.entities.Guild.Timeout;
 import net.dv8tion.jda.api.entities.Guild.VerificationLevel;
 import net.dv8tion.jda.api.entities.ISnowflake;
-import net.dv8tion.jda.api.entities.VoiceChannel;
+import net.dv8tion.jda.api.interactions.DiscordLocale;
+import net.dv8tion.jda.api.utils.ImageProxy;
+import org.jetbrains.annotations.Unmodifiable;
+
+import java.util.Collections;
+import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
 
 /**
  * POJO for the guild information provided by a template.
  *
  * @see Template#getGuild()
  */
-public class TemplateGuild implements ISnowflake
-{
+public class TemplateGuild implements ISnowflake {
     private final long id;
-    private final String name, description, region, iconId;
+    private final String name, description, iconId;
     private final VerificationLevel verificationLevel;
     private final NotificationLevel notificationLevel;
     private final ExplicitContentLevel explicitContentLevel;
-    private final Locale locale;
+    private final DiscordLocale locale;
     private final Timeout afkTimeout;
     private final TemplateChannel afkChannel;
     private final TemplateChannel systemChannel;
     private final List<TemplateRole> roles;
     private final List<TemplateChannel> channels;
 
-    public TemplateGuild(final long id, final String name, final String description, final String region, final String iconId, final VerificationLevel verificationLevel,
-                         final NotificationLevel notificationLevel, final ExplicitContentLevel explicitContentLevel, final Locale locale, final Timeout afkTimeout,
-                         final TemplateChannel afkChannel, final TemplateChannel systemChannel, final List<TemplateRole> roles, final List<TemplateChannel> channels)
-    {
+    public TemplateGuild(
+            long id,
+            String name,
+            String description,
+            String iconId,
+            VerificationLevel verificationLevel,
+            NotificationLevel notificationLevel,
+            ExplicitContentLevel explicitContentLevel,
+            DiscordLocale locale,
+            Timeout afkTimeout,
+            TemplateChannel afkChannel,
+            TemplateChannel systemChannel,
+            List<TemplateRole> roles,
+            List<TemplateChannel> channels) {
         this.id = id;
         this.name = name;
         this.description = description;
-        this.region = region;
         this.iconId = iconId;
         this.verificationLevel = verificationLevel;
         this.notificationLevel = notificationLevel;
@@ -72,8 +80,7 @@ public class TemplateGuild implements ISnowflake
     }
 
     @Override
-    public long getIdLong()
-    {
+    public long getIdLong() {
         return this.id;
     }
 
@@ -83,8 +90,7 @@ public class TemplateGuild implements ISnowflake
      * @return The guild's name
      */
     @Nonnull
-    public String getName()
-    {
+    public String getName() {
         return this.name;
     }
 
@@ -95,42 +101,8 @@ public class TemplateGuild implements ISnowflake
      * @return The description
      */
     @Nullable
-    public String getDescription()
-    {
+    public String getDescription() {
         return this.description;
-    }
-
-    /**
-     * The Voice {@link net.dv8tion.jda.api.Region Region} that this Guild is using for audio connections.
-     * <br>If the Region is not recognized, this returns {@link net.dv8tion.jda.api.Region#UNKNOWN UNKNOWN} but you
-     * can still use the {@link #getRegionRaw()} to retrieve the raw name this region has.
-     *
-     * @return The the audio Region this Guild is using for audio connections. Can return Region.UNKNOWN.
-     *
-     * @deprecated Guilds no longer have the {@link net.dv8tion.jda.api.Region Region} option. Use {@link VoiceChannel#getRegion()} instead.
-     */
-    @Nonnull
-    @Deprecated
-    @ForRemoval(deadline = "5.0.0")
-    public Region getRegion()
-    {
-        return Region.fromKey(region);
-    }
-
-    /**
-     * The raw voice region name that this Guild is using for audio connections.
-     * <br>This is resolved to an enum constant of {@link Region Region} by {@link #getRegion()}!
-     *
-     * @return Raw region name
-     *
-     * @deprecated Guilds no longer have the {@link net.dv8tion.jda.api.Region Region} option. Use {@link VoiceChannel#getRegion()} instead.
-     */
-    @Nonnull
-    @Deprecated
-    @ForRemoval(deadline = "5.0.0")
-    public String getRegionRaw()
-    {
-        return region;
     }
 
     /**
@@ -141,8 +113,7 @@ public class TemplateGuild implements ISnowflake
      * @see    #getIconUrl()
      */
     @Nullable
-    public String getIconId()
-    {
+    public String getIconId() {
         return this.iconId;
     }
 
@@ -154,10 +125,23 @@ public class TemplateGuild implements ISnowflake
      * @see    #getIconId()
      */
     @Nullable
-    public String getIconUrl()
-    {
-        return this.iconId == null ? null
+    public String getIconUrl() {
+        return this.iconId == null
+                ? null
                 : String.format(Guild.ICON_URL, this.id, this.iconId, iconId.startsWith("a_") ? "gif" : "png");
+    }
+
+    /**
+     * Returns an {@link ImageProxy} for this template guild's icon.
+     *
+     * @return Possibly-null {@link ImageProxy} of this template guild's icon
+     *
+     * @see    #getIconUrl()
+     */
+    @Nullable
+    public ImageProxy getIcon() {
+        String iconUrl = getIconUrl();
+        return iconUrl == null ? null : new ImageProxy(iconUrl);
     }
 
     /**
@@ -166,8 +150,7 @@ public class TemplateGuild implements ISnowflake
      * @return the verification level of the guild
      */
     @Nonnull
-    public VerificationLevel getVerificationLevel()
-    {
+    public VerificationLevel getVerificationLevel() {
         return this.verificationLevel;
     }
 
@@ -177,8 +160,7 @@ public class TemplateGuild implements ISnowflake
      * @return the notification level of the guild
      */
     @Nonnull
-    public NotificationLevel getDefaultNotificationLevel()
-    {
+    public NotificationLevel getDefaultNotificationLevel() {
         return this.notificationLevel;
     }
 
@@ -188,19 +170,17 @@ public class TemplateGuild implements ISnowflake
      * @return the explicit content level of the guild
      */
     @Nonnull
-    public ExplicitContentLevel getExplicitContentLevel()
-    {
+    public ExplicitContentLevel getExplicitContentLevel() {
         return this.explicitContentLevel;
     }
 
     /**
      * The preferred locale for this guild.
      *
-     * @return The preferred {@link Locale} for this guild
+     * @return The preferred {@link DiscordLocale} for this guild
      */
     @Nonnull
-    public Locale getLocale()
-    {
+    public DiscordLocale getLocale() {
         return this.locale;
     }
 
@@ -210,22 +190,20 @@ public class TemplateGuild implements ISnowflake
      * @return the afk timeout for this guild
      */
     @Nonnull
-    public Timeout getAfkTimeout()
-    {
+    public Timeout getAfkTimeout() {
         return this.afkTimeout;
     }
 
     /**
      * Provides the {@link net.dv8tion.jda.api.entities.templates.TemplateChannel TemplateChannel} that has been set as the channel
      * which {@link net.dv8tion.jda.api.entities.Member Members} will be moved to after they have been inactive in a
-     * {@link net.dv8tion.jda.api.entities.VoiceChannel VoiceChannel} for longer than {@link #getAfkTimeout()}.
+     * {@link net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel VoiceChannel} for longer than {@link #getAfkTimeout()}.
      * <br>If no channel has been set as the AFK channel, this returns {@code null}.
      *
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.templates.TemplateChannel TemplateChannel} that is the AFK Channel.
      */
     @Nullable
-    public TemplateChannel getAfkChannel()
-    {
+    public TemplateChannel getAfkChannel() {
         return this.afkChannel;
     }
 
@@ -237,8 +215,7 @@ public class TemplateGuild implements ISnowflake
      * @return Possibly-null {@link net.dv8tion.jda.api.entities.templates.TemplateChannel TemplateChannel} that is the system Channel.
      */
     @Nullable
-    public TemplateChannel getSystemChannel()
-    {
+    public TemplateChannel getSystemChannel() {
         return this.systemChannel;
     }
 
@@ -248,8 +225,8 @@ public class TemplateGuild implements ISnowflake
      * @return An immutable List of {@link net.dv8tion.jda.api.entities.templates.TemplateRole Roles}.
      */
     @Nonnull
-    public List<TemplateRole> getRoles()
-    {
+    @Unmodifiable
+    public List<TemplateRole> getRoles() {
         return this.roles;
     }
 
@@ -259,8 +236,8 @@ public class TemplateGuild implements ISnowflake
      * @return An immutable List of {@link net.dv8tion.jda.api.entities.templates.TemplateChannel Channels}.
      */
     @Nonnull
-    public List<TemplateChannel> getChannels()
-    {
+    @Unmodifiable
+    public List<TemplateChannel> getChannels() {
         return this.channels;
     }
 }

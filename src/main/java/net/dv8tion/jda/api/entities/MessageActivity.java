@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.entities;
+
+import net.dv8tion.jda.api.utils.ImageProxy;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -23,14 +26,12 @@ import javax.annotation.Nullable;
  *
  * @see Message#getActivity()
  */
-public class MessageActivity
-{
+public class MessageActivity {
     private final ActivityType type;
     private final String partyId;
     private final Application application;
 
-    public MessageActivity(ActivityType type, String partyId, Application application)
-    {
+    public MessageActivity(ActivityType type, String partyId, Application application) {
         this.type = type;
         this.partyId = partyId;
         this.application = application;
@@ -42,8 +43,7 @@ public class MessageActivity
      * @return the type of the activity, or {@link ActivityType#UNKNOWN UNKNOWN}
      */
     @Nonnull
-    public ActivityType getType()
-    {
+    public ActivityType getType() {
         return type;
     }
 
@@ -53,8 +53,7 @@ public class MessageActivity
      * @return Possibly-null party id
      */
     @Nullable
-    public String getPartyId()
-    {
+    public String getPartyId() {
         return partyId;
     }
 
@@ -64,24 +63,21 @@ public class MessageActivity
      * @return A possibly-null {@link net.dv8tion.jda.api.entities.MessageActivity.Application}
      */
     @Nullable
-    public MessageActivity.Application getApplication()
-    {
+    public MessageActivity.Application getApplication() {
         return application;
     }
 
     /**
      * Represents the {@link net.dv8tion.jda.api.entities.MessageActivity.Application Application} of a MessageActivity, if it has been set.
      */
-    public static class Application implements ISnowflake
-    {
+    public static class Application implements ISnowflake {
         private final String name;
         private final String description;
         private final String iconId;
         private final String coverId;
         private final long id;
 
-        public Application(String name, String description, String iconId, String coverId, long id)
-        {
+        public Application(String name, String description, String iconId, String coverId, long id) {
             this.name = name;
             this.description = description;
             this.iconId = iconId;
@@ -95,8 +91,7 @@ public class MessageActivity
          * @return the applications name
          */
         @Nonnull
-        public String getName()
-        {
+        public String getName() {
             return name;
         }
 
@@ -106,8 +101,7 @@ public class MessageActivity
          * @return the applications description
          */
         @Nonnull
-        public String getDescription()
-        {
+        public String getDescription() {
             return description;
         }
 
@@ -117,8 +111,7 @@ public class MessageActivity
          * @return the applications icon id
          */
         @Nullable
-        public String getIconId()
-        {
+        public String getIconId() {
             return iconId;
         }
 
@@ -128,9 +121,21 @@ public class MessageActivity
          * @return the url of the icon
          */
         @Nullable
-        public String getIconUrl()
-        {
+        public String getIconUrl() {
             return iconId == null ? null : "https://cdn.discordapp.com/application/" + getId() + "/" + iconId + ".png";
+        }
+
+        /**
+         * Returns an {@link ImageProxy} for this application's icon.
+         *
+         * @return Possibly-null {@link ImageProxy} of this application's icon
+         *
+         * @see    #getIconUrl()
+         */
+        @Nullable
+        public ImageProxy getIcon() {
+            String iconUrl = getIconUrl();
+            return iconUrl == null ? null : new ImageProxy(iconUrl);
         }
 
         /**
@@ -139,8 +144,7 @@ public class MessageActivity
          * @return the applications cover image/id
          */
         @Nullable
-        public String getCoverId()
-        {
+        public String getCoverId() {
             return coverId;
         }
 
@@ -150,14 +154,27 @@ public class MessageActivity
          * @return the url of the cover/splash
          */
         @Nullable
-        public String getCoverUrl()
-        {
-            return coverId == null ? null : "https://cdn.discordapp.com/application/" + getId() + "/" + coverId + ".png";
+        public String getCoverUrl() {
+            return coverId == null
+                    ? null
+                    : "https://cdn.discordapp.com/application/" + getId() + "/" + coverId + ".png";
+        }
+
+        /**
+         * Returns an {@link ImageProxy} for this cover's icon.
+         *
+         * @return Possibly-null {@link ImageProxy} of this cover's icon
+         *
+         * @see    #getCoverUrl()
+         */
+        @Nullable
+        public ImageProxy getCover() {
+            String coverUrl = getCoverUrl();
+            return coverUrl == null ? null : new ImageProxy(coverUrl);
         }
 
         @Override
-        public long getIdLong()
-        {
+        public long getIdLong() {
             return id;
         }
     }
@@ -165,8 +182,7 @@ public class MessageActivity
     /**
      * An enum representing {@link net.dv8tion.jda.api.entities.MessageActivity MessageActivity} types.
      */
-    public enum ActivityType
-    {
+    public enum ActivityType {
         /**
          * The {@link net.dv8tion.jda.api.entities.MessageActivity MessageActivity} type used for inviting people to join a game.
          */
@@ -190,8 +206,7 @@ public class MessageActivity
 
         private final int id;
 
-        ActivityType(int id)
-        {
+        ActivityType(int id) {
             this.id = id;
         }
 
@@ -200,18 +215,16 @@ public class MessageActivity
          *
          * @return the id of the type
          */
-        public int getId()
-        {
+        public int getId() {
             return id;
         }
 
         @Nonnull
-        public static ActivityType fromId(int id)
-        {
-            for (ActivityType activityType : values())
-            {
-                if (activityType.id == id)
+        public static ActivityType fromId(int id) {
+            for (ActivityType activityType : values()) {
+                if (activityType.id == id) {
                     return activityType;
+                }
             }
             return UNKNOWN;
         }

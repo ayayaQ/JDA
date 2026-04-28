@@ -17,32 +17,35 @@
 package net.dv8tion.jda.api.requests;
 
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.events.GenericEvent;
-import net.dv8tion.jda.api.events.emote.GenericEmoteEvent;
+import net.dv8tion.jda.api.events.automod.AutoModExecutionEvent;
+import net.dv8tion.jda.api.events.automod.GenericAutoModRuleEvent;
+import net.dv8tion.jda.api.events.emoji.GenericEmojiEvent;
+import net.dv8tion.jda.api.events.guild.GuildAuditLogEntryCreateEvent;
 import net.dv8tion.jda.api.events.guild.GuildBanEvent;
 import net.dv8tion.jda.api.events.guild.GuildUnbanEvent;
 import net.dv8tion.jda.api.events.guild.invite.GenericGuildInviteEvent;
 import net.dv8tion.jda.api.events.guild.member.GenericGuildMemberEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
+import net.dv8tion.jda.api.events.guild.scheduledevent.update.GenericScheduledEventUpdateEvent;
 import net.dv8tion.jda.api.events.guild.voice.GenericGuildVoiceEvent;
 import net.dv8tion.jda.api.events.message.GenericMessageEvent;
 import net.dv8tion.jda.api.events.message.MessageBulkDeleteEvent;
-import net.dv8tion.jda.api.events.message.guild.GenericGuildMessageEvent;
-import net.dv8tion.jda.api.events.message.guild.react.GenericGuildMessageReactionEvent;
-import net.dv8tion.jda.api.events.message.priv.GenericPrivateMessageEvent;
-import net.dv8tion.jda.api.events.message.priv.react.GenericPrivateMessageReactionEvent;
 import net.dv8tion.jda.api.events.message.react.GenericMessageReactionEvent;
+import net.dv8tion.jda.api.events.sticker.GenericGuildStickerEvent;
 import net.dv8tion.jda.api.events.user.UserTypingEvent;
 import net.dv8tion.jda.api.events.user.update.GenericUserPresenceEvent;
 import net.dv8tion.jda.api.events.user.update.GenericUserUpdateEvent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import net.dv8tion.jda.internal.utils.Checks;
 
-import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+
+import javax.annotation.Nonnull;
 
 /**
  * Flags which enable or disable specific events from the discord gateway.
@@ -52,8 +55,8 @@ import java.util.EnumSet;
  *
  * <ol>
  *     <li><b>GUILD_MEMBERS</b> - This is a <b>privileged</b> gateway intent that is used to update user information and join/leaves (including kicks). This is required to cache all members of a guild (including chunking)</li>
- *     <li><b>GUILD_BANS</b> - This will only track guild bans and unbans</li>
- *     <li><b>GUILD_EMOJIS</b> - This will only track guild emote create/modify/delete. Most bots don't need this since they just use the emote id anyway.</li>
+ *     <li><b>GUILD_MODERATION</b> - This will only track guild moderation events, such as bans, unbans, and audit-logs.</li>
+ *     <li><b>GUILD_EMOJIS</b> - This will only track custom emoji create/modify/delete. Most bots don't need this since they just use the emoji id anyway.</li>
  *     <li><b>GUILD_WEBHOOKS</b> - This will only track guild webhook create/update/delete. Most bots don't need this since related events don't contain any useful information about webhook changes.</li>
  *     <li><b>GUILD_INVITES</b> - This will only track invite create/delete. Most bots don't make use of invites since they are added through OAuth2 authorization by administrators.</li>
  *     <li><b>GUILD_VOICE_STATES</b> - Required to properly get information of members in voice channels and cache them. <u>You cannot connect to a voice channel without this intent</u>.</li>
@@ -64,9 +67,13 @@ import java.util.EnumSet;
  *     <li><b>DIRECT_MESSAGES</b> - This is used to receive incoming messages in private channels (DMs). You can still send private messages without this intent.</li>
  *     <li><b>DIRECT_MESSAGE_REACTIONS</b> - This is used to track reactions on messages in private channels (DMs).</li>
  *     <li><b>DIRECT_MESSAGE_TYPING</b> - This is used to track when a user starts typing in private channels (DMs). Almost no bot will have a use for this.</li>
+ *     <li><b>MESSAGE_CONTENT</b> - This is a <b>privileged</b> gateway intent this is only used to enable access to the user content in messages (also including embeds/attachments/components).</li>
+ *     <li><b>SCHEDULED_EVENTS</b> - This is used to keep track of scheduled events in guilds.</li>
+ *     <li><b>AUTO_MODERATION_CONFIGURATION</b> - This is used to keep track of auto-mod rule changes in guilds.</li>
+ *     <li><b>AUTO_MODERATION_EXECUTION</b> - This is used to receive events related to auto-mod response actions.</li>
  * </ol>
  *
- * If an intent is not specifically mentioned to be <b>privileged</b>, it is not required to be on the whitelist to use if (and its related events).
+ * If an intent is not specifically mentioned to be <b>privileged</b>, it is not required to be on the whitelist to use it (and its related events).
  * To get whitelisted you either need to contact discord support (for bots in more than 100 guilds)
  * or enable it in the developer dashboard of your application.
  *
@@ -78,9 +85,9 @@ import java.util.EnumSet;
  * @see net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder#disableIntents(GatewayIntent, GatewayIntent...)
  * @see net.dv8tion.jda.api.sharding.DefaultShardManagerBuilder#enableIntents(GatewayIntent, GatewayIntent...)
  */
-public enum GatewayIntent
-{
-    //GUILDS(0), we currently don't support to disable this one as its required to get a good base cache
+public enum GatewayIntent {
+    // GUILDS(0), we currently don't support to disable this one as its required to get a good base
+    // cache
     /**
      * <b>PRIVILEGED INTENT</b> Events which inform us about member update/leave/join of a guild.
      * <br>This is required to chunk all members of a guild. Without this enabled you have to use {@link net.dv8tion.jda.api.utils.ChunkingFilter#NONE ChunkingFilter.NONE}!
@@ -89,17 +96,17 @@ public enum GatewayIntent
      */
     GUILD_MEMBERS(1),
     /**
-     * Ban events.
+     * Moderation events, such as ban/unban/audit-log.
      */
-    GUILD_BANS(2),
+    GUILD_MODERATION(2),
     /**
-     * Emote add/update/delete events.
+     * Custom emoji, sticker and soundboard sound add/update/delete events.
      */
-    GUILD_EMOJIS(3),
-//    /**
-//     * Integration events. (unused)
-//     */
-//    GUILD_INTEGRATIONS(4),
+    GUILD_EXPRESSIONS(3),
+    //    /**
+    //     * Integration events. (unused)
+    //     */
+    //    GUILD_INTEGRATIONS(4),
     /**
      * Webhook events.
      */
@@ -143,10 +150,49 @@ public enum GatewayIntent
      * Typing events in private channels.
      */
     DIRECT_MESSAGE_TYPING(14),
+
     /**
-     * Privileged Intent. Access to message content.
+     * <b>PRIVILEGED INTENT</b> Access to message content.
+     *
+     * <p>This specifically affects messages received through the message history of a channel, or through {@link GenericMessageEvent Message Events}.
+     * The content restriction does not apply if the message <b>mentions the bot directly</b> (using @username), sent by the bot itself,
+     * or if the message is a direct message from a {@link net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel PrivateChannel}.
+     * Affected are all user-generated content fields of a message, such as:
+     * <ul>
+     *     <li>{@link Message#getContentRaw()}, {@link Message#getContentDisplay()}, {@link Message#getContentStripped()}</li>
+     *     <li>{@link Message#getEmbeds()}</li>
+     *     <li>{@link Message#getAttachments()}</li>
+     *     <li>{@link Message#getComponents()}, {@link Message#getComponentTree()}</li>
+     * </ul>
+     *
+     * @see <a href="https://support-dev.discord.com/hc/en-us/articles/4404772028055-Message-Content-Privileged-Intent-FAQ" target="_blank">Message Content Privileged Intent FAQ</a>
      */
     MESSAGE_CONTENT(15),
+
+    /**
+     * Scheduled Events events.
+     */
+    SCHEDULED_EVENTS(16),
+
+    /**
+     * Events related to {@link net.dv8tion.jda.api.entities.automod.AutoModRule AutoModRule} changes.
+     */
+    AUTO_MODERATION_CONFIGURATION(20),
+
+    /**
+     * Events related to {@link net.dv8tion.jda.api.entities.automod.AutoModResponse AutoModResponse} triggers.
+     */
+    AUTO_MODERATION_EXECUTION(21),
+
+    /**
+     * Events for poll votes in {@link net.dv8tion.jda.api.entities.Guild Guilds}.
+     */
+    GUILD_MESSAGE_POLLS(24),
+
+    /**
+     * Events for poll votes in {@link net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel PrivateChannels}.
+     */
+    DIRECT_MESSAGE_POLLS(25),
     ;
 
     /**
@@ -164,6 +210,7 @@ public enum GatewayIntent
      * <ul>
      *     <li>GUILD_MEMBERS (because its privileged)</li>
      *     <li>GUILD_PRESENCES (because its privileged)</li>
+     *     <li>MESSAGE_CONTENT (because its privileged)</li>
      *     <li>GUILD_WEBHOOKS because its not useful for most bots</li>
      *     <li>GUILD_MESSAGE_TYPING because its not useful for most bots</li>
      *     <li>DIRECT_MESSAGE_TYPING because its not useful for most bots</li>
@@ -174,13 +221,19 @@ public enum GatewayIntent
      * You can further configure intents by using {@link net.dv8tion.jda.api.JDABuilder#enableIntents(GatewayIntent, GatewayIntent...) enableIntents(intents)}
      * and {@link net.dv8tion.jda.api.JDABuilder#disableIntents(GatewayIntent, GatewayIntent...) disableIntents(intents)}.
      */
-    public static final int DEFAULT = ALL_INTENTS & ~getRaw(GUILD_MEMBERS, GUILD_PRESENCES, GUILD_WEBHOOKS, GUILD_MESSAGE_TYPING, DIRECT_MESSAGE_TYPING);
+    public static final int DEFAULT = ALL_INTENTS
+            & ~getRaw(
+                    GUILD_MEMBERS,
+                    GUILD_PRESENCES,
+                    MESSAGE_CONTENT,
+                    GUILD_WEBHOOKS,
+                    GUILD_MESSAGE_TYPING,
+                    DIRECT_MESSAGE_TYPING);
 
     private final int rawValue;
     private final int offset;
 
-    GatewayIntent(int offset)
-    {
+    GatewayIntent(int offset) {
         this.offset = offset;
         this.rawValue = 1 << offset;
     }
@@ -190,8 +243,7 @@ public enum GatewayIntent
      *
      * @return The raw bitmask value
      */
-    public int getRawValue()
-    {
+    public int getRawValue() {
         return rawValue;
     }
 
@@ -201,8 +253,7 @@ public enum GatewayIntent
      *
      * @return The offset
      */
-    public int getOffset()
-    {
+    public int getOffset() {
         return offset;
     }
 
@@ -215,13 +266,12 @@ public enum GatewayIntent
      * @return {@link EnumSet} of intents
      */
     @Nonnull
-    public static EnumSet<GatewayIntent> getIntents(int raw)
-    {
+    public static EnumSet<GatewayIntent> getIntents(int raw) {
         EnumSet<GatewayIntent> set = EnumSet.noneOf(GatewayIntent.class);
-        for (GatewayIntent intent : values())
-        {
-            if ((intent.getRawValue() & raw) != 0)
+        for (GatewayIntent intent : values()) {
+            if ((intent.getRawValue() & raw) != 0) {
                 set.add(intent);
+            }
         }
         return set;
     }
@@ -237,11 +287,11 @@ public enum GatewayIntent
      *
      * @return The bitmask for this set of intents
      */
-    public static int getRaw(@Nonnull Collection<GatewayIntent> set)
-    {
+    public static int getRaw(@Nonnull Collection<GatewayIntent> set) {
         int raw = 0;
-        for (GatewayIntent intent : set)
+        for (GatewayIntent intent : set) {
             raw |= intent.rawValue;
+        }
         return raw;
     }
 
@@ -258,10 +308,9 @@ public enum GatewayIntent
      *
      * @return The bitmask for this set of intents
      */
-    public static int getRaw(@Nonnull GatewayIntent intent, @Nonnull GatewayIntent... set)
-    {
+    public static int getRaw(@Nonnull GatewayIntent intent, @Nonnull GatewayIntent... set) {
         Checks.notNull(intent, "Intent");
-        Checks.notNull(set,    "Intent");
+        Checks.notNull(set, "Intent");
         return getRaw(EnumSet.of(intent, set));
     }
 
@@ -280,8 +329,7 @@ public enum GatewayIntent
      * @return {@link EnumSet} for the required intents
      */
     @Nonnull
-    public static EnumSet<GatewayIntent> fromCacheFlags(@Nonnull CacheFlag flag, @Nonnull CacheFlag... other)
-    {
+    public static EnumSet<GatewayIntent> fromCacheFlags(@Nonnull CacheFlag flag, @Nonnull CacheFlag... other) {
         Checks.notNull(flag, "CacheFlag");
         Checks.noneNull(other, "CacheFlag");
         return fromCacheFlags(EnumSet.of(flag, other));
@@ -300,15 +348,14 @@ public enum GatewayIntent
      * @return {@link EnumSet} for the required intents
      */
     @Nonnull
-    public static EnumSet<GatewayIntent> fromCacheFlags(@Nonnull Collection<CacheFlag> flags)
-    {
+    public static EnumSet<GatewayIntent> fromCacheFlags(@Nonnull Collection<CacheFlag> flags) {
         EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
-        for (CacheFlag flag : flags)
-        {
+        for (CacheFlag flag : flags) {
             Checks.notNull(flag, "CacheFlag");
             GatewayIntent intent = flag.getRequiredIntent();
-            if (intent != null)
+            if (intent != null) {
                 intents.add(intent);
+            }
         }
 
         return intents;
@@ -327,8 +374,7 @@ public enum GatewayIntent
      */
     @Nonnull
     @SafeVarargs
-    public static EnumSet<GatewayIntent> fromEvents(@Nonnull Class<? extends GenericEvent>... events)
-    {
+    public static EnumSet<GatewayIntent> fromEvents(@Nonnull Class<? extends GenericEvent>... events) {
         Checks.noneNull(events, "Event");
         return fromEvents(Arrays.asList(events));
     }
@@ -345,45 +391,43 @@ public enum GatewayIntent
      * @return {@link EnumSet} for the required intents
      */
     @Nonnull
-    public static EnumSet<GatewayIntent> fromEvents(@Nonnull Collection<Class<? extends GenericEvent>> events)
-    {
+    public static EnumSet<GatewayIntent> fromEvents(@Nonnull Collection<Class<? extends GenericEvent>> events) {
         EnumSet<GatewayIntent> intents = EnumSet.noneOf(GatewayIntent.class);
-        for (Class<? extends GenericEvent> event : events)
-        {
+        for (Class<? extends GenericEvent> event : events) {
             Checks.notNull(event, "Event");
 
-            if (GenericUserPresenceEvent.class.isAssignableFrom(event))
+            if (GenericUserPresenceEvent.class.isAssignableFrom(event)) {
                 intents.add(GUILD_PRESENCES);
-            else if (GenericUserUpdateEvent.class.isAssignableFrom(event) || GenericGuildMemberEvent.class.isAssignableFrom(event) || GuildMemberRemoveEvent.class.isAssignableFrom(event))
+            } else if (GenericUserUpdateEvent.class.isAssignableFrom(event)
+                    || GenericGuildMemberEvent.class.isAssignableFrom(event)
+                    || GuildMemberRemoveEvent.class.isAssignableFrom(event)) {
                 intents.add(GUILD_MEMBERS);
-
-            else if (GuildBanEvent.class.isAssignableFrom(event) || GuildUnbanEvent.class.isAssignableFrom(event))
-                intents.add(GUILD_BANS);
-            else if (GenericEmoteEvent.class.isAssignableFrom(event))
-                intents.add(GUILD_EMOJIS);
-            else if (GenericGuildInviteEvent.class.isAssignableFrom(event))
+            } else if (GuildBanEvent.class.isAssignableFrom(event)
+                    || GuildUnbanEvent.class.isAssignableFrom(event)
+                    || GuildAuditLogEntryCreateEvent.class.isAssignableFrom(event)) {
+                intents.add(GUILD_MODERATION);
+            } else if (GenericEmojiEvent.class.isAssignableFrom(event)
+                    || GenericGuildStickerEvent.class.isAssignableFrom(event)) {
+                intents.add(GUILD_EXPRESSIONS);
+            } else if (GenericScheduledEventUpdateEvent.class.isAssignableFrom(event)) {
+                intents.add(SCHEDULED_EVENTS);
+            } else if (GenericGuildInviteEvent.class.isAssignableFrom(event)) {
                 intents.add(GUILD_INVITES);
-            else if (GenericGuildVoiceEvent.class.isAssignableFrom(event))
+            } else if (GenericGuildVoiceEvent.class.isAssignableFrom(event)) {
                 intents.add(GUILD_VOICE_STATES);
-
-            else if (GenericGuildMessageReactionEvent.class.isAssignableFrom(event))
-                intents.add(GUILD_MESSAGE_REACTIONS);
-            else if (GenericGuildMessageEvent.class.isAssignableFrom(event) || MessageBulkDeleteEvent.class.isAssignableFrom(event))
+            } else if (MessageBulkDeleteEvent.class.isAssignableFrom(event)) {
                 intents.add(GUILD_MESSAGES);
-
-            else if (GenericPrivateMessageReactionEvent.class.isAssignableFrom(event))
-                intents.add(DIRECT_MESSAGE_REACTIONS);
-            else if (GenericPrivateMessageEvent.class.isAssignableFrom(event))
-                intents.add(DIRECT_MESSAGES);
-
-            else if (GenericMessageReactionEvent.class.isAssignableFrom(event))
+            } else if (GenericMessageReactionEvent.class.isAssignableFrom(event)) {
                 Collections.addAll(intents, GUILD_MESSAGE_REACTIONS, DIRECT_MESSAGE_REACTIONS);
-
-            else if (GenericMessageEvent.class.isAssignableFrom(event))
+            } else if (GenericMessageEvent.class.isAssignableFrom(event)) {
                 Collections.addAll(intents, GUILD_MESSAGES, DIRECT_MESSAGES);
-
-            else if (UserTypingEvent.class.isAssignableFrom(event))
+            } else if (UserTypingEvent.class.isAssignableFrom(event)) {
                 Collections.addAll(intents, GUILD_MESSAGE_TYPING, DIRECT_MESSAGE_TYPING);
+            } else if (AutoModExecutionEvent.class.isAssignableFrom(event)) {
+                intents.add(AUTO_MODERATION_EXECUTION);
+            } else if (GenericAutoModRuleEvent.class.isAssignableFrom(event)) {
+                intents.add(AUTO_MODERATION_CONFIGURATION);
+            }
         }
         return intents;
     }
@@ -402,8 +446,8 @@ public enum GatewayIntent
      * @return {@link EnumSet} for the required intents
      */
     @Nonnull
-    public static EnumSet<GatewayIntent> from(@Nonnull Collection<Class<? extends GenericEvent>> events, @Nonnull Collection<CacheFlag> flags)
-    {
+    public static EnumSet<GatewayIntent> from(
+            @Nonnull Collection<Class<? extends GenericEvent>> events, @Nonnull Collection<CacheFlag> flags) {
         EnumSet<GatewayIntent> intents = fromEvents(events);
         intents.addAll(fromCacheFlags(flags));
         return intents;

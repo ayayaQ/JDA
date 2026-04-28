@@ -13,27 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package net.dv8tion.jda.api.entities;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
 import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
-import net.dv8tion.jda.api.exceptions.MissingAccessException;
 import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.requests.CompletedRestAction;
 import net.dv8tion.jda.internal.requests.RestActionImpl;
-import net.dv8tion.jda.internal.requests.Route;
+import net.dv8tion.jda.internal.utils.Checks;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * An object representing a reference in a Discord message.
+ *
  * @see Message#getMessageReference()
  */
-public class MessageReference
-{
+public class MessageReference {
+    private final int type;
     private final long messageId;
     private final long channelId;
     private final long guildId;
@@ -43,17 +50,19 @@ public class MessageReference
     private final Guild guild;
     private Message referencedMessage;
 
-    public MessageReference(long messageId, long channelId, long guildId, @Nullable Message referencedMessage, JDA api)
-    {
+    public MessageReference(
+            int type, long messageId, long channelId, long guildId, @Nullable Message referencedMessage, JDA api) {
+        this.type = type;
         this.messageId = messageId;
         this.channelId = channelId;
         this.guildId = guildId;
         this.referencedMessage = referencedMessage;
 
-        if (guildId == 0L)
+        if (guildId == 0L) {
             this.channel = api.getPrivateChannelById(channelId);
-        else
-            this.channel = (MessageChannel) api.getGuildChannelById(channelId);
+        } else {
+            this.channel = api.getChannelById(MessageChannel.class, channelId);
+        }
 
         this.guild = api.getGuildById(guildId); // is null if guildId = 0 anyway
 
@@ -68,12 +77,12 @@ public class MessageReference
      * <ul>
      *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#MISSING_ACCESS MISSING_ACCESS}
      *     <br>The request was attempted after the account lost access to the {@link net.dv8tion.jda.api.entities.Guild Guild}
-     *         typically due to being kicked or removed, or after {@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ}
-     *         was revoked in the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}</li>
+     *         typically due to being kicked or removed, or after {@link net.dv8tion.jda.api.Permission#VIEW_CHANNEL Permission.VIEW_CHANNEL}
+     *         was revoked in the {@link TextChannel TextChannel}</li>
      *
      *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#MISSING_PERMISSIONS MISSING_PERMISSIONS}
      *     <br>The request was attempted after the account lost {@link net.dv8tion.jda.api.Permission#MESSAGE_HISTORY Permission.MESSAGE_HISTORY}
-     *         in the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}.</li>
+     *         in the {@link TextChannel TextChannel}.</li>
      *
      *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_MESSAGE UNKNOWN_MESSAGE}
      *     <br>The message has already been deleted.</li>
@@ -83,20 +92,20 @@ public class MessageReference
      * </ul>
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
-     *         If this reference refers to a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} and the logged in account does not have
+     *         If this reference refers to a {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel GuildChannel} and the logged in account does not have
      *         <ul>
-     *             <li>{@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ}</li>
+     *             <li>{@link net.dv8tion.jda.api.Permission#VIEW_CHANNEL Permission.VIEW_CHANNEL}</li>
+     *             <li>{@link net.dv8tion.jda.api.Permission#VOICE_CONNECT Permission.VOICE_CONNECT} (applicable if {@code getChannel().getType().isAudio()})</li>
      *             <li>{@link net.dv8tion.jda.api.Permission#MESSAGE_HISTORY Permission.MESSAGE_HISTORY}</li>
      *         </ul>
-     *
      * @throws java.lang.IllegalStateException
      *         If this message reference does not have a channel
      *
      * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.Message}
      */
     @Nonnull
-    public RestAction<Message> resolve()
-    {
+    @CheckReturnValue
+    public RestAction<Message> resolve() {
         return resolve(true);
     }
 
@@ -108,12 +117,12 @@ public class MessageReference
      * <ul>
      *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#MISSING_ACCESS MISSING_ACCESS}
      *     <br>The request was attempted after the account lost access to the {@link net.dv8tion.jda.api.entities.Guild Guild}
-     *         typically due to being kicked or removed, or after {@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ}
-     *         was revoked in the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}</li>
+     *         typically due to being kicked or removed, or after {@link net.dv8tion.jda.api.Permission#VIEW_CHANNEL Permission.VIEW_CHANNEL}
+     *         was revoked in the {@link TextChannel TextChannel}</li>
      *
      *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#MISSING_PERMISSIONS MISSING_PERMISSIONS}
      *     <br>The request was attempted after the account lost {@link net.dv8tion.jda.api.Permission#MESSAGE_HISTORY Permission.MESSAGE_HISTORY}
-     *         in the {@link net.dv8tion.jda.api.entities.TextChannel TextChannel}.</li>
+     *         in the {@link TextChannel TextChannel}.</li>
      *
      *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_MESSAGE UNKNOWN_MESSAGE}
      *     <br>The message has already been deleted.</li>
@@ -126,35 +135,40 @@ public class MessageReference
      *         Whether to update the already stored message
      *
      * @throws net.dv8tion.jda.api.exceptions.InsufficientPermissionException
-     *         If this reference refers to a {@link net.dv8tion.jda.api.entities.TextChannel TextChannel} and the logged in account does not have
+     *         If this reference refers to a {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel GuildChannel} and the logged in account does not have
      *         <ul>
-     *             <li>{@link net.dv8tion.jda.api.Permission#MESSAGE_READ Permission.MESSAGE_READ}</li>
+     *             <li>{@link net.dv8tion.jda.api.Permission#VIEW_CHANNEL Permission.VIEW_CHANNEL}</li>
+     *             <li>{@link net.dv8tion.jda.api.Permission#VOICE_CONNECT Permission.VOICE_CONNECT} (applicable if {@code getChannel().getType().isAudio()})</li>
      *             <li>{@link net.dv8tion.jda.api.Permission#MESSAGE_HISTORY Permission.MESSAGE_HISTORY}</li>
      *         </ul>
-     *
      * @throws java.lang.IllegalStateException
      *         If this message reference does not have a channel
      *
      * @return {@link net.dv8tion.jda.api.requests.RestAction RestAction} - Type: {@link net.dv8tion.jda.api.entities.Message}
      */
     @Nonnull
-    public RestAction<Message> resolve(boolean update)
-    {
-        checkPermission(Permission.MESSAGE_READ);
+    @CheckReturnValue
+    public RestAction<Message> resolve(boolean update) {
+        checkPermission(Permission.VIEW_CHANNEL);
         checkPermission(Permission.MESSAGE_HISTORY);
 
-        if (channel == null)
+        if (channel == null) {
             throw new IllegalStateException("Cannot resolve a message without a channel present.");
+        }
 
         JDAImpl jda = (JDAImpl) getJDA();
         Message referenced = getMessage();
 
-        if (referenced != null && !update)
+        if (referenced != null && !update) {
             return new CompletedRestAction<>(jda, referenced);
+        }
 
         Route.CompiledRoute route = Route.Messages.GET_MESSAGE.compile(getChannelId(), getMessageId());
         return new RestActionImpl<>(jda, route, (response, request) -> {
-            Message created = jda.getEntityBuilder().createMessage(response.getObject(), getChannel(), false);
+            // channel can be null for MessageReferences,
+            // but we've already checked for that above,
+            // so it is nonnull here
+            Message created = jda.getEntityBuilder().createMessageWithChannel(response.getObject(), channel, false);
             this.referencedMessage = created;
             return created;
         });
@@ -172,8 +186,7 @@ public class MessageReference
      * @see    #resolve()
      */
     @Nullable
-    public Message getMessage()
-    {
+    public Message getMessage() {
         return referencedMessage;
     }
 
@@ -186,11 +199,9 @@ public class MessageReference
      * @see    #getChannelId()
      */
     @Nullable
-    public MessageChannel getChannel()
-    {
-        return channel;
+    public MessageChannelUnion getChannel() {
+        return (MessageChannelUnion) channel;
     }
-
 
     /**
      * The guild for this reference.
@@ -201,9 +212,27 @@ public class MessageReference
      * @see    #getGuildId()
      */
     @Nullable
-    public Guild getGuild()
-    {
+    public Guild getGuild() {
         return guild;
+    }
+
+    /**
+     * The message reference type id
+     *
+     * @return The raw type id
+     */
+    public int getTypeRaw() {
+        return type;
+    }
+
+    /**
+     * The type of this message reference
+     *
+     * @return The {@link MessageReferenceType} or {@link MessageReferenceType#UNKNOWN}
+     */
+    @Nonnull
+    public MessageReferenceType getType() {
+        return MessageReferenceType.fromId(type);
     }
 
     /**
@@ -211,8 +240,7 @@ public class MessageReference
      *
      * @return The message id, or 0.
      */
-    public long getMessageIdLong()
-    {
+    public long getMessageIdLong() {
         return messageId;
     }
 
@@ -221,8 +249,7 @@ public class MessageReference
      *
      * @return The channel id, or 0.
      */
-    public long getChannelIdLong()
-    {
+    public long getChannelIdLong() {
         return channelId;
     }
 
@@ -231,8 +258,7 @@ public class MessageReference
      *
      * @return The guild id, or 0.
      */
-    public long getGuildIdLong()
-    {
+    public long getGuildIdLong() {
         return guildId;
     }
 
@@ -242,8 +268,7 @@ public class MessageReference
      * @return The message id, or 0.
      */
     @Nonnull
-    public String getMessageId()
-    {
+    public String getMessageId() {
         return Long.toUnsignedString(getMessageIdLong());
     }
 
@@ -253,8 +278,7 @@ public class MessageReference
      * @return The channel id, or 0.
      */
     @Nonnull
-    public String getChannelId()
-    {
+    public String getChannelId() {
         return Long.toUnsignedString(getChannelIdLong());
     }
 
@@ -264,8 +288,7 @@ public class MessageReference
      * @return The guild id, or 0.
      */
     @Nonnull
-    public String getGuildId()
-    {
+    public String getGuildId() {
         return Long.toUnsignedString(getGuildIdLong());
     }
 
@@ -275,21 +298,66 @@ public class MessageReference
      * @return The corresponding JDA instance
      */
     @Nonnull
-    public JDA getJDA()
-    {
+    public JDA getJDA() {
         return api;
     }
 
-    private void checkPermission(Permission permission)
-    {
-        if (guild == null || !(channel instanceof GuildChannel)) return;
+    private void checkPermission(Permission permission) {
+        if (guild == null || !(channel instanceof GuildChannel)) {
+            return;
+        }
 
         Member selfMember = guild.getSelfMember();
         GuildChannel guildChannel = (GuildChannel) channel;
 
-        if (!selfMember.hasAccess(guildChannel))
-            throw new MissingAccessException(guildChannel, Permission.VIEW_CHANNEL);
-        if (!selfMember.hasPermission(guildChannel, permission))
+        Checks.checkAccess(selfMember, guildChannel);
+        if (!selfMember.hasPermission(guildChannel, permission)) {
             throw new InsufficientPermissionException(guildChannel, permission);
+        }
+    }
+
+    /**
+     * The type of message reference
+     */
+    public enum MessageReferenceType {
+        /** This message reference indicates a replied to message */
+        DEFAULT(0),
+        /** This message reference indicates a forwarded message */
+        FORWARD(1),
+
+        UNKNOWN(-1);
+
+        private final int id;
+
+        MessageReferenceType(int id) {
+            this.id = id;
+        }
+
+        /**
+         * Convert the raw type id to the message reference type enum
+         *
+         * @param  id
+         *         Raw type id
+         *
+         * @return Enum constant of the reference type or {@link #UNKNOWN}
+         */
+        @Nonnull
+        public static MessageReferenceType fromId(int id) {
+            for (MessageReferenceType type : values()) {
+                if (type.id == id) {
+                    return type;
+                }
+            }
+            return UNKNOWN;
+        }
+
+        /**
+         * The raw type id used in the API.
+         *
+         * @return The raw type id
+         */
+        public int getId() {
+            return id;
+        }
     }
 }
